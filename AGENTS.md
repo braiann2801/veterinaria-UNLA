@@ -23,42 +23,61 @@
 
 ---
 
-## 3. Dinámica de Trabajo y Roles de Agentes
+## 3. Directivas de UI/UX y Diseño Responsive (Mobile-First)
+
+Todo desarrollo en el frontend debe cumplir estrictamente con los siguientes estándares de adaptabilidad:
+
+1. **Enfoque Mobile-First:** Diseñar y estructurar los layouts pensando primero en pantallas reducidas (`viewport < 640px`) y escalar progresivamente hacia tablets y desktops usando prefijos de Tailwind (`sm:`, `md:`, `lg:`, `xl:`).
+2. **Navegación Móvil:**
+   - En pantallas móviles (`< md`), la barra lateral de navegación debe colapsarse en un menú hamburguesa o menú inferior accesible con el pulgar (*bottom navigation bar*).
+   - En escritorio (`>= md`), mostrar la barra lateral fija o expandible.
+3. **Tablas de Datos y Grillas:**
+   - Evitar el desbordamiento horizontal (*horizontal scroll*) en páginas completas.
+   - En celulares, las tablas densas (turnos, historial clínico, pacientes) deben transformarse en tarjetas individuales (*cards* apiladas) o encapsularse en contenedores con scroll horizontal localizado (`overflow-x-auto`).
+4. **Formularios e Inputs Táctiles:**
+   - Los campos de entrada y botones deben tener un área mínima de toque de 44x44 px (`min-h-[44px]`) para facilitar la interacción táctil.
+   - Modales y diálogos (`shadcn/ui Sheet` o `Dialog`) deben ocupar el ancho completo o adaptarse como paneles inferiores deslizantes (*bottom sheets*) en pantallas pequeñas.
+
+---
+
+## 4. Dinámica de Trabajo y Roles de Agentes
 
 El flujo de trabajo sigue una arquitectura de agentes especializados con división de responsabilidades:
-### 3.1. Agente Orquestador (Team Lead)
+
+### 4.1. Agente Orquestador (Team Lead)
 - **Función:** Descompone las épicas en tareas atómicas, coordina la interacción entre agentes y evita el desborde de ventana de contexto delegando tareas operativas.
 - **Memoria de Ejecución:** No almacena historiales extensos en memoria; consulta y actualiza el archivo `PROGRESS.md` al inicio y fin de cada tarea.
 - **Gobernanza sobre `AGENTS.md`:** 
   - Solo puede sugerir cambios a este archivo ante dependencias no previstas o refactorizaciones estructurales.
   - **REGLA CRÍTICA:** Queda estrictamente prohibido sobreescribir `AGENTS.md` de forma autónoma. Debe presentar la propuesta de cambio en formato *diff* y esperar la confirmación explícita del usuario (`braiann2801`) antes de aplicar cualquier edición.
 
-### 3.2. Agente Implementador (Code Writer)
-- **Función:** Escribe el código en Next.js (migración de mockData a llamadas `fetch`) o en Spring Boot (entidades, repositorios, servicios y controladores).
+### 4.2. Agente Implementador (Code Writer)
+- **Función:** Escribe el código en Next.js (migración de mockData a llamadas `fetch` y vistas responsive) o en Spring Boot (entidades, repositorios, servicios y controladores).
 - **Alcance:** Solo modifica los archivos necesarios para la tarea puntual asignada por el Orquestador. No toca archivos ajenos al alcance de la tarea.
 - **Restricción:** No puede commitear cambios si el Agente Revisor no aprobó la solución o si falla el script de tests.
 
-### 3.3. Agente Revisor (Code Reviewer)
+### 4.3. Agente Revisor (Code Reviewer)
 - **Función:** Inspecciona el código generado por el Implementador antes de darlo por listo.
 - **Criterios de Aprobación:**
   - Código desacoplado, escalable y con nombres semánticos.
+  - Verificación de diseño responsive y usabilidad en pantallas móviles (sin rupturas de layout ni scrolls no deseados).
   - Arquitectura en capas estricta en Spring Boot (`Controller` -> `Service` -> `Repository`).
   - Uso de DTOs para evitar ciclos infinitos de serialización Jackson en relaciones bidireccionales ($N:M$).
   - Manejo de errores controlados (`try/catch`, respuestas HTTP semánticas `400`, `404`, `409`, `500`).
   - Componentes de React sin fugas de memoria y con manejo de estados de carga (`loading`) y error.
 
-### 3.4. Agente Test Harness (`init.sh`)
+### 4.4. Agente Test Harness (`test-harness.ps1` / `init.sh`)
 - **Función:** Barrera de control automatizada (*Quality Gate*).
 - **Comportamiento:** Si alguna prueba o verificación de compilación falla, el flujo se detiene por completo: **no se aplican cambios, no se hace commit y se emite un reporte inmediato de error**.
 
 ---
 
-## 4. Harness de Pruebas Automatizadas (`init.sh`)
+## 5. Harness de Pruebas Automatizadas
 
-El archivo `init.sh` (o `test-harness.ps1` en Windows) debe validar los siguientes puntos en cada ciclo de integración:
+El archivo `test-harness.ps1` (o `init.sh` en Linux/macOS) debe validar los siguientes puntos en cada ciclo de integración:
 
 1. **Frontend Integrity:** Compilación limpia de Next.js (`npm run build` o chequeo de tipos con `tsc --noEmit`).
-2. **Backend Unit & Domain Tests:** Ejecución de suites de prueba (`mvn test`):
+2. **Backend Unit & Domain Tests:** Ejecución de suites de prueba (`mvn test` / `mvnw.cmd test`):
    - Prueba unitaria de rechazo de reserva cuando cupo sea igual a 10.
    - Prueba de validación de turnos (intervalo mínimo de 15 minutos).
    - Prueba de autorización de retiro por cotutor.
@@ -66,7 +85,7 @@ El archivo `init.sh` (o `test-harness.ps1` en Windows) debe validar los siguient
 
 ---
 
-## 5. Protocolo de Persistencia de Contexto (`PROGRESS.md`)
+## 6. Protocolo de Persistencia de Contexto (`PROGRESS.md`)
 
 Para mantener el consumo de tokens bajo control y permitir retomar el trabajo en cualquier momento, se mantiene un log estructurado en `PROGRESS.md`:
 
@@ -79,8 +98,9 @@ Para mantener el consumo de tokens bajo control y permitir retomar el trabajo en
 - Bloqueantes: [Ninguno / Detalle del error]
 
 ## Tareas Completadas
-- [x] [Fecha] - Setup inicial repositorio y frontend base v0.
-- [x] [Fecha] - Configuración de AGENTS.md y reglas de gobernanza.
+- [x] Setup inicial repositorio y frontend base v0.
+- [x] Configuración de AGENTS.md y reglas de gobernanza.
+- [x] Pipeline local validado (XAMPP + Next.js + test-harness.ps1).
 
 ## Registro de Cambios Técnicos
 - [Commit Hash / Archivo modificado]: [Breve justificación del cambio]
