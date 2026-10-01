@@ -39,7 +39,9 @@ public record MascotaRequestDTO(
 		@Positive(message = "El peso debe ser mayor a 0")
 		BigDecimal pesoKg,
 
-		@Pattern(regexp = "^(normal|gruñe|grune|muerde|miedoso)$",
+		// Acepta las dos grafias porque el enum de la base es ASCII (GRUNE) y el
+		// cliente usa la palabra acentuada; el mapper normaliza a una sola.
+		@Pattern(regexp = "^(normal|grune|gruñe|muerde|miedoso)$",
 				message = "La conducta debe ser normal, gruñe, muerde o miedoso")
 		String conducta,
 

@@ -14,11 +14,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.VinculoRequestDTO;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
+import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.TutorService;
 
 import jakarta.validation.Valid;
@@ -26,17 +28,20 @@ import jakarta.validation.Valid;
 /**
  * API REST de tutores.
  *
- * <p>El controller no toca repositorios: solo consume {@link TutorService},
- * que es quien administra las transacciones y traduce entidades a DTOs.</p>
+ * <p>El controller no toca repositorios: solo consume {@link TutorService} y
+ * {@link ComandaCobroService}, que son los que administran las transacciones y
+ * traducen entidades a DTOs.</p>
  */
 @RestController
 @RequestMapping("/api/v1/tutores")
 public class TutorController {
 
 	private final TutorService tutorService;
+	private final ComandaCobroService comandaService;
 
-	public TutorController(TutorService tutorService) {
+	public TutorController(TutorService tutorService, ComandaCobroService comandaService) {
 		this.tutorService = tutorService;
+		this.comandaService = comandaService;
 	}
 
 	/** GET /api/v1/tutores */
@@ -101,6 +106,22 @@ public class TutorController {
 	public ResponseEntity<Void> desvincular(@PathVariable Long tutorId, @PathVariable Long mascotaId) {
 		tutorService.desvincularMascota(tutorId, mascotaId);
 		return ResponseEntity.noContent().build();
+	}
+
+	/**
+	 * GET /api/v1/tutores/{tutorId}/deuda
+	 *
+	 * <p>Estado consolidado de morosidad: {@code tieneDeuda} y {@code totalDeuda}
+	 * con el detalle de las comandas que lo componen (regla 2.5). Es lo que
+	 * dispara la alerta visual antes de un egreso de guarderia.</p>
+	 *
+	 * <p>El endpoint vive bajo {@code /tutores} y no bajo {@code /comandas} a
+	 * proposito: la pregunta que hace el mostrador es "este tutor puede
+	 * llevarse a la mascota", no "estas son las comandas de la persona".</p>
+	 */
+	@GetMapping("/{tutorId}/deuda")
+	public ResponseEntity<DeudaTutorResponseDTO> consultarDeuda(@PathVariable Long tutorId) {
+		return ResponseEntity.ok(comandaService.consultarDeuda(tutorId));
 	}
 
 	private Boolean resolverFlag(Boolean queryParam, VinculoRequestDTO body) {

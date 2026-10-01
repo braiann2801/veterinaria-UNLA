@@ -167,6 +167,10 @@ public class EntityMapper {
 	/**
 	 * Traduce la conducta de la API (con ñ) al valor ASCII persistido.
 	 * El enum JPA usa GRUNE a proposito, ver {@link Mascota.Conducta}.
+	 *
+	 * <p>La API habla {@code "gruñe"} y la base guarda {@code GRUNE}: el
+	 * frontend y este metodo comparten ese valor, y separarlos exigiria un
+	 * diccionario de traduccion que solo existe para una palabra.</p>
 	 */
 	public static String conductaToApi(Mascota.Conducta conducta) {
 		if (conducta == null) {
@@ -184,8 +188,12 @@ public class EntityMapper {
 		if (conducta == null || conducta.isBlank()) {
 			return null;
 		}
+		// Se aceptan las dos grafias (grune y gruñe) porque el cliente puede
+		 // venir de una carga manual y no vale la pena rechazar una ficha por
+		//  una tilde. El enum de la base es ASCII, asi que se compara ya
+		//  normalizado en mayusculas.
 		String normalizado = conducta.trim().toUpperCase();
-		if ("GRUÑE".equals(normalizado) || "GRUÑE".equalsIgnoreCase(conducta.trim())) {
+		if ("GRUÑE".equals(normalizado)) {
 			return Mascota.Conducta.GRUNE;
 		}
 		return Mascota.Conducta.valueOf(normalizado);
