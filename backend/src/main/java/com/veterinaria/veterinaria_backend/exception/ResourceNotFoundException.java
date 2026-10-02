@@ -15,6 +15,10 @@ public class ResourceNotFoundException extends RuntimeException {
 		return new ResourceNotFoundException("No existe un tutor con id " + id);
 	}
 
+	public static ResourceNotFoundException tutorPorDni(String dni) {
+		return new ResourceNotFoundException("No existe un tutor con DNI " + dni);
+	}
+
 	public static ResourceNotFoundException mascota(Long id) {
 		return new ResourceNotFoundException("No existe una mascota con id " + id);
 	}

@@ -9,6 +9,9 @@ __v0_jsx-dev-runtime.ts
 # Environment variables
 .env*.local
 
+# Cache de tipos que genera `tsc --noEmit` (primer paso del test-harness)
+tsconfig.tsbuildinfo
+
 # Common ignores
 node_modules
 .next/

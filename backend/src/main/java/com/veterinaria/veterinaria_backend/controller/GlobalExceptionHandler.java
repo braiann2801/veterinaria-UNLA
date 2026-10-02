@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.veterinaria.veterinaria_backend.exception.ApiErrorResponse;
@@ -88,6 +89,22 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 				.body(ApiErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Bad Request",
 						"La peticion no pudo interpretarse: " + ex.getMessage(),
+						request.getRequestURI()));
+	}
+
+	/**
+	 * 400: falta un query param obligatorio.
+	 *
+	 * <p>Sin este handler, omitir un parametro required devolvia 500. No es solo
+	 * una cuestion de status: un 500 hace pensar al operador que el servidor esta
+	 * roto, cuando lo que paso es que el formulario no envio el campo.</p>
+	 */
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	public ResponseEntity<ApiErrorResponse> handleMissingParam(MissingServletRequestParameterException ex,
+			HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Bad Request",
+						"Falta el parametro obligatorio '" + ex.getParameterName() + "'",
 						request.getRequestURI()));
 	}
 

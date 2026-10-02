@@ -35,8 +35,8 @@ export function TopBar({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por DNI del dueño, teléfono o nombre del perro"
-          className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-ring"
+          placeholder="Buscar por DNI, teléfono o nombre"
+          className="min-h-[44px] w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-ring"
         />
         {matches.length > 0 && (
           <ul className="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
@@ -70,11 +70,14 @@ export function TopBar({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Usuario</span>
+        <label htmlFor="selector-rol" className="hidden text-xs text-muted-foreground sm:inline">
+          Usuario
+        </label>
         <select
+          id="selector-rol"
           value={role}
           onChange={(e) => setRole(e.target.value as Role)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-ring"
+          className="min-h-[44px] rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-ring"
         >
           {(Object.keys(roleLabels) as Role[]).map((r) => (
             <option key={r} value={r}>
