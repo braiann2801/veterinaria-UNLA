@@ -22,6 +22,7 @@ import { FichaMedica } from "@/components/modules/ficha"
 import { Fichas } from "@/components/modules/fichas"
 import { Mostrador } from "@/components/modules/mostrador"
 import { Padron } from "@/components/modules/padron"
+import { Profesionales } from "@/components/modules/profesionales"
 import { Panel } from "@/components/ui/field"
 
 function Shell() {
@@ -49,9 +50,18 @@ function Shell() {
         <main className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4 lg:p-6">
           <div className="mx-auto max-w-5xl">
             {active === "mostrador" && (
-              <AvisoDemo titulo="Mostrador" texto="Pantalla de demostración de TASK-001. Los módulos conectados a la API real están en Agenda, Padrón, Ficha médica, Caja y Egreso." />
+              <div className="flex flex-col gap-4">
+                <AvisoDemo
+                  titulo="Mostrador"
+                  texto="El padrón de profesionales y el resumen de la jornada leen la base real. El alta de tutores y mascotas está en Padrón; el movimiento clínico y de caja, en Agenda, Ficha médica, Caja y Egreso."
+                />
+                <Mostrador />
+                {/* El padron de profesionales va en el mostrador porque es la
+                    pantalla donde se da de alta a quien atiende, no un modulo
+                    de consulta. */}
+                <Profesionales />
+              </div>
             )}
-            {active === "mostrador" && <Mostrador />}
             {active === "agenda" && <Agenda />}
             {active === "padron" && <Padron />}
             {active === "consultas" && <FichaMedica />}

@@ -9,8 +9,8 @@
  * que retira y un cotutor que no.
  */
 
-import { useState } from "react"
-import { Link2, ShieldCheck, ShieldOff, UserPlus } from "lucide-react"
+import { useRef, useState } from "react"
+import { Link2, PawPrint, ShieldCheck, ShieldOff, UserPlus } from "lucide-react"
 
 import { mascotas as apiMascotas, tutores as apiTutores } from "@/lib/api"
 import type { Mascota, Tutor } from "@/lib/api"
@@ -18,25 +18,52 @@ import { useApi } from "@/lib/use-api"
 import { Panel, Select, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { AltaMascota } from "@/components/modules/alta-mascota"
 
 export function Padron() {
   const tutores = useApi<Tutor[]>(() => apiTutores.listar())
   const mascotas = useApi<Mascota[]>(() => apiMascotas.listar())
   const [seleccion, setSeleccion] = useState<Tutor | null>(null)
   const [openAlta, setOpenAlta] = useState(false)
+  const refAltaMascota = useRef<HTMLDivElement | null>(null)
+
+  /**
+   * Refresco unico de ambos listados.
+   *
+   * <p>Se recarga tambien el tutor abierto, porque los modales muestran la copia
+   * del tutor guardada en el estado: sin esto, un vinculo recien hecho no se
+   * veria hasta reabrir el modal.</p>
+   */
+  async function refrescar(tutorId?: number) {
+    await Promise.all([tutores.recargar(), mascotas.recargar()])
+    if (tutorId !== undefined) {
+      setSeleccion(await apiTutores.buscarPorId(tutorId))
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <Panel
         title="Tutores"
         action={
-          <button
-            onClick={() => setOpenAlta(true)}
-            className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-          >
-            <UserPlus className="size-3.5" aria-hidden />
-            Nuevo tutor
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() =>
+                refAltaMascota.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              className={`inline-flex items-center gap-2 rounded-md border border-border px-3 text-xs font-medium transition-colors hover:bg-muted ${TOQUE_MINIMO}`}
+            >
+              <PawPrint className="size-3.5" aria-hidden />
+              Nueva mascota
+            </button>
+            <button
+              onClick={() => setOpenAlta(true)}
+              className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+            >
+              <UserPlus className="size-3.5" aria-hidden />
+              Nuevo tutor
+            </button>
+          </div>
         }
       >
         <Recurso
@@ -118,23 +145,19 @@ export function Padron() {
         </Recurso>
       </Panel>
 
+      {/* Alta de mascota. El select de tutores se alimenta del listado real, asi
+          que si todavia no hay tutores el formulario ofrece guardarla sin vinculo
+          en lugar de fallar. */}
+      <div ref={refAltaMascota}>
+        <AltaMascota tutores={tutores.datos ?? []} onCreada={() => refrescar()} />
+      </div>
+
       {seleccion && (
         <ModalAltaTutor
           abierto={Boolean(seleccion)}
           onCerrar={() => setSeleccion(null)}
           tutor={seleccion}
-          onCambio={async () => {
-            // El modal muestra `tutor.mascotas`, que viene de la copia guardada
-            // en el estado. Recargar los listados no actualiza esa copia, asi
-            // que el vinculo recien hecho no apareceria hasta reabrir el modal.
-            // Se vuelve a pedir el tutor puntual en vez de leer `tutores.datos`:
-            // ese estado recien asignado todavia no llega a tiempo.
-            const id = seleccion?.id
-            await Promise.all([tutores.recargar(), mascotas.recargar()])
-            if (id !== undefined) {
-              setSeleccion(await apiTutores.buscarPorId(id))
-            }
-          }}
+          onCambio={() => refrescar(seleccion.id)}
         />
       )}
 
@@ -143,7 +166,7 @@ export function Padron() {
         onCerrar={() => setOpenAlta(false)}
         onCreado={async () => {
           setOpenAlta(false)
-          await tutores.recargar()
+          await refrescar()
         }}
       />
     </div>

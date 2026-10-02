@@ -8,11 +8,13 @@ import org.springframework.stereotype.Component;
 import com.veterinaria.veterinaria_backend.dto.MascotaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResumenDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.ProfesionalResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResumenDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorMascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
+import com.veterinaria.veterinaria_backend.entity.Profesional;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
 
@@ -204,6 +206,30 @@ public class EntityMapper {
 			return null;
 		}
 		return MascotaResumenDTO.Especie.valueOf(especie.name());
+	}
+
+	// --------------------------------------------------------- Profesional
+
+	public ProfesionalResponseDTO toResponse(Profesional profesional) {
+		if (profesional == null) {
+			return null;
+		}
+		return new ProfesionalResponseDTO(
+				profesional.getId(),
+				profesional.getNombre(),
+				profesional.getApellido(),
+				profesional.getNombreCompleto(),
+				profesional.getDni(),
+				profesional.getMatricula(),
+				profesional.getTelefono(),
+				profesional.isActivo());
+	}
+
+	public List<ProfesionalResponseDTO> toProfesionalResponseList(List<Profesional> profesionales) {
+		if (profesionales == null) {
+			return List.of();
+		}
+		return profesionales.stream().filter(Objects::nonNull).map(this::toResponse).toList();
 	}
 
 	// -------------------------------------------------------- TutorMascota

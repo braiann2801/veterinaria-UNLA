@@ -169,7 +169,8 @@ export interface Tutor {
 export interface Mascota {
   id: number
   nombre: string
-  especie: string
+  /** El backend emite el nombre del enum: coincide con {@link EspecieMascota}. */
+  especie: EspecieMascota
   raza: string | null
   sexo: string | null
   fechaNacimiento: string | null
@@ -185,7 +186,14 @@ export interface Profesional {
   nombre: string
   apellido: string
   nombreCompleto: string
-  matricula: string
+  /**
+   * Identificadores del profesional. Son `string` y no `number` porque la
+   * matricula es alfanumerica ("MAT-1234") y el DNI puede traer guiones.
+   * `null` cuando el profesional todavia no tramito la matricula o el DNI.
+   */
+  dni: string | null
+  matricula: string | null
+  telefono: string | null
   activo: boolean
 }
 
@@ -368,10 +376,20 @@ export const tutores = {
 
 // --------------------------------------------------------------- mascotas
 
+/**
+ * Especie segun el enum `Mascota.Especie` del backend.
+ *
+ * Se tipa como union y no como `string` a proposito: el backend deserializa
+ * `especie` contra ese enum, asi que un `"canino"` en minusculas devuelve un
+ * 400 con un mensaje que no dice nada util. Con la union, el error aparece en
+ * `tsc` y no en produccion.
+ */
+export type EspecieMascota = "CANINO" | "FELINO" | "AVE" | "ROEDOR" | "REPTIL" | "OTRO"
+
 /** Payload de alta/edición de mascota. */
 export interface MascotaInput {
   nombre: string
-  especie: string
+  especie: EspecieMascota
   raza?: string
   sexo?: "Macho" | "Hembra"
   fechaNacimiento?: string
@@ -379,6 +397,11 @@ export interface MascotaInput {
   conducta?: ConductaMascota
   chip?: string
   observaciones?: string
+  /**
+   * Tutores a vincular en la misma operacion, cada uno con su flag de retiro
+   * explicito (regla 2.4). El backend sincroniza la lista completa: lo que no
+   * este aqui queda desvinculado.
+   */
   tutores?: { tutorId: number; autorizadoRetiro: boolean }[]
 }
 
@@ -396,10 +419,24 @@ export const mascotas = {
 
 // ------------------------------------------------------------ profesionales
 
+/**
+ * Payload de alta de profesional.
+ *
+ * Solo `nombre` y `apellido` son obligatorios: el backend acepta un profesional
+ * sin matricula todavia (un auxiliar que recien se incorporo) y solo rechaza
+ * el DNI o la matricula si ya pertenecen a otro profesional.
+ */
+export interface ProfesionalInput {
+  nombre: string
+  apellido: string
+  dni?: string
+  matricula?: string
+  telefono?: string
+}
+
 export const profesionales = {
   listar: () => get<Profesional[]>("/profesionales"),
-  crear: (body: { nombre: string; apellido: string; matricula: string }) =>
-    post<Profesional>("/profesionales", body),
+  crear: (body: ProfesionalInput) => post<Profesional>("/profesionales", body),
 }
 
 // ----------------------------------------------------------------- turnos

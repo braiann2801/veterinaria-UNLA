@@ -175,13 +175,14 @@ class VentanaDesinfeccionTest {
 
 	private Long crearProfesional() {
 		ProfesionalRequestDTO request = new ProfesionalRequestDTO(
-				"Laura", "Sosa", "MAT-" + System.nanoTime());
+				"Laura", "Sosa", null, "MAT-" + System.nanoTime(), null);
 		// ProfesionalController es la via HTTP; aca se va directo al repositorio
 		// porque el test no necesita validar el endpoint de alta.
 		Profesional profesional = new Profesional();
 		profesional.setNombre(request.nombre());
 		profesional.setApellido(request.apellido());
 		profesional.setMatricula(request.matricula());
+		profesional.setTelefono(request.telefono());
 		profesional.setActivo(true);
 		Profesional guardado = profesionalRepository.save(profesional);
 		return guardado.getId();

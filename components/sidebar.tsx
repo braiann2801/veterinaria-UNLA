@@ -49,7 +49,10 @@ type TabDef = {
 export const TABS: TabDef[] = [
   { id: "mostrador", label: "Mostrador", icon: LayoutDashboard, roles: ["recepcion", "veterinario", "duenio"] },
   { id: "agenda", label: "Agenda", icon: CalendarDays, roles: ["recepcion", "veterinario", "duenio"] },
-  { id: "padron", label: "Padrón", icon: Users, roles: ["recepcion", "duenio"] },
+  // El veterinario entra al Padron para consultar de quien es cada paciente antes
+  // de firmar una ficha clinica. Sin este rol la pestana le era invisible y se
+  // quedaba sin forma de resolver el DNI de una emergencia.
+  { id: "padron", label: "Padrón", icon: Users, roles: ["recepcion", "veterinario", "duenio"] },
   { id: "consultas", label: "Ficha médica", icon: Stethoscope, roles: ["veterinario", "recepcion"] },
   { id: "cobros", label: "Caja", icon: Wallet, roles: ["recepcion", "duenio"] },
   { id: "egreso", label: "Egreso", icon: LogOut, roles: ["recepcion", "veterinario", "duenio"] },

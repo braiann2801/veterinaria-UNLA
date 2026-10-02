@@ -36,8 +36,24 @@ public class Profesional {
 	@Column(name = "apellido", nullable = false, length = 80)
 	private String apellido;
 
+	/**
+	 * Documento del profesional. Es el identificador que usa el mostrador para
+	 * encontrar a un matriculado, y por eso es unico: dos profesionales con el
+	 * mismo DNI son el mismo profesional con el dato mal cargado, no dos personas.
+	 *
+	 * <p>Es nullable a proposito. La matricula es el identificador de dominio
+	 * (regla 2.2) y puede faltar en el alta de un profesional que todavia no
+	 * tramito el titulo; el DNI llega junto con la documentacion. MySQL admite
+	 * varios NULL en una columna UNIQUE, asi que no choca entre si.</p>
+	 */
+	@Column(name = "dni", unique = true, length = 20)
+	private String dni;
+
 	@Column(name = "matricula", unique = true, length = 40)
 	private String matricula;
+
+	@Column(name = "telefono", length = 30)
+	private String telefono;
 
 	@Column(name = "activo", nullable = false)
 	private boolean activo = true;
