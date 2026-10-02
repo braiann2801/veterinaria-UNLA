@@ -15,6 +15,24 @@ public interface ReservaGuarderiaRepository extends JpaRepository<ReservaGuarder
 
 	List<ReservaGuarderia> findByFecha(LocalDate fecha);
 
+	/**
+	 * Reservas de un dia ordenadas como una jornada: primero las que tienen
+	 * horario y de la mas temprano a la mas tarde, y al final las que no lo
+	 * tienen.
+	 *
+	 * <p>El {@code CASE} hace el trabajo que un {@code ORDER BY hora_entrada ASC}
+	 * no puede: en MySQL el NULL ordena primero en ascendente, asi que las
+	 * reservas sin horario taparian la cabeza de la lista del mostrador. En
+	 * JPQL y no en SQL nativo para que el orden sea el mismo en H2 y en MySQL.</p>
+	 */
+	@Query("""
+			SELECT r FROM ReservaGuarderia r
+			WHERE r.fecha = :fecha
+			ORDER BY CASE WHEN r.horaEntrada IS NULL THEN 1 ELSE 0 END,
+			         r.horaEntrada, r.horaSalida, r.id
+			""")
+	List<ReservaGuarderia> findByFechaOrdenadasPorHorario(@Param("fecha") LocalDate fecha);
+
 	List<ReservaGuarderia> findByFechaAndEstadoIn(LocalDate fecha,
 			List<ReservaGuarderia.EstadoReserva> estados);
 

@@ -14,7 +14,21 @@ import com.veterinaria.veterinaria_backend.entity.TurnoClinico;
 @Repository
 public interface TurnoClinicoRepository extends JpaRepository<TurnoClinico, Long> {
 
-	List<TurnoClinico> findByFechaHoraInicioBetween(LocalDateTime desde, LocalDateTime hasta);
+	/**
+	 * Turnos de un dia, en orden cronologico: la agenda los dibuja en una grilla
+	 * y sin el {@code ORDER BY} el orden queda a mano de MySQL.
+	 *
+	 * <p>El rango es semiabierto {@code [inicio, fin)} y no
+	 * {@code findByFechaHoraInicioBetween}, que es cerrado por los dos lados: con
+	 * el cerrado, un turno a las 00:00 exactas del dia siguiente entraba en el
+	 * listado de los dos dias y la grilla lo mostraba dos veces.</p>
+	 */
+	@Query("""
+			SELECT t FROM TurnoClinico t
+			WHERE t.fechaHoraInicio >= :desde AND t.fechaHoraInicio < :hasta
+			ORDER BY t.fechaHoraInicio, t.id
+			""")
+	List<TurnoClinico> findDelDia(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 
 	List<TurnoClinico> findByMascotaId(Long mascotaId);
 
@@ -42,6 +56,12 @@ public interface TurnoClinicoRepository extends JpaRepository<TurnoClinico, Long
 			@Param("finBloque") LocalDateTime finBloque);
 
 	/** Agenda de un profesional en una fecha, para pintar el calendario. */
-	List<TurnoClinico> findByProfesionalIdAndFechaHoraInicioBetweenOrderByFechaHoraInicio(
-			Long profesionalId, LocalDateTime desde, LocalDateTime hasta);
+	@Query("""
+			SELECT t FROM TurnoClinico t
+			WHERE t.profesional.id = :profesionalId
+			  AND t.fechaHoraInicio >= :desde AND t.fechaHoraInicio < :hasta
+			ORDER BY t.fechaHoraInicio, t.id
+			""")
+	List<TurnoClinico> findDelDiaDelProfesional(@Param("profesionalId") Long profesionalId,
+			@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 }

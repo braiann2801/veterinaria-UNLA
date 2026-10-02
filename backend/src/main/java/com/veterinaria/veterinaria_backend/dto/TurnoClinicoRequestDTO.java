@@ -15,6 +15,11 @@ import jakarta.validation.constraints.Size;
  */
 public record TurnoClinicoRequestDTO(
 
+		/**
+	 * Inicio del turno. <b>Acepta valores pasados a proposito:</b> no lleva
+	 * {@code @Future} porque las atenciones ya ocurridas se documentan en el
+	 * momento en que el paciente vuelve o el veterinario cierra la ficha.
+	 */
 		@NotNull(message = "La fecha y hora de inicio es obligatoria")
 		LocalDateTime fechaHoraInicio,
 

@@ -156,7 +156,9 @@ class AforoGuarderiaTest {
 	}
 
 	private ReservaGuarderiaRequestDTO pedir(long mascotaId, LocalDate fecha) {
+		// Sin horario: el aforo no depende de las horas, asi que estos tests
+		// dejan esos campos en null para aislar la regla de los 10 cupos.
 		return new ReservaGuarderiaRequestDTO(
-				fecha, ReservaGuarderiaRequestDTO.TipoEstadiaRequestDTO.COMPLETA_24H, mascotaId, null, null);
+				fecha, ReservaGuarderiaRequestDTO.TipoEstadiaRequestDTO.COMPLETA_24H, mascotaId, null, null, null, null);
 	}
 }

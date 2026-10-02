@@ -2,6 +2,7 @@ package com.veterinaria.veterinaria_backend.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 /**
  * Vista publica de una reserva de guarderia, con el dato de aforo del dia.
@@ -16,6 +17,8 @@ public record ReservaGuarderiaResponseDTO(
 		String estado,
 		Long mascotaId,
 		String nombreMascota,
+		LocalTime horaEntrada,
+		LocalTime horaSalida,
 		BigDecimal sena,
 		String observaciones,
 		long cuposOcupados,

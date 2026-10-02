@@ -45,6 +45,40 @@ const CONDUCTAS: { valor: ConductaObservada; etiqueta: string }[] = [
  */
 const CONDUCTAS_CON_ALERTA = new Set<ConductaObservada>(["REACTIVO", "AGRESIVO"])
 
+/**
+ * Fecha local en `YYYY-MM-DD`.
+ *
+ * No se usa `toISOString()`: convierte a UTC, asi que entre las 21:00 y las
+ * 24:00 de Argentina devuelve el dia siguiente y la ficha se archivaria bajo
+ * una fecha que todavia no ocurrio.
+ */
+function hoy(): string {
+  const d = new Date()
+  const mes = String(d.getMonth() + 1).padStart(2, "0")
+  const dia = String(d.getDate()).padStart(2, "0")
+  return `${d.getFullYear()}-${mes}-${dia}`
+}
+
+/** `Matriz DNI 12345678 · Laura Sosa`, para distinguir dos pacientes homonimos. */
+function etiquetaMascota(m: Mascota): string {
+  const tutor = m.tutores?.[0]
+  const nombreTutor = tutor
+    ? `${tutor.nombre} ${tutor.apellido}`
+    : "sin tutor"
+  return `${m.nombre} · ${nombreTutor}`
+}
+
+/**
+ * `Laura Sosa · MAT-123`, y solo la matricula si existe.
+ *
+ * `matricula` es `string | null` desde TASK-007: un auxiliar sin titulo
+ * tramitado se puede dar de alta, y sin este guarda el selector renderizaba
+ * literalmente "· null".
+ */
+function etiquetaProfesional(p: Profesional): string {
+  return p.matricula ? `${p.nombreCompleto} · ${p.matricula}` : p.nombreCompleto
+}
+
 export function FichaMedica() {
   const mascotas = useApi<Mascota[]>(() => apiMascotas.listar())
   const profesionales = useApi<Profesional[]>(() => apiProfesionales.listar())
@@ -52,6 +86,12 @@ export function FichaMedica() {
   const [mascotaId, setMascotaId] = useState<number | null>(null)
   const [profesionalId, setProfesionalId] = useState<number | null>(null)
   const [turnoId, setTurnoId] = useState<number | null>(null)
+  /**
+   * Dia de la atencion. Va aparte de la fecha del turno porque el turno puede
+   * no existir: un paciente que llega sin turno previo igual genera ficha, y en
+   * ese caso la fecha es la que escribe el operador, no la de una grilla.
+   */
+  const [fechaAtencion, setFechaAtencion] = useState(hoy())
   const [anamnesis, setAnamnesis] = useState("")
   const [diagnostico, setDiagnostico] = useState("")
   const [tratamiento, setTratamiento] = useState("")
@@ -62,9 +102,19 @@ export function FichaMedica() {
 
   // Los turnos del dia son el origen natural del `turnoClinicoId` que hace
   // idempotente el alta: sin turno, la ficha puede cargarse dos veces.
+  // El filtro `mascotaId` va como clave y no dentro de la fn porque `useApi`
+  // guarda la fn en un ref: sin la clave, elegir otra mascota no recargaria y
+  // el selector de turno seguiría ofreciendo los turnos del paciente anterior.
   const turnos = useApi<TurnoClinico[]>(
-    () => apiTurnos.listar(),
+    () => apiTurnos.listar(fechaAtencion),
     mascotaId !== null,
+    `${fechaAtencion}:${mascotaId}`,
+  )
+
+  // De los turnos del dia solo interesan los de la mascota elegida: ofrecer los
+  // de otros pacientes invita a vincular una ficha con un turno ajeno.
+  const turnosDeLaMascota = (turnos.datos ?? []).filter(
+    (t) => t.mascota?.id === mascotaId && t.estado !== "CANCELADO",
   )
 
   const historial = useApi<ConsultaMedica[]>(
@@ -90,6 +140,9 @@ export function FichaMedica() {
         mascotaId,
         profesionalId,
         turnoClinicoId: turnoId,
+        // El backend usa esto como fecha de la ficha cuando no hay turno
+        // asociado; mandarlo siempre evita que el servidor la fije a hoy.
+        fechaAtencion: fechaAtencion || undefined,
         anamnesis: anamnesis.trim() || undefined,
         diagnostico: diagnostico.trim() || undefined,
         tratamiento: tratamiento.trim() || undefined,
@@ -120,16 +173,26 @@ export function FichaMedica() {
               <span className="text-xs font-medium text-muted-foreground">Mascota</span>
               <Select
                 value={mascotaId ?? ""}
-                onChange={(e) => setMascotaId(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => {
+                  setMascotaId(e.target.value ? Number(e.target.value) : null)
+                  // El turno pertenece a la mascota anterior: dejarlo elegido
+                  // seria una ficha cruzada sin que nadie lo note.
+                  setTurnoId(null)
+                }}
                 className={TOQUE_MINIMO}
               >
                 <option value="">Elegí una mascota…</option>
                 {(mascotas.datos ?? []).map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.nombre}
+                    {etiquetaMascota(m)}
                   </option>
                 ))}
               </Select>
+              {mascotas.datos && mascotas.datos.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No hay mascotas dadas de alta. Cargalas en el Padrón.
+                </p>
+              )}
             </label>
 
             <label className="flex flex-col gap-1.5 text-sm">
@@ -142,16 +205,39 @@ export function FichaMedica() {
                 className={TOQUE_MINIMO}
               >
                 <option value="">Elegí un profesional…</option>
-                {(profesionales.datos ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombreCompleto} · {p.matricula}
-                  </option>
-                ))}
+                {(profesionales.datos ?? [])
+                  .filter((p) => p.activo)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {etiquetaProfesional(p)}
+                    </option>
+                  ))}
               </Select>
+              {profesionales.datos && !profesionales.datos.some((p) => p.activo) && (
+                <p className="text-xs text-muted-foreground">
+                  No hay profesionales activos. Cargalos desde el Mostrador.
+                </p>
+              )}
             </label>
           </div>
 
-          {mascotaId !== null && turnos.datos && turnos.datos.length > 0 && (
+          <label className="flex flex-col gap-1.5 text-sm sm:max-w-[220px]">
+            <span className="text-xs font-medium text-muted-foreground">Fecha de la atención</span>
+            <TextInput
+              type="date"
+              value={fechaAtencion}
+              onChange={(e) => {
+                setFechaAtencion(e.target.value || hoy())
+                setTurnoId(null)
+              }}
+              className={TOQUE_MINIMO}
+            />
+            <span className="text-xs text-muted-foreground">
+              Admite fechas pasadas: la consulta se documenta cuando ocurrió.
+            </span>
+          </label>
+
+          {mascotaId !== null && turnosDeLaMascota.length > 0 && (
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="text-xs font-medium text-muted-foreground">
                 Turno (opcional, evita cargas duplicadas)
@@ -162,9 +248,9 @@ export function FichaMedica() {
                 className={TOQUE_MINIMO}
               >
                 <option value="">Sin turno asociado</option>
-                {turnos.datos.map((t) => (
+                {turnosDeLaMascota.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.fechaHoraInicio.slice(0, 16).replace("T", " ")} · {t.motivo}
+                    {t.fechaHoraInicio.slice(11, 16)} · {t.motivo}
                   </option>
                 ))}
               </Select>

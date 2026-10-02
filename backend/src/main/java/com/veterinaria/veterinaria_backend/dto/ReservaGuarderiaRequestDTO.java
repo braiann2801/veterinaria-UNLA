@@ -2,6 +2,7 @@ package com.veterinaria.veterinaria_backend.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -20,6 +21,19 @@ public record ReservaGuarderiaRequestDTO(
 
 		@NotNull(message = "El id de la mascota es obligatorio")
 		Long mascotaId,
+
+		/**
+		 * Horario de entrada. Opcional para no invalidar las reservas ya
+		 * cargadas, pero si se manda {@code horaSalida} tiene que venir con
+		 * entrada: un horario a medias no se puede leer en el mostrador.
+		 */
+		LocalTime horaEntrada,
+
+		/**
+		 * Horario de salida. Debe ser posterior a {@code horaEntrada}; la
+		 * comparacion va en el servicio porque necesita los dos valores juntos.
+		 */
+		LocalTime horaSalida,
 
 		@DecimalMin(value = "0.00", message = "La sena no puede ser negativa")
 		BigDecimal sena,

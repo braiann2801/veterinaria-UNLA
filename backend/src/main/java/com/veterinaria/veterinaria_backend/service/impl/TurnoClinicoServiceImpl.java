@@ -48,7 +48,9 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 	@Override
 	public List<TurnoClinicoResponseDTO> listarPorFecha(LocalDate fecha) {
 		LocalDate dia = fecha != null ? fecha : LocalDate.now();
-		return turnoRepository.findByFechaHoraInicioBetween(inicioDelDia(dia), finDelDia(dia)).stream()
+		// Sin fecha el backend responde por hoy, no por todo el historico: la
+		// agenda manda siempre la fecha que el usuario tiene seleccionada.
+		return turnoRepository.findDelDia(inicioDelDia(dia), finDelDia(dia)).stream()
 				.map(this::toResponse)
 				.toList();
 	}
@@ -57,13 +59,22 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 	public List<TurnoClinicoResponseDTO> listarPorProfesional(Long profesionalId, LocalDate fecha) {
 		LocalDate dia = fecha != null ? fecha : LocalDate.now();
 		return turnoRepository
-				.findByProfesionalIdAndFechaHoraInicioBetweenOrderByFechaHoraInicio(
-						profesionalId, inicioDelDia(dia), finDelDia(dia))
+				.findDelDiaDelProfesional(profesionalId, inicioDelDia(dia), finDelDia(dia))
 				.stream()
 				.map(this::toResponse)
 				.toList();
 	}
 
+	/**
+	 * Agenda un turno. <b>Admite fechas y horas pasadas.</b>
+	 *
+	 * <p>No hay ninguna restriccion de "futuro" en el request ni en el servicio:
+	 * una atencion que ya ocurrio se registra igual, porque el mostrador la
+	 * documenta cuando el paciente vuelve, y el veterinario puede cargar la
+	 * consulta de ayer antes de firmar. Lo unico que se valida es el solapamiento
+	 * del bloque contra los turnos del mismo profesional, que es una regla de
+	 * ocupacion del consultorio y no de calendario.</p>
+	 */
 	@Override
 	@Transactional
 	public TurnoClinicoResponseDTO crear(TurnoClinicoRequestDTO request) {

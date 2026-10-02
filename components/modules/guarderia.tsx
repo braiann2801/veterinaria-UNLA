@@ -1,5 +1,18 @@
 "use client"
 
+/**
+ * SIN MONTAR. Esta pantalla escribe en el store en memoria de `lib/store.tsx`,
+ * asi que las reservas no llegan a MySQL.
+ *
+ * <p>Reemplazada para el alta por `components/modules/nueva-reserva.tsx`, que
+ * sí persiste contra `POST /api/v1/guarderia`, y para el aforo por la seccion
+ * de guarderia de `components/modules/agenda.tsx`. Ningun modulo la importa.</p>
+ *
+ * <p>Se conserva como referencia del flujo de seña y persona autorizada a
+ * retirar, pero montarla devolveria al mostrador una pantalla que acepta datos
+ * y los pierde. Si hay que recuperarla, hay que rehacerla contra `lib/api.ts`.</p>
+ */
+
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Panel, Field, TextInput, Select } from "@/components/ui/field"

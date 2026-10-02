@@ -205,10 +205,15 @@ export interface TurnoClinico {
   motivo: string
   estado: "PENDIENTE" | "ATENDIDO" | "CANCELADO"
   mascota: { id: number; nombre: string }
-  profesional: { id: number; nombreCompleto: string; matricula: string }
+  profesional: { id: number; nombreCompleto: string; matricula: string | null }
 }
 
 export interface TurnoClinicoInput {
+  /**
+   * `YYYY-MM-DDTHH:mm` en hora local. Acepta fechas pasadas a proposito: una
+   * atencion ya ocurrida se documenta cuando el paciente vuelve, y el backend
+   * no impone ninguna restriccion de futuro.
+   */
   fechaHoraInicio: string
   motivo: string
   mascotaId: number
@@ -226,10 +231,13 @@ export interface AforoGuarderia {
 export interface ReservaGuarderia {
   id: number
   fecha: string
-  tipoEstadia: "DIURNA" | "NOCTURNA" | "COMPLETA_24H"
+  tipoEstadia: TipoEstadiaGuarderia
   estado: string
   mascotaId: number
   nombreMascota: string
+  /** `null` en las reservas cargadas antes de que existiera el horario. */
+  horaEntrada: string | null
+  horaSalida: string | null
   sena: number
   observaciones: string | null
   cuposOcupados: number
@@ -238,11 +246,20 @@ export interface ReservaGuarderia {
 
 export interface ReservaGuarderiaInput {
   fecha: string
-  tipoEstadia: "DIURNA" | "NOCTURNA" | "COMPLETA_24H"
+  tipoEstadia: TipoEstadiaGuarderia
   mascotaId: number
+  /**
+   * Horarios en `HH:mm`. Se mandan juntos o ninguno: el backend rechaza media
+   * pareja en vez de completarla. En `COMPLETA_24H` la salida es una hora del
+   * reloj del dia siguiente, asi que puede ser anterior a la de entrada.
+   */
+  horaEntrada?: string
+  horaSalida?: string
   sena: number
   observaciones?: string
 }
+
+export type TipoEstadiaGuarderia = "DIURNA" | "NOCTURNA" | "COMPLETA_24H"
 
 export interface ConsultaMedica {
   id: number
@@ -254,7 +271,7 @@ export interface ConsultaMedica {
   conductaObservada: ConductaObservada
   alertaConducta: boolean
   mascota: { id: number; nombre: string; especie: string }
-  profesional: { id: number; nombreCompleto: string; matricula: string }
+  profesional: { id: number; nombreCompleto: string; matricula: string | null }
   comandaId: number
 }
 

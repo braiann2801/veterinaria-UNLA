@@ -29,13 +29,24 @@ export type EstadoApi<T> = {
 /**
  * Carga un recurso y lo mantiene fresco bajo demanda.
  *
- * @param fn  la llamada a la API. Debe ser estable (memoizada o un metodo de
- *            objeto de `lib/api.ts`) o el efecto se dispara en cada render.
+ * @param fn     la llamada a la API. Debe ser estable (memoizada o un metodo de
+ *               objeto de `lib/api.ts`) o el efecto se dispara en cada render.
  * @param activo si es false no se llama a la API. Sirve para no pedir datos
- *              hasta que el usuario haya elegido algo (por ejemplo, una
- *              mascota en el modulo de egreso).
+ *               hasta que el usuario haya elegido algo (por ejemplo, una
+ *               mascota en el modulo de egreso).
+ * @param clave  valor que, al cambiar, fuerza una recarga aunque `fn` y `activo
+ *               sigan igual. Es lo que permite que un hook dependa de un
+ *               parametro sin que el consumidor tenga que armar la fn a mano:
+ *               `useApi(() => turnos.listar(fecha), true, fecha)`.
+ *
+ *               Sin esto, pasar la fecha como closure no recarga nada. El
+ *               `fnRef` de mas abajo existe justamente para que `fn` no sea
+ *               dependencia del efecto, y el precio de esa decision es que un
+ *               parametro capturado en la fn deja de disparar la carga. `clave`
+ *               es el escape explicito: el consumidor declara que hay un input
+ *               del que el resultado depende.
  */
-export function useApi<T>(fn: () => Promise<T>, activo = true): EstadoApi<T> {
+export function useApi<T>(fn: () => Promise<T>, activo = true, clave?: string | number): EstadoApi<T> {
   const [datos, setDatos] = useState<T | null>(null)
   const [cargando, setCargando] = useState(activo)
   const [error, setError] = useState<ApiError | null>(null)
@@ -55,6 +66,23 @@ export function useApi<T>(fn: () => Promise<T>, activo = true): EstadoApi<T> {
     }
   }, [])
 
+  /**
+   * Descarta los datos anteriores cuando cambia `clave`.
+   *
+   * <p>Sin esto, cambiar la fecha dejaria los turnos del dia viejo en pantalla
+   * mientras se pide el nuevo: la lista se veria exacta y estaria mal, que es
+   * peor que un spinner. `Recurso` ya dibuja el estado de carga cuando
+   * {@code datos} es null, asi que basta con limpiar.</p>
+   */
+  useEffect(() => {
+    if (activo) {
+      setDatos(null)
+      setError(null)
+    }
+  }, [activo, clave])
+
+  // `clave` entra en las dependencias para que cambiar un parametro de la
+  // consulta recargue. Sin esta dependencia el efecto solo corre al montar.
   const recargar = useCallback(async () => {
     if (!activo) return
     setCargando(true)
@@ -69,7 +97,7 @@ export function useApi<T>(fn: () => Promise<T>, activo = true): EstadoApi<T> {
     } finally {
       if (montado.current) setCargando(false)
     }
-  }, [activo])
+  }, [activo, clave])
 
   useEffect(() => {
     if (activo) void recargar()

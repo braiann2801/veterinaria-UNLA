@@ -1,11 +1,66 @@
 ﻿# PROGRESS.md
 
 ## Estado Actual
-- Tarea en curso: [Ninguna] — **TASK-007 (FASE 1) FINALIZADA**
+- Tarea en curso: [Ninguna] — **TASK-008 (FASE 2) FINALIZADA**
 - Agente asignado: Orquestador -> Implementador -> Revisor/Harness — OK
 - Bloqueantes: [Ninguno]
-- Harness: `tsc --noEmit` limpio, `next build` OK, **104 tests backend en verde**
-  (89 previos + 15 nuevos).
+- Harness: `tsc --noEmit` limpio, `next build` OK, **121 tests backend en verde**
+  (104 previos + 17 nuevos)
+
+## Diagnóstico de FASE 2 (Orquestador)
+
+**Nota previa sobre el alcance de archivos.** El encargo menciona
+`frontend/src/`, pero en este repositorio **no existe**: el frontend de Next.js
+vive en la raíz, en `app/`, `components/` y `lib/`. Setomaron esos tres
+directorios como las "vistas/componentes correspondientes", junto con `lib/api.ts`
+y `lib/use-api.ts`, que son la capa de conexión de los módulos involucrados.
+No se tocó ningún otro módulo.
+
+Cuatro diagnósticos fueron planteados. **Dos no se sostienen al leer el código** y
+uno tiene la causa en otro archivo del que se suponía:
+
+1. **"El backend bloquea turnos en fechas anteriores a hoy" — FALSO.**
+   No existe ninguna restricción que lo impida. `TurnoClinicoRequestDTO` solo
+   declara `@NotNull` y `@Size` sobre `fechaHoraInicio`; no hay `@Future`,
+   `@PastOrPresent` ni comparación con `LocalDate.now()` en
+   `TurnoClinicoServiceImpl`. Un grep de `Future|PastOrPresent|isBefore|isAfter`
+   sobre todo `backend/src/main/java` no devuelve ni una coincidencia en el camino
+   de turnos. **Los turnos retroactivos ya se pueden guardar hoy.** La
+   corrección de FASE 1 en `Profesional.dni` no tiene nada que ver. Este punto se
+   verifica con un test en vez de asumirlo.
+
+2. **"La agenda no refleja los turnos de la base ni filtra por fecha" — el
+   síntoma es real, la causa está en otro archivo.**
+   `components/modules/agenda.tsx:30` ya llama `apiTurnos.listar(fecha)` con la
+   fecha del `<input type="date">`, y `TurnoClinicoController.listarPorFecha`
+   (`controller/TurnoClinicoController.java:41-46`) ya acepta `?fecha=` con
+   `@DateTimeFormat(ISO.DATE)`. Todo el cableado existe.
+   El bug está en `lib/use-api.ts`: el hook guarda la función de carga en un
+   `fnRef` y su `recargar` tiene dependencias `[activo]`. **Cambiar `fecha` no
+   cambia `activo`, así que el efecto no vuelve a dispararse**: la grilla sigue
+   mostrando los turnos del primer día que se cargó, para siempre. La fecha
+   cambia en el input y la pantalla miente. El arreglo es una clave de recarga
+   en el hook, no en la agenda.
+
+3. **"No existe formulario operativo para reservar guardería con horario de
+   entrada y salida" — CONFIRMADO, y es peor de lo que decía.**
+   No solo faltan `horaEntrada` y `horaSalida`: `components/modules/guarderia.tsx`
+   entero es mock (consume `useStore` y llama `addReserva`), y **no está montado
+   en `app/page.tsx`** — no hay pestaña que lo muestre. En el backend,
+   `ReservaGuarderia` no tiene columnas de horario.
+
+4. **"La ficha médica no lista las mascotas ni los profesionales" — FALSO como
+   diagnóstico, pero hay dos defectos reales cerca.**
+   `components/modules/ficha.tsx:49-50` ya pide `apiMascotas.listar()` y
+   `apiProfesionales.listar()`. Los dos selects leen la base. Lo que sí está mal:
+   - El selector de mascotas muestra **solo el nombre**: con dos pacientes
+     llamados igual, el veterinario no puede elegir. Falta el tutor.
+   - El selector de profesionales imprime `· {p.matricula}` sin guarda. Como
+     `matricula` pasó a ser `string | null` en FASE 1, un profesional sin
+     matrícula renderiza literalmente "· null".
+   - `turnos` se pide con `apiTurnos.listar()` **sin fecha**, o sea solo el día de
+     hoy. Junto con el punto 2, esto significa que una ficha de una atención de
+     ayer no puede asociar su turno.
 
 ## Diagnóstico de FASE 1 (Orquestador)
 
@@ -55,6 +110,115 @@ Hallazgos, con el archivo y la línea donde se comprueba:
 - [x] TASK-005: Ficha Médica (alertas conducta), Comanda de Cobro (desacouple clínico-contable) y Caja Multipago.
 - [x] TASK-006: Circuito de Egreso Seguro y conexión end-to-end del frontend. **MVP 1 cerrado.**
 - [x] TASK-007 (FASE 1): Persistencia de mascotas en Padrón + módulo de Profesionales.
+- [x] TASK-008 (FASE 2): Turnos retroactivos, grilla de Agenda conectada, reserva horaria de Guardería y selects reales en Ficha Médica.
+
+## Registro de Cambios Técnicos (TASK-008 / FASE 2)
+
+### Backend — turnos
+- **No se quitó ninguna validación**: no había `@Future` ni comparación con
+  `LocalDate.now()` en el camino de turnos. Se dejó constancia en el Javadoc de
+  `TurnoClinicoServiceImpl.crear` y de `TurnoClinicoRequestDTO.fechaHoraInicio`,
+  y se blindó con `TurnoRetroactivoTest` (7 tests) para que nadie reintroduzca
+  el límite por error.
+- `TurnoClinicoRepository`: `findByFechaHoraInicioBetween` se reemplazó por
+  `findDelDia` y `findDelDiaDelProfesional`, ambos con rango semiabierto
+  `[inicio, fin)` y `ORDER BY fecha_hora_inicio, id`. El método anterior era
+  cerrado por los dos lados y sin orden: un turno a las 00:00 exactas entraba
+  en el listado de dos días, y el orden de la grilla quedaba en manos de MySQL.
+- `GET /api/v1/turnos?fecha=` no se tocó: ya existía y ya filtraba.
+
+### Backend — guardería
+- `ReservaGuarderia`: columnas `hora_entrada` y `hora_salida` (`LocalTime`,
+  nullable). Nullable sin valor por defecto a propósito: las reservas previas no
+  tienen hora y rellenarlas sería inventar un dato.
+- `ReservaGuarderiaRequestDTO` / `ResponseDTO`: `horaEntrada` y `horaSalida` en
+  el contrato.
+- `ReservaGuarderiaServiceImpl.aplicarHorario`: **la validación depende del tipo
+  de estadía**. Es el punto no obvio de esta fase: las horas son horas de reloj,
+  no instantes, así que `COMPLETA_24H` admite `08:00 → 08:00` y también
+  `22:00 → 06:00` (salida del día siguiente), mientras que en `DIURNA`/`NOCTURNA`
+  la igualdad sí es un error de tipeo. Una regla ingenua de "salida > entrada"
+  rechazaba el caso más común de la guardería. El tipo viaja como parámetro en
+  vez de leerse de la entidad porque en `actualizar` el tipo del request puede
+  ser `null` mientras el horario sí se está cambiando.
+- `ReservaGuarderiaRepository.findByFechaOrdenadasPorHorario`: la jornada se
+  ordena con `CASE WHEN horaEntrada IS NULL THEN 1 ELSE 0 END` primero, porque
+  en MySQL el `NULL` ordena antes en ascendente y las reservas sin horario
+  taparían la cabeza de la lista.
+- **Sin tocar el semáforo ni el lock pesimista** de TASK-004-HOTFIX: el aforo
+  sigue contando una reserva por fila y por día, y `ReservaGuarderiaHorarioTest`
+  incluye un caso que llena los 10 cupos con horarios distintos y verifica que el
+ reserva número 11 siga recibiendo 409.
+
+### Frontend
+- `lib/use-api.ts`: nuevo tercer parámetro `clave`. Es el arreglo de raíz del
+  bug de la agenda: el hook guarda la `fn` en un `fnRef` y su efecto solo
+  dependía de `activo`, así que cambiar la fecha re-renderizaba sin volver a
+  pedir nada. `clave` entra en las dependencias **y** dispara un `setDatos(null)`
+  para que no quede la lista del día viejo en pantalla mientras vuela la nueva.
+- `components/modules/agenda.tsx`: la fecha viaja como clave en los tres hooks;
+  nuevo botón "Agendar turno" (el input de fecha **no lleva `min`**); la reserva
+  muestra el horario; se corrigió `CANCELADA` → `CANCELADO` en el semáforo (el
+  enum es `CANCELADO`, la condición nunca era verdadera).
+- `components/modules/nuevo-turno.tsx` (nuevo): modal de alta contra
+  `POST /api/v1/turnos`.
+- `components/modules/nueva-reserva.tsx` (nuevo): modal "Nueva reserva de
+  guardería" contra `POST /api/v1/guarderia` con mascota, fecha, entrada, salida
+  y tipo de estadía. El semáforo muestra el aforo **de la fecha del formulario**,
+  no el de la fecha abierta en la agenda.
+- `components/modules/ficha.tsx`: el selector de mascotas muestra `nombre · tutor`
+  (con dos pacientes homónimos no había forma de elegir); el de profesionales
+  filtra por `activo` y no imprime `"· null"` cuando no hay matrícula; se agregó
+  el campo **Fecha de la atención** (admite pasado) y el selector de turno se
+  filtra por mascota y por esa fecha, en vez de ofrecer los turnos del día de
+  cualquier paciente.
+- `components/modules/guarderia.tsx`: **queda sin montar** (no lo importaba nadie).
+  Se le agregó una nota de encabezado que explica que escribe en el store en
+  memoria y que no debe montarse tal cual.
+- `lib/api.ts`: `horaEntrada`/`horaSalida` en `ReservaGuarderia*Input`,
+  `TipoEstadiaGuarderia` como tipo propio, y `matricula` de los resumenes de
+  turno y consulta pasó a `string | null` (ya era nullable en el backend desde
+  FASE 1 y el tipo del frontend mentía).
+
+### Verificación end-to-end
+Backend levantado contra MySQL real, por HTTP y confirmado en
+`veterinaria_db`: turno retroactivo del `2026-02-11` guardado con
+`fecha_hora_inicio` correcta y derivado +45/+60; turno solapado en la ventana de
+desinfección rejected con 409 **aunque la fecha sea pasada**; `GET /turnos?fecha=`
+devolvió 1 turno y `GET /turnos` (hoy) 0; reserva `COMPLETA_24H` 08:00→08:00
+persistida con aforo 1/10; `DIURNA` 18:00→09:00 rechazada con 400 y horario a
+medias rechazado con 400. Datos de prueba borrados (8 tablas en 0 filas) y puerto
+8080 liberado.
+
+## Decisiones de diseño (TASK-008)
+1. **La UI no replica las reglas de horario.** El modal deja enviar cualquier par
+   y muestra el 400 del backend. Duplicar la condición en el frontend crearía
+   dos verdades, y ya se rompió una vez: la versión ingenua rechazaba la
+   estadía de 24 horas.
+2. **La estadística del semáforo viene del servidor.** No hay conteo local de
+   cupos: el backend es la única fuente del aforo (regla 2.1).
+3. **El filtro por fecha se hace en el servidor.** La ficha pide
+   `?fecha=<fecha de atención>` y acota por mascota en el cliente, porque el
+   endpoint por profesional no filtra por paciente.
+
+## Riesgos abiertos (TASK-008)
+1. **El `CargarClienteModal` del Mostrador sigue llamando a `addOwnerWithDog`**
+   (store en memoria). Es el camino que queda con la falla que se reportó en
+   FASE 1: el alta de cliente desde el mostrador no persiste. Corregirlo es
+   reescribir ese modal contra `lib/api.ts`, fuera del alcance declarado de esta
+   fase.
+2. **No hay Flyway ni Liquibase.** `spring.jpa.hibernate.ddl-auto=update`
+   agregó `hora_entrada` y `hora_salida` solas. Sin versionado del esquema, una
+   base existente y una recién creada pueden divergir sin que nada lo advierta.
+3. **Los tests corren contra la base de desarrollo** (`veterinaria_db`), no contra
+   una base de test. `RollbackTransaccionalTest` hace `DELETE` sobre 10 tablas:
+   si alguien corre los tests con datos reales cargados, los borra.
+4. **`turno_clinico.fecha_hora_inicio` es `datetime(6)` sin timezone** y el
+   cliente MySQL muestra los valores corridos respecto de lo que devuelve la API
+   (la JVM corre en UTC-3 y `serverTimezone=UTC`). Verificado end-to-end que la
+   ida y la vuelta por la API son consistentes, así que no afecta la aplicación,
+   pero conviene revisar el mapeo antes de que haya reportes o cortes de caja
+   que comparen contra la base cruda.
 
 ## Registro de Cambios Técnicos (TASK-006)
 
