@@ -1,24 +1,45 @@
 "use client"
 
 /**
- * TASK-006: Caja y Recepción contra la API real.
+ * TASK-009: Caja del Día.
  *
- * Lista las comandas pendientes del tutor, permite el cobro mixto (varios medios
- * en una sola operación) y muestra la alerta visual de "TUTOR MOROSO" (regla
- * 2.5 de AGENTS.md).
+ * Antes de esta fase el módulo no tenía día: `GET /comandas` exigía un tutor, así
+ * que para cobrar había que acordarse de a quién se le cobra y elegirlo de entre
+ * todo el padrón. Ahora arranca en hoy, propone a los tutores que efectivamente
+ * pasaron por el consultorio o dejaron un perro en la guardería, y deja cambiar
+ * de fecha para el corte de un día anterior.
  *
- * El modal de cobro no calcula el saldo: usa `saldoPendiente` del backend. Si el
- * frontend restara por su cuenta, cualquier diferencia de redondeo mostraría un
- * saldo que no existe y el mostrador cobraría de más o de menos.
+ * Dos cosas que esta pantalla no hace, a propósito:
+ *
+ * - **No calcula saldos.** El saldo que se muestra es el `saldoPendiente` del
+ *   backend. Si el frontend restara por su cuenta, cualquier diferencia de
+ *   redondeo haría que el mostrador cobre de más o de menos.
+ * - **No decide quién puede pagar.** El selector ofrece a los tutores vinculados
+ *   a la mascota de esa comanda, y el backend es el que acepta o rechaza. Si la
+ *   UI filtrara, el operador vería un 400 sin explicación; si aceptara de más,
+ *   un desconocido saldría con una comanda ajena saldada.
  */
 
-import { useState } from "react"
-import { AlertTriangle, Ban, Receipt, Wallet } from "lucide-react"
+import { useMemo, useState } from "react"
+import { AlertTriangle, Ban, CalendarDays, Receipt, Wallet } from "lucide-react"
 
-import { caja as apiCaja, comandas as apiComandas, tutores as apiTutores } from "@/lib/api"
-import type { ComandaCobro, DeudaTutor, EstadoComanda, MetodoPago, Tutor } from "@/lib/api"
+import {
+  caja as apiCaja,
+  comandas as apiComandas,
+  hoyLocal,
+  mascotas as apiMascotas,
+  tutores as apiTutores,
+} from "@/lib/api"
+import type {
+  ComandaCobro,
+  DeudaTutor,
+  EstadoComanda,
+  Mascota,
+  MetodoPago,
+  TutorDelDia,
+} from "@/lib/api"
 import { useApi } from "@/lib/use-api"
-import { Panel, Select } from "@/components/ui/field"
+import { Panel, Select, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
 
@@ -37,38 +58,86 @@ const ETIQUETA_ESTADO: Record<EstadoComanda, string> = {
   CANCELADA: "Cancelada",
 }
 
+const ETIQUETA_CONCEPTO: Record<string, string> = {
+  CONSULTA_CLINICA: "Consulta clínica",
+  GUARDERIA: "Guardería",
+  OTRO: "Otros",
+}
+
 export function Caja() {
-  const tutores = useApi<Tutor[]>(() => apiTutores.listar())
-  const [tutorId, setTutorId] = useState<number | null>(null)
+  // El backend también usa hoy por defecto cuando no le mandan fecha, pero el
+  // input tiene que mostrar un valor: un select de fecha vacío no es una fecha.
+  const [fecha, setFecha] = useState(hoyLocal())
   const [filtro, setFiltro] = useState<EstadoComanda | "TODAS">("TODAS")
+  const [tutorId, setTutorId] = useState<number | null>(null)
   const [aCobrar, setACobrar] = useState<ComandaCobro | null>(null)
 
-  // El endpoint de comandas exige un tutorId: no existe un listado global por
-  // diseño, así que la vista arranca sin selección en vez de traer todo.
-  const comandas = useApi<ComandaCobro[]>(
-    () => apiComandas.listarPorTutor(tutorId as number, filtro === "TODAS" ? undefined : filtro),
-    tutorId !== null,
+  // La fecha viaja como clave: sin esto el hook pediria una sola vez y la pantalla
+  // seguiria mostrando las comandas del dia con el que se abrio.
+  const tutoresDelDia = useApi<TutorDelDia[]>(
+    () => apiCaja.tutoresDelDia(fecha),
+    true,
+    fecha,
   )
+  const comandas = useApi<ComandaCobro[]>(
+    () => apiComandas.listarDelDia(fecha, tutorId ?? undefined, filtro === "TODAS" ? undefined : filtro),
+    true,
+    `${fecha}|${tutorId ?? ""}|${filtro}`,
+  )
+  // La deuda se consulta solo con un tutor elegido: sin seleccion no hay a quien
+  // alertarle, y pedirla "para todos" no existe en la API.
   const deuda = useApi<DeudaTutor>(
     () => apiTutores.deuda(tutorId as number),
     tutorId !== null,
+    tutorId ?? undefined,
   )
+
+  const tutorElegido = (tutoresDelDia.datos ?? []).find((t) => t.tutorId === tutorId) ?? null
+
+  async function refrescar() {
+    await Promise.all([comandas.recargar(), tutoresDelDia.recargar()])
+    if (tutorId !== null) await deuda.recargar()
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <Panel title="Recepción">
+      <Panel title="Caja del día">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="flex flex-1 flex-col gap-1.5 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">Tutor</span>
+            <span className="text-xs font-medium text-muted-foreground">Jornada</span>
+            <div className="flex items-center gap-2">
+              <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <TextInput
+                type="date"
+                value={fecha}
+                onChange={(e) => {
+                  const nueva = e.target.value
+                  if (!nueva) return
+                  // Cambiar de dia descarta la seleccion de tutor: el de ayer no
+                  // tiene por que ser el de hoy, y dejarlo puesto mandaria un
+                  // filtro que el operador no eligio.
+                  setFecha(nueva)
+                  setTutorId(null)
+                }}
+                aria-label="Jornada de caja"
+                className={TOQUE_MINIMO}
+              />
+            </div>
+          </label>
+
+          <label className="flex flex-1 flex-col gap-1.5 text-sm">
+            <span className="text-xs font-medium text-muted-foreground">
+              Tutor con actividad
+            </span>
             <Select
               value={tutorId ?? ""}
               onChange={(e) => setTutorId(e.target.value ? Number(e.target.value) : null)}
               className={TOQUE_MINIMO}
             >
-              <option value="">Elegí un tutor…</option>
-              {(tutores.datos ?? []).map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nombreCompleto} · DNI {t.dni}
+              <option value="">Todos los tutores de la jornada</option>
+              {(tutoresDelDia.datos ?? []).map((t) => (
+                <option key={t.tutorId} value={t.tutorId}>
+                  {t.nombreCompleto} · {t.mascotas.map((m) => m.nombreMascota).join(", ")}
                 </option>
               ))}
             </Select>
@@ -89,6 +158,14 @@ export function Caja() {
             </Select>
           </label>
         </div>
+
+        {tutorElegido && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {tutorElegido.nombreCompleto} · DNI {tutorElegido.dni} ·{" "}
+            {tutorElegido.mascotas.length} mascota{tutorElegido.mascotas.length === 1 ? "" : "s"} en la
+            jornada.
+          </p>
+        )}
       </Panel>
 
       {tutorId !== null && deuda.datos && deuda.datos.tieneDeuda && (
@@ -109,8 +186,9 @@ export function Caja() {
             <ul className="mt-2 flex flex-col gap-0.5">
               {deuda.datos.comandasPendientes.map((c) => (
                 <li key={c.id} className="text-xs text-red-800">
-                  #{c.id} {c.concepto} · {money(c.saldoPendiente)} ·{" "}
-                  {c.diasDeAntiguedad} día{c.diasDeAntiguedad === 1 ? "" : "s"} de atraso
+                  #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto} ·{" "}
+                  {money(c.saldoPendiente)} · {c.diasDeAntiguedad} día
+                  {c.diasDeAntiguedad === 1 ? "" : "s"} de atraso
                 </li>
               ))}
             </ul>
@@ -118,86 +196,78 @@ export function Caja() {
         </div>
       )}
 
-      {tutorId !== null ? (
-        <Panel title="Comandas">
-          <Recurso
-            estado={comandas}
-            textoCarga="Cargando comandas"
-            textoVacio="Este tutor no tiene comandas con ese estado"
-          >
-            {(lista) => (
-              <ul className="flex flex-col divide-y divide-border">
-                {lista.map((c) => (
-                  <li key={c.id} className="flex flex-col gap-2 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {c.concepto === "CONSULTA_CLINICA"
-                            ? "Consulta clínica"
-                            : c.concepto === "GUARDERIA"
-                              ? "Guardería"
-                              : "Otros"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          #{c.id} · {c.fechaEmision.slice(0, 10)}
-                          {c.nombreMascota ? ` · ${c.nombreMascota}` : ""}
-                        </p>
-                      </div>
-                      <Semforo
-                        tono={
-                          c.estado === "PAGADA"
-                            ? "verde"
-                            : c.estado === "CANCELADA"
-                              ? "ambar"
-                              : "rojo"
-                        }
-                      >
-                        {ETIQUETA_ESTADO[c.estado]}
-                      </Semforo>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm">
-                        <span className="font-medium">{money(c.saldoPendiente)}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {" "}
-                          pendientes de {money(c.montoTotal)}
-                        </span>
+      <Panel title={`Comandas del ${fecha.split("-").reverse().join("/")}`}>
+        <Recurso
+          estado={comandas}
+          textoCarga="Cargando comandas"
+          textoVacio="No se emitió ninguna comanda en esa jornada"
+          onReintentar={comandas.recargar}
+        >
+          {(lista) => (
+            <ul className="flex flex-col divide-y divide-border">
+              {lista.map((c) => (
+                <li key={c.id} className="flex flex-col gap-2 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto}
                       </p>
-                      {c.estado !== "PAGADA" && c.estado !== "CANCELADA" && (
-                        <button
-                          onClick={() => setACobrar(c)}
-                          className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-                        >
-                          <Wallet className="size-3.5" aria-hidden />
-                          Cobrar
-                        </button>
-                      )}
+                      <p className="text-xs text-muted-foreground">
+                        #{c.id} · {c.fechaEmision.slice(11, 16)} · {c.nombreTutor}
+                        {c.nombreMascota ? ` · ${c.nombreMascota}` : ""}
+                      </p>
                     </div>
+                    <Semforo
+                      tono={
+                        c.estado === "PAGADA"
+                          ? "verde"
+                          : c.estado === "CANCELADA"
+                            ? "ambar"
+                            : "rojo"
+                      }
+                    >
+                      {ETIQUETA_ESTADO[c.estado]}
+                    </Semforo>
+                  </div>
 
-                    {c.pagos.length > 0 && (
-                      <ul className="flex flex-col gap-0.5 border-t border-border pt-2">
-                        {c.pagos.map((p) => (
-                          <li key={p.id} className="text-xs text-muted-foreground">
-                            {METODOS.find((m) => m.valor === p.metodoPago)?.etiqueta ?? p.metodoPago} ·{" "}
-                            {money(p.monto)} · {p.fechaHora.slice(0, 10)}
-                          </li>
-                        ))}
-                      </ul>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm">
+                      <span className="font-medium">{money(c.saldoPendiente)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {" "}
+                        pendientes de {money(c.montoTotal)}
+                      </span>
+                    </p>
+                    {c.estado !== "PAGADA" && c.estado !== "CANCELADA" && (
+                      <button
+                        onClick={() => setACobrar(c)}
+                        className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+                      >
+                        <Wallet className="size-3.5" aria-hidden />
+                        Cobrar
+                      </button>
                     )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Recurso>
-        </Panel>
-      ) : (
-        <Panel title="Comandas">
-          <p className="text-sm text-muted-foreground">
-            Elegí un tutor para ver sus comandas y registrar el cobro.
-          </p>
-        </Panel>
-      )}
+                  </div>
+
+                  {c.pagos.length > 0 && (
+                    <ul className="flex flex-col gap-0.5 border-t border-border pt-2">
+                      {c.pagos.map((p) => (
+                        <li key={p.id} className="text-xs text-muted-foreground">
+                          {METODOS.find((m) => m.valor === p.metodoPago)?.etiqueta ?? p.metodoPago} ·{" "}
+                          {money(p.monto)} · {p.fechaHora.slice(0, 10)}
+                          {/* El pagador se muestra solo cuando se informó: los pagos
+                              anteriores a TASK-009 no lo tienen y no se inventa. */}
+                          {p.nombreTutorPagador ? ` · pagó ${p.nombreTutorPagador}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Recurso>
+      </Panel>
 
       {aCobrar && (
         <ModalCobro
@@ -206,7 +276,7 @@ export function Caja() {
           onCerrar={() => setACobrar(null)}
           onCobrado={async () => {
             setACobrar(null)
-            await Promise.all([comandas.recargar(), deuda.recargar()])
+            await refrescar()
           }}
         />
       )}
@@ -221,6 +291,11 @@ export function Caja() {
  * efectivo y el resto por transferencia) y lo que el backend soporta con un
  * array de pagos. El saldo restante se muestra en vivo para que quien cobra vea
  * si llegó a cero antes de confirmar.
+ *
+ * El selector de "quién paga" se arma con los tutores **vinculados a la mascota
+ * de esa comanda**, no con el padrón entero: la lista corta es la que el backend
+ * va a aceptar, y ofrecer 300 personas para que 2 pasen el filtro es peor que no
+ * ofrecer nada. El backend sigue siendo el que decide.
  */
 function ModalCobro({
   comanda,
@@ -236,12 +311,30 @@ function ModalCobro({
   const [lineas, setLineas] = useState<{ metodoPago: MetodoPago; monto: string }[]>([
     { metodoPago: "EFECTIVO", monto: String(comanda.saldoPendiente) },
   ])
+  const [pagadorId, setPagadorId] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
   const [cobrando, setCobrando] = useState(false)
+
+  // Los vinculos salen de la ficha de la mascota y no de la jornada del dia: la
+  // comanda que se esta cobrando puede ser de una jornada vieja, y con "los
+  // tutores de hoy" un cliente que volvio a pagar una deuda anterior veria la
+  // lista de pagadores de otra familia.
+  const mascota = useApi<Mascota>(
+    () => apiMascotas.buscarPorId(comanda.mascotaId as number),
+    comanda.mascotaId !== null,
+    comanda.mascotaId ?? undefined,
+  )
+
+  const vinculados = useMemo(() => mascota.datos?.tutores ?? [], [mascota.datos])
 
   const total = lineas.reduce((acc, l) => acc + (Number(l.monto) || 0), 0)
   const restante = Math.max(0, comanda.saldoPendiente - total)
   const excede = total > comanda.saldoPendiente
+
+  // Sin selección se manda undefined y el backend asume al deudor. Es el mismo
+  // camino que el de siempre, no una excepcion: la mayoria de los cobros la paga
+  // el titular.
+  const pagador = pagadorId ? Number(pagadorId) : undefined
 
   async function cobrar() {
     const pagos = lineas
@@ -262,7 +355,7 @@ function ModalCobro({
     setCobrando(true)
     setError(null)
     try {
-      await apiCaja.registrarPago(comanda.id, pagos)
+      await apiCaja.registrarPago(comanda.id, pagos, pagador)
       await onCobrado()
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar el cobro")
@@ -292,6 +385,32 @@ function ModalCobro({
             <span>{money(comanda.saldoPendiente)}</span>
           </div>
         </div>
+
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-xs font-medium text-muted-foreground">Quién paga</span>
+          <Select
+            value={pagadorId}
+            onChange={(e) => setPagadorId(e.target.value)}
+            aria-label="Tutor que realiza el pago"
+            className={TOQUE_MINIMO}
+          >
+            <option value="">
+              {comanda.nombreTutor} (titular de la comanda)
+            </option>
+            {vinculados
+              .filter((t) => t.id !== comanda.tutorId)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {`${t.nombre} ${t.apellido}`}
+                  {t.autorizadoRetiro ? "" : " · no autorizado a retirar"}
+                </option>
+              ))}
+          </Select>
+          <span className="text-xs text-muted-foreground">
+            Cualquier tutor vinculado a la mascota puede pagar. Que esté autorizado a
+            retirarla es otro tema: el retiro se valida por separado, en el egreso.
+          </span>
+        </label>
 
         <div className="flex flex-col gap-2">
           {lineas.map((linea, i) => (

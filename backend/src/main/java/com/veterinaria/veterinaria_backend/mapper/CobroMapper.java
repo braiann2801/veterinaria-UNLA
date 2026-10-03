@@ -50,11 +50,17 @@ public class CobroMapper {
 	}
 
 	public PagoResponseDTO toPagoResponse(Pago pago) {
+		// El pagador es nullable (pagos anteriores a TASK-009) y ademas es LAZY, asi
+		// que solo se toca aca adentro, con la transaccion del servicio abierta: leer
+		// la relacion desde el controller lanzaria LazyInitializationException.
+		var pagador = pago.getTutorPagador();
 		return new PagoResponseDTO(
 				pago.getId(),
 				pago.getMetodoPago() != null ? pago.getMetodoPago().name() : null,
 				pago.getMonto(),
-				pago.getFechaHora());
+				pago.getFechaHora(),
+				pagador != null ? pagador.getId() : null,
+				pagador != null ? pagador.getNombreCompleto() : null);
 	}
 
 	public List<PagoResponseDTO> toPagoResponseList(List<Pago> pagos) {

@@ -1,5 +1,9 @@
 package com.veterinaria.veterinaria_backend.controller;
 
+import java.time.LocalDate;
+import java.util.List;
+
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -7,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.MascotaDelDiaResponseDTO;
 import com.veterinaria.veterinaria_backend.service.EgresoService;
 
 import jakarta.validation.constraints.NotNull;
@@ -54,5 +59,23 @@ public class EgresoController {
 			@RequestParam @NotNull Long mascotaId,
 			@RequestParam @NotNull Long tutorId) {
 		return ResponseEntity.ok(egresoService.validarPorTutorId(mascotaId, tutorId));
+	}
+
+	/**
+	 * GET /api/v1/egreso/pacientes-hoy?fecha=2026-10-03
+	 *
+	 * <p>La fecha es opcional y por defecto es hoy: el mostrador que abre el
+	 * mostrador de egreso esta esperando la jornada que esta cerrando, no un
+	 * archivo historico. El selector de dias anteriores existe para el caso real de
+	 * un retiro que quedo pendiente ayer.</p>
+	 *
+	 * <p>Devuelve las mascotas con turno o guarderia en esa fecha, con sus tutores
+	 * y el flag de retiro de cada vinculo. No es el semaforo: es la lista de
+	 * candidatos sobre la que después se corre {@code /validar}.</p>
+	 */
+	@GetMapping("/pacientes-hoy")
+	public ResponseEntity<List<MascotaDelDiaResponseDTO>> pacientesDelDia(
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+		return ResponseEntity.ok(egresoService.listarPacientesDelDia(fecha));
 	}
 }

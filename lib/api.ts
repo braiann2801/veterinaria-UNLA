@@ -298,6 +298,12 @@ export interface Pago {
   metodoPago: MetodoPago
   monto: number
   fechaHora: string
+  /**
+   * Quien pago. `null` en los pagos cargados antes de TASK-009: "no informado",
+   * nunca "no pago nadie".
+   */
+  tutorPagadorId: number | null
+  nombreTutorPagador: string | null
 }
 
 export interface ComandaCobro {
@@ -359,6 +365,51 @@ export interface EgresoValidacion {
   tutorId: number
   tutorNombre: string
   etiquetaMotivo: string
+}
+
+// ------------------------------------------------------------- jornada del día
+
+/** Motivos por los que una mascota estuvo en el local un día (TASK-009). */
+export type MotivoJornada = "TURNO_CLINICO" | "GUARDERIA"
+
+/** Tutor vinculado a la mascota, con el flag de retiro de esa tupla. */
+export interface TutorVinculado {
+  tutorId: number
+  nombreCompleto: string
+  dni: string
+  /**
+   * Solo gobierna quién puede **retirar** a la mascota (regla 2.4). No habilita ni
+   * bloquea el pago: un cotutor sin autorización puede perfectamente pagar.
+   */
+  autorizadoRetiro: boolean
+}
+
+/**
+ * Mascota con actividad en una jornada.
+ *
+ * La usan el checkout de egreso y la caja del día, y salen de la misma consulta
+ * del backend a propósito: si cada pantalla armara la suya, una podría mostrar un
+ * turno cancelado que la otra no muestra.
+ */
+export interface MascotaDelDia {
+  mascotaId: number
+  nombreMascota: string
+  especie: EspecieMascota
+  conducta: ConductaMascota | null
+  motivos: MotivoJornada[]
+  cantidadTurnos: number
+  estadoGuarderia: "RESERVADO" | "INGRESADO" | null
+  horaIngreso: string | null
+  horaSalida: string | null
+  tutores: TutorVinculado[]
+}
+
+/** Tutor con actividad en una jornada, con las mascotas por las que vino. */
+export interface TutorDelDia {
+  tutorId: number
+  nombreCompleto: string
+  dni: string
+  mascotas: { mascotaId: number; nombreMascota: string; motivos: MotivoJornada[] }[]
 }
 
 // ---------------------------------------------------------------- tutores
@@ -488,9 +539,26 @@ export const consultas = {
 // ---------------------------------------------------------------- comandas
 
 export const comandas = {
+  /**
+   * Historial completo de un tutor, de cualquier fecha.
+   *
+   * Para la caja del día está `listarDelDia`: este no acota por fecha, y el
+   * mostrador necesita las dos cosas.
+   */
   listarPorTutor: (tutorId: number, estado?: EstadoComanda) =>
     get<ComandaCobro[]>(
       `/comandas?tutorId=${tutorId}${estado ? `&estado=${estado}` : ""}`,
+    ),
+  /**
+   * Caja del día: comandas **emitidas** en la fecha.
+   *
+   * La fecha filtra por emisión y no por la fecha del turno, porque la comanda no
+   * conoce otra: se emite al guardar la ficha, que puede ser días después de la
+   * atención. `fecha` es opcional porque el backend usa hoy por defecto.
+   */
+  listarDelDia: (fecha?: string, tutorId?: number, estado?: EstadoComanda) =>
+    get<ComandaCobro[]>(
+      `/comandas/dia?${query({ fecha, tutorId, estado })}`,
     ),
   buscarPorId: (id: number) => get<ComandaCobro>(`/comandas/${id}`),
   emitir: (body: { concepto: ConceptoCobro; tutorId: number; mascotaId?: number; descripcion?: string }) =>
@@ -505,14 +573,25 @@ export const caja = {
   /**
    * Registra uno o varios pagos contra una comanda.
    *
-   * El array es lo que habilita el cobro mixto: una misma comanda se puede
-   * saldar con efectivo y transferencia en la misma operacion, y el backend
-   * recalcula el saldo una sola vez al final.
+   * El array es lo que habilita el cobro mixto: una misma comanda se puede saldar
+   * con efectivo y transferencia en la misma operacion, y el backend recalcula el
+   * saldo una sola vez al final.
+   *
+   * `tutorId` es opcional y aplica a toda la llamada: es la misma persona en los
+   * tres medios. Sirve para que un cotutor vinculado pague la comanda de su
+   * familia. El backend exige que este vinculado a la mascota de la comanda, y no
+   * revisa el flag de retiro: omitirlo asume al deudor. No cambia quien debe la
+   * comanda, solo registra quien pago.
    */
-  registrarPago: (comandaId: number, pagos: { metodoPago: MetodoPago; monto: number }[]) =>
-    post<ComandaCobro>(`/caja/pagos/${comandaId}`, { pagos }),
+  registrarPago: (
+    comandaId: number,
+    pagos: { metodoPago: MetodoPago; monto: number }[],
+    tutorId?: number,
+  ) => post<ComandaCobro>(`/caja/pagos/${comandaId}`, { pagos, tutorId }),
   pagosDe: (comandaId: number) => get<Pago[]>(`/caja/pagos/${comandaId}`),
   cierre: (fecha: string) => get<CierreCaja>(`/caja/cierre?fecha=${fecha}`),
+  /** Quién estuvo en la jornada, para cobrarle sin recorrer todo el padrón. */
+  tutoresDelDia: (fecha?: string) => get<TutorDelDia[]>(`/caja/tutores-del-dia?${query({ fecha })}`),
 }
 
 // ------------------------------------------------------------------ egreso
@@ -531,9 +610,29 @@ export const egreso = {
     ),
   validarPorTutorId: (mascotaId: number, tutorId: number) =>
     get<EgresoValidacion>(`/egreso/validar/tutor?mascotaId=${mascotaId}&tutorId=${tutorId}`),
+  /**
+   * Mascotas con turno o guardería en la fecha, con sus tutores y el flag de
+   * retiro de cada vínculo. La lista de candidatos del checkout; el veredicto sale
+   * de `validar`. Sin `fecha` es hoy.
+   */
+  pacientesDelDia: (fecha?: string) =>
+    get<MascotaDelDia[]>(`/egreso/pacientes-hoy?${query({ fecha })}`),
 }
 
 // ----------------------------------------------------------------- helpers
+
+/**
+ * Query string descartando lo que viene vacío.
+ *
+ * Sin esto habría que escribir `fecha ? "&fecha=" + fecha : ""` en cada llamada, y
+ * el olvido manda un parámetro vacío que el backend no sabe interpretar.
+ */
+function query(params: Record<string, string | number | undefined | null>) {
+  const partes = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+  return partes.length > 0 ? partes.join("&") : ""
+}
 
 /** Un numero del backend es `number | null`; la UI no deberia ver nulls. */
 export function aTexto(valor: number | null | undefined, porDefecto = "—") {
@@ -561,5 +660,20 @@ export function aHoraLocal(iso: string | null | undefined) {
 }
 
 export function esFechaHoy(fecha: string | null | undefined) {
-  return fecha === new Date().toISOString().slice(0, 10)
+  return fecha === hoyLocal()
+}
+
+/**
+ * Fecha de hoy en `YYYY-MM-DD` **local**.
+ *
+ * `new Date().toISOString()` devuelve la fecha en UTC, que en una zona como
+ * UTC-3 entre las 21:00 y las 24:00 da el dia de manana. Para una caja o un
+ * checkout abiertos por defecto a hoy, eso significaria mostrar la jornada
+ * equivocada justo cuando el mostrador esta cerrando el dia.
+ */
+export function hoyLocal() {
+  const ahora = new Date()
+  const mes = String(ahora.getMonth() + 1).padStart(2, "0")
+  const dia = String(ahora.getDate()).padStart(2, "0")
+  return `${ahora.getFullYear()}-${mes}-${dia}`
 }

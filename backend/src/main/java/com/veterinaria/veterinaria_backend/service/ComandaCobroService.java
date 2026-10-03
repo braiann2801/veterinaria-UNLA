@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +19,18 @@ public interface ComandaCobroService {
 
 	/** Comandas de un tutor, opcionalmente filtradas por estado. */
 	List<ComandaCobroResponseDTO> listarPorTutor(Long tutorId, String estado);
+
+	/**
+	 * Comandas emitidas en una jornada: la caja del dia.
+	 *
+	 * <p>Los tres filtros se combinan. Sin tutor devuelve todas las de la fecha,
+	 * que es lo que el mostrador consulta al abrir la jornada.</p>
+	 *
+	 * @param fecha  dia a listar; null significa hoy
+	 * @param tutorId tutor a acotar, o null para todas
+	 * @param estado estado a acotar, o null para todos
+	 */
+	List<ComandaCobroResponseDTO> listarDelDia(LocalDate fecha, Long tutorId, String estado);
 
 	ComandaCobroResponseDTO buscarPorId(Long id);
 

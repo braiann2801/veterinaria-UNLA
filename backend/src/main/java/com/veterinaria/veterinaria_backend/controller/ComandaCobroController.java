@@ -1,9 +1,11 @@
 package com.veterinaria.veterinaria_backend.controller;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,12 +40,34 @@ public class ComandaCobroController {
 		this.comandaService = comandaService;
 	}
 
-	/** GET /api/v1/comandas?tutorId=1&estado=PENDIENTE */
+	/**
+	 * GET /api/v1/comandas?tutorId=1&estado=PENDIENTE
+	 *
+	 * <p>Listado por tutor. El {@code tutorId} sigue siendo obligatorio: es el
+	 * historial completo de una persona, con el alcance de todas las fechas.</p>
+	 */
 	@GetMapping
 	public ResponseEntity<List<ComandaCobroResponseDTO>> listar(
 			@RequestParam Long tutorId,
 			@RequestParam(required = false) String estado) {
 		return ResponseEntity.ok(comandaService.listarPorTutor(tutorId, estado));
+	}
+
+	/**
+	 * GET /api/v1/comandas/dia?fecha=2026-10-03&estado=PENDIENTE&tutorId=1
+	 *
+	 * <p>La caja del dia. Los tres filtros son opcionales y se combinan; sin
+	 * {@code fecha} el backend usa hoy, porque el mostrador que abre la caja esta
+	 * arrancando la jornada. El filtro es por <b>fecha de emision</b>, que es
+	 * lo unico que la comanda conoce: la comanda de una consulta se emite al
+	 * guardar la ficha, que puede ser dias despues de la atencion.</p>
+	 */
+	@GetMapping("/dia")
+	public ResponseEntity<List<ComandaCobroResponseDTO>> listarDelDia(
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+			@RequestParam(required = false) Long tutorId,
+			@RequestParam(required = false) String estado) {
+		return ResponseEntity.ok(comandaService.listarDelDia(fecha, tutorId, estado));
 	}
 
 	/** GET /api/v1/comandas/{id} */

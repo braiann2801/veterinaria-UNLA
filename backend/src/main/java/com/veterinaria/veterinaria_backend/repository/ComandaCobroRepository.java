@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -63,4 +64,29 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 	 */
 	@Query(value = "SELECT * FROM comanda_cobro WHERE id = :id FOR UPDATE", nativeQuery = true)
 	Optional<ComandaCobro> bloquearPorId(@Param("id") Long id);
+
+	/**
+	 * Comandas emitidas en una jornada, para la caja del dia.
+	 *
+	 * <p>El rango es semiabierto {@code [inicio, fin)} por la misma razon que en
+	 * {@code TurnoClinicoRepository.findDelDia}: una comanda emitida a las 00:00
+	 * del dia siguiente no es de hoy, y con un rango cerrado entraria en los dos
+	 * listados.</p>
+	 *
+	 * <p><b>La fecha filtra por {@code fechaEmision}, que es la unica fecha que la
+	 * comanda tiene.</b> No se infiere el dia del turno o de la reserva: la comanda
+	 * se emite al guardar la ficha clinica, que puede ser dias despues de la
+	 * atencion. Filtrar "comandas del dia" por la actividad mezclaria en el corte
+	 * de hoy una consulta de la semana pasada. Lo que la caja del dia necesita son
+	 * las emisiones de la jornada, que es ademas lo que un cierre de caja cuenta.</p>
+	 *
+	 * <p>El orden es por emision descendente con desempate por id: la comanda mas
+	 * reciente arriba, y dos emitidas en el mismo instante con orden estable.</p>
+	 */
+	@Query("""
+			SELECT c FROM ComandaCobro c
+			WHERE c.fechaEmision >= :inicio AND c.fechaEmision < :fin
+			ORDER BY c.fechaEmision DESC, c.id DESC
+			""")
+	List<ComandaCobro> findDelDia(@Param("inicio") LocalDateTime inicio, @Param("fin") LocalDateTime fin);
 }

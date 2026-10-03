@@ -1,11 +1,188 @@
 ﻿# PROGRESS.md
 
 ## Estado Actual
-- Tarea en curso: [Ninguna] — **TASK-008 (FASE 2) FINALIZADA**
+- Tarea en curso: [Ninguna] — **TASK-009 (FASE 3) FINALIZADA**
 - Agente asignado: Orquestador -> Implementador -> Revisor/Harness — OK
 - Bloqueantes: [Ninguno]
-- Harness: `tsc --noEmit` limpio, `next build` OK, **121 tests backend en verde**
-  (104 previos + 17 nuevos)
+- Harness: `tsc --noEmit` limpio, `next build` OK, **145 tests backend en verde**
+  (121 previos + 24 nuevos)
+
+## Revisión de FASE 3 (Revisor)
+
+Tres observaciones que se corrigieron antes de dar por cerrada la fase:
+
+1. **`esFechaHoy` comparaba contra la fecha UTC.** Usaba
+   `toISOString().slice(0,10)`, que entre las 21:00 y las 24:00 de una zona
+   UTC-3 devuelve el día de mañana. El módulo ya tenía `aFechaLocal` con el
+   comentario explicando ese mismo error, pero el helper de "hoy" no lo aplicaba.
+   Con la Caja y el Egreso abriendo por defecto en hoy, el mostrador abría la
+   jornada equivocada justo en la franja en la que está cerrando el día. Se
+   agregó `hoyLocal()`, que arma la fecha con `getFullYear/getMonth/getDate`, y
+   `esFechaHoy` pasó a usar ese helper.
+2. **El selector de "quién paga" se armaba con la jornada, no con la ficha.** La
+   primera versión de `caja.tsx` llamaba a `/egreso/pacientes-hoy` con la fecha de
+   emisión de la comanda para sacar los tutores de la mascota. Funciona solo si el
+   animal estuvo en el local ese día: una comanda vieja, cobrada hoy con el cliente
+  returned de visita, mostraba la lista de pagadores de otra familia. Cambiado a
+   `mascotas.buscarPorId(comanda.mascotaId)`, que es la fuente de los vínculos y no
+   depende del día.
+3. **Dos caminos de entrada al semáforo, un solo veredicto.** El modal de egreso
+   ofrece los tutores vinculados (el caso normal, sin escribir un DNI) y deja el
+   campo de DNI para quien no figura en la base. No son dos reglas: los dos
+   caminos llaman al mismo endpoint y pintan el mismo `EgresoValidacion`. La UI no
+   decide habilitación; sólo muestra el `autorizadoRetiro` como dato.
+
+Sobre los criterios de aprobación de la sección 4.3:
+
+- **Capas:** los tres controladores delegan sin lógica; toda decisión vive en
+  `CajaServiceImpl`, `ComandaCobroServiceImpl` y `JornadaDelDiaServiceImpl`. No se
+  agregaron repositorios fuera de `ComandaCobroRepository`.
+- **Ciclos de Jackson:** `PagoResponseDTO` grown con dos campos planos
+  (`tutorPagadorId`, `nombreTutorPagador`) en vez de un `Tutor` anidado. El DTO
+  sigue siendo una proyección sin retroceso.
+- **Semánticas HTTP:** `400` para tutor no vinculado y para estado de comanda
+  inválido, `404` para pagador inexistente, `409` para comanda cancelada o
+  saldada (comportamiento previo, sin cambios). Ningún endpoint devuelve 409 por
+  un retiro bloqueado: sigue siendo una respuesta válida con veredicto.
+- **Carga y error:** ambas vistas usan `useApi` con `clave` por fecha, y `Recurso`
+  / `ErrorBox` para los tres estados. El reintentar es explícito, no automático.
+- **Responsive:** los controles del filtro de caja bajan a una columna bajo `sm`
+  y las filas de egreso apilan el botón debajo del dato. Todos los inputs y
+  botones llevan `TOQUE_MINIMO` (44 px), y el modal es `max-w-lg` a pantalla
+  completa en móvil.
+
+## Cambios de FASE 3
+
+**Backend — nuevo:**
+- `service/JornadaDelDiaService` + `service/impl/JornadaDelDiaServiceImpl`: una
+  sola definición de "actividad del día" (turno no cancelado o reserva
+  RESERVADO/INGRESADO), ordenada por el primer horario y con las mascotas sin hora
+  al final, igual que `findByFechaOrdenadasPorHorario`.
+- `dto/MascotaDelDiaResponseDTO`, `dto/TutorDelDiaResponseDTO`: la proyección que
+  comparten egreso y caja.
+
+**Backend — endpoints:**
+- `GET /api/v1/comandas/dia?fecha&tutorId&estado` (Caja del Día; los tres
+  filtros opcionales, `fecha` por defecto hoy).
+- `GET /api/v1/egreso/pacientes-hoy?fecha` (candidatos del checkout).
+- `GET /api/v1/caja/tutores-del-dia?fecha` (a quién cobrarle).
+- `POST /api/v1/caja/pagos/{id}` acepta `tutorId` opcional.
+
+**Backend — cobros:**
+- `Pago.tutorPagador` (columna `tutor_pagador_id`, nullable) y su proyección en
+  `PagoResponseDTO`. La deuda **no** cambia de dueño: se registra quién pagó.
+- `resolverPagador` en `CajaServiceImpl`: acepta al deudor o a cualquier tutor
+  vinculado a la mascota de la comanda. **Valida la vinculación, no
+  `autorizado_retiro`**: el flag gobierna el retiro (regla 2.4), no el cobro. Sin
+  mascota en la comanda, solo el titular.
+- `findDelDia(inicio, fin)` en `ComandaCobroRepository`, rango semiabierto.
+- `mapper/CobroMapper` proyecta el pagador.
+
+**Frontend:**
+- `lib/api.ts`: `hoyLocal()`, tipos `MascotaDelDia` / `TutorVinculado` /
+  `TutorDelDia` / `MotivoJornada`, `comandas.listarDelDia`,
+  `caja.tutoresDelDia`, `caja.registrarPago(…, tutorId?)`, `egreso.pacientesDelDia`,
+  y helper `query()` que descarta parámetros vacíos.
+- `components/modules/caja.tsx`: reescrito como Caja del Día.
+- `components/modules/egreso.tsx`: reescrito como checkout de la jornada, con
+  botón "Validar egreso" por fila.
+
+**Tests nuevos (24):** `JornadaDelDiaTest` (9) y `CajaDelDiaTest` (15).
+
+### Decisiones de la revisión que conviene no perder
+
+- **La Caja del Día filtra por fecha de emisión, no por la del turno.** La comanda
+  se emite al guardar la ficha y no conoce otra fecha. Filtrar por la actividad
+  mezclaría una consulta de la semana pasada en el corte de hoy.
+- **Un tercero vinculado puede pagar aunque no esté autorizado a retirar.** Es el
+  caso real (el hermano del dueño vino a pagar y no puede llevarse al perro) y es
+  la confusión más probable de esta fase: son dos puertas distintas.
+- **El deudor de la comanda no se reasigna al pagador.** Mover la deuda haría que
+  el deudor real apareciera al día y el que pagó quedara moroso.
+- **El turno CANCELADO y la reserva CANCELADA/FINALIZADA no cuentan como
+  actividad.** Si aparecieran, la caja ofrecería cobrar una consulta que no se
+  atendió.
+- **`GET /comandas?tutorId=` no cambió.** Sigue siendo el historial completo de un
+  tutor y `tutorId` sigue siendo obligatorio; la caja del día va por `/dia`. El
+  único consumidor del endpoint viejo era `caja.tsx`, que se reescribió, y ningún
+  test lo golpeaba.
+
+## Diagnóstico de FASE 2 (Orquestador)
+
+## Diagnóstico de FASE 3 (Orquestador)
+
+FASE 3: Vista de Caja del Día (Turnos/Guardería de Hoy) y Checkout de Egreso
+Filtrado por Fecha.
+
+**Nota previa sobre el alcance de archivos.** Igual que en FASE 1 y FASE 2, el
+encargo menciona `frontend/src/`, que no existe: el frontend vive en la raíz
+(`app/`, `components/`, `lib/`). Se toman esos directorios. En el backend se
+toca `entity, controller, service, dto, repository` de Comanda, Caja y Egreso,
+**más `mapper/CobroMapper`**, que es el archivo que proyecta `Pago` al DTO
+público y por lo tanto es inseparable de los dos módulos: sin tocarlo, el
+`pago.tutorPagador` no llegaría al mostrador. No se modifica
+`TurnoClinicoRepository` ni `ReservaGuarderiaRepository`: los dos métodos que
+hacen falta ya existen (`findDelDia`, `findByFechaAndEstadoIn`).
+
+Tres diagnósticos fueron planteados. **Ninguno se sostiene tal como está escrito,
+y el que más daño hace es el primero**, porque su corrección literal rompería
+cosas que hoy funcionan.
+
+1. **"GET /api/v1/comandas debe filtrar por fecha" — el endpoint no existe como
+   caja del día, y `fecha_emision` no es lo que el encargo sugiere.**
+   `ComandaCobroController.listar` declara `@RequestParam Long tutorId`
+   **obligatorio**: no hay listing global, no hay filtro por fecha y no hay
+   forma de obtener "las comandas de hoy". El encarte del endpoint es además
+   ambiguo: `ComandaCobro` solo tiene `fecha_emision`, y la comanda de una
+   consulta se emite al guardar la ficha, no al cobrar. Filtrar "guardería del
+   día" por emisión mezclaría una reserva de hoy facturada mañana con las
+   comandas de hoy. **La fecha que se filtra es la de emisión**, y queda
+   documentado que "caja del día" significa "lo que se emitió hoy", que es
+   además lo único que un corte de caja necesita. Los filtros de `estado` y de
+   `tutor` pasan a ser opcionales y combinables.
+
+2. **"El pago puede hacerlo cualquiera de los tutores vinculados" — el
+   endpoint citado no existe con esa ruta y no tiene ningún campo de pagador.**
+   El cobro entra por `POST /api/v1/caja/pagos/{comandaId}`, no por
+   `POST /api/v1/comandas/{id}/pagos`; y `PagoRequestDTO` solo transporta la
+   lista de medios de pago. `Pago` no tiene ninguna referencia al tutor que
+   paga: hoy **no se sabe quién pagó**. Agregar `tutorId` opcional y validarlo
+   contra `tutor_mascota` cierra el hueco.
+   El punto no obvio es **qué NO hay que hacer**: el deudor de la comanda no se
+   reasigna al que paga. Mover la deuda de un tutor a otro porque un cotutor
+   pagó haría que el deudor real apareciera al día y el que pagó quedara
+   moroso. Lo que se registra es *quién pagó*, y la deuda sigue donde estaba.
+
+3. **"El flag de retiro" NO aplica al cobro, y es el error más tentador de esta
+   fase.** `tutor_mascota.autorizado_retiro` gobierna **quién puede retirar a la
+   mascota** (regla 2.4), no quién puede pagar. Un cotutor sin autorización de
+   retiro es perfectamente alguien a quien se le acepta pagar: son dos puertas
+   distintas. Se valida **la vinculación**, no el flag. Usar el flag acá
+   rechazaría el caso real: el hermano del dueño vino a pagar y se lleva al
+   perro, y tiene prohibido retirarlo.
+
+4. **"En Egreso, listar las mascotas con estadía del día" — CONFIRMADO, no
+   existe.** `EgresoController` expone solo `/validar` y `/validar/tutor`, por
+   diseño deliberado (un endpoint, un veredicto). No hay ninguna forma de
+   listar la jornada, así que el mostrador no tiene de dónde partir: tiene que
+   buscar la mascota entre todas, a mano, y recién ahí discover que puede
+   validar. La regla de validación consolidada no se toca.
+
+5. **Riesgo de diseño: dos consultas de "actividad del día" divergiendo.** Caja
+   necesita "quién estuvo hoy" y Egreso necesita "qué pacientes están hoy". Si
+   cada uno escribe su propia versión de "tiene turno o tiene reserva", el día
+   que una de las dos se olvide de excluir los CANCELADOS, la caja muestra a
+   alguien que nunca vino. Se crea **un solo servicio de consulta** de jornada
+   y los dos módulos delegan, igual que el egreso ya delegaba la morosidad en
+   `ComandaCobroService.consultarDeuda`.
+
+6. **Riesgo de regresión en el frontend.** `GET /comandas` pasa a filtrar por
+   fecha. `caja.tsx` es su único consumidor y se reescribe en esta fase, y
+   **ningún test existente golpea `GET /api/v1/comandas?tutorId=`** (verificado
+   por grep: los tests solo usan `POST /comandas` y `PUT /comandas/tarifas`).
+   Aun así, el historial completo de un tutor no se pierde: sigue disponible en
+   el detalle de `GET /tutores/{id}/deuda`, que lista las pendientes con días de
+   atraso. Se deja asentado para que nadie Después lo reporte como bug.
 
 ## Diagnóstico de FASE 2 (Orquestador)
 

@@ -17,15 +17,21 @@ import com.veterinaria.veterinaria_backend.dto.CierreCajaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.TutorDelDiaResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ComandaCobro;
+import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.Pago;
+import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.CobroMapper;
 import com.veterinaria.veterinaria_backend.repository.ComandaCobroRepository;
 import com.veterinaria.veterinaria_backend.repository.PagoRepository;
+import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
+import com.veterinaria.veterinaria_backend.repository.TutorRepository;
 import com.veterinaria.veterinaria_backend.service.CajaService;
+import com.veterinaria.veterinaria_backend.service.JornadaDelDiaService;
 
 /**
  * Implementacion transaccional de {@link CajaService}.
@@ -43,13 +49,22 @@ public class CajaServiceImpl implements CajaService {
 
 	private final ComandaCobroRepository comandaRepository;
 	private final PagoRepository pagoRepository;
+	private final TutorMascotaRepository vinculoRepository;
+	private final TutorRepository tutorRepository;
+	private final JornadaDelDiaService jornadaDelDiaService;
 	private final CobroMapper mapper;
 
 	public CajaServiceImpl(ComandaCobroRepository comandaRepository,
 			PagoRepository pagoRepository,
+			TutorMascotaRepository vinculoRepository,
+			TutorRepository tutorRepository,
+			JornadaDelDiaService jornadaDelDiaService,
 			CobroMapper mapper) {
 		this.comandaRepository = comandaRepository;
 		this.pagoRepository = pagoRepository;
+		this.vinculoRepository = vinculoRepository;
+		this.tutorRepository = tutorRepository;
+		this.jornadaDelDiaService = jornadaDelDiaService;
 		this.mapper = mapper;
 	}
 
@@ -67,13 +82,18 @@ public class CajaServiceImpl implements CajaService {
 					"La comanda " + comandaId + " ya esta saldada.");
 		}
 
+		// Se resuelve una sola vez por operacion: es la misma persona en los tres
+		// medios de un cobro mixto, y validarlo por linea haria tres viajes a la
+		// base y tres mensajes de error posibles por la misma causa.
+		Tutor pagador = resolverPagador(comanda, request.tutorId());
+
 		BigDecimal saldoAntes = comanda.getSaldoPendiente();
 
 		// Todos los pagos de la llamada se aplican en esta transaccion. Si el
 		// segundo excede el saldo, la excepcion revierte el primero: el cliente
 		// no puede quedar con medio cobro registrado.
 		for (PagoRequestDTO.DetallePagoDTO detalle : request.pagos()) {
-			aplicarPago(comanda, detalle, saldoAntes);
+			aplicarPago(comanda, detalle, saldoAntes, pagador);
 			saldoAntes = comanda.getSaldoPendiente();
 		}
 
@@ -91,6 +111,13 @@ public class CajaServiceImpl implements CajaService {
 			throw new BadRequestException("El id de la comanda es obligatorio");
 		}
 		return mapper.toPagoResponseList(pagoRepository.findByComandaIdOrderByFechaHoraAsc(comandaId));
+	}
+
+	@Override
+	public List<TutorDelDiaResponseDTO> tutoresDelDia(LocalDate fecha) {
+		// Sin reglas propias: "actividad del dia" tiene una sola definicion y la
+		// comparte con el checkout de egreso.
+		return jornadaDelDiaService.tutoresDelDia(fecha);
 	}
 
 	@Override
@@ -172,7 +199,7 @@ public class CajaServiceImpl implements CajaService {
 	}
 
 	private void aplicarPago(ComandaCobro comanda, PagoRequestDTO.DetallePagoDTO detalle,
-			BigDecimal saldoAntes) {
+			BigDecimal saldoAntes, Tutor pagador) {
 		BigDecimal monto = detalle.monto().setScale(2, RoundingMode.HALF_UP);
 
 		if (monto.compareTo(BigDecimal.ZERO) <= 0) {
@@ -190,6 +217,7 @@ public class CajaServiceImpl implements CajaService {
 		pago.setMetodoPago(Pago.MetodoPago.valueOf(detalle.metodoPago().name()));
 		pago.setMonto(monto);
 		pago.setFechaHora(LocalDateTime.now());
+		pago.setTutorPagador(pagador);
 
 		// registrarPago vuelve a validar el saldo, descuenta y recalcula el
 		// estado. Los chequeos de arriba ya cubren la mayor parte de los casos,
@@ -202,5 +230,61 @@ public class CajaServiceImpl implements CajaService {
 		} catch (IllegalArgumentException ex) {
 			throw new BadRequestException(ex.getMessage());
 		}
+	}
+
+	/**
+	 * Quien esta pagando, segun lo que declara la peticion.
+	 *
+	 * <p>Sin {@code tutorId} se asume el deudor de la comanda, que es el caso
+	 * normal y el unico posible antes de que existiera el campo: los pagos ya
+	 * cargados no tienen pagador y no se van a inventar.</p>
+	 *
+	 * <p>Con {@code tutorId} se exige que sea el deudor o un tutor vinculado a la
+	 * mascota de la comanda. Se valida la <b>vinculacion</b> y no el
+	 * {@code autorizado_retiro}: el flag gobierna quien puede llevarse al animal
+	 * (regla 2.4) y el cobro es otra puerta. Un cotutor al que se le prohibio
+	 * retirar al perro es exactamente a quien se le acepta el pago cuando vino a
+	 * saldar la cuenta de la familia; exigir el flag en el cobro rechazaria el caso
+	 * real y dejaria la comanda impaga.</p>
+	 *
+	 * <p>Sin mascota no hay vinculo contra el cual comprobar: ahi solo el deudor
+	 * puede pagar. Admitir cualquier tutor seria aceptar que un desconocido salde
+	 * una comanda ajena.</p>
+	 *
+	 * <p>Que exista en {@code tutor} no alcanza: sin el vinculo, o con el vinculo y
+	 * el flag en false, la respuesta es la misma por decision de negocio. La
+	 * diferencia solo importa para diagnosticar, igual que en el semaforo de egreso.</p>
+	 */
+	private Tutor resolverPagador(ComandaCobro comanda, Long tutorId) {
+		if (tutorId == null) {
+			return comanda.getTutor();
+		}
+
+		Tutor tutor = tutorRepository.findById(tutorId)
+				.orElseThrow(() -> ResourceNotFoundException.tutor(tutorId));
+
+		if (tutorId.equals(comanda.getTutor().getId())) {
+			return tutor;
+		}
+
+		Mascota mascota = comanda.getMascota();
+		if (mascota == null) {
+			throw new BadRequestException(
+					"La comanda " + comanda.getId() + " no tiene mascota asociada, "
+							+ "asi que solo puede pagarla su titular " + comanda.getTutor().getNombreCompleto());
+		}
+
+		boolean vinculado = vinculoRepository
+				.findByTutorIdAndMascotaId(tutorId, mascota.getId())
+				.isPresent();
+		if (!vinculado) {
+			throw new BadRequestException(
+					"El tutor " + tutor.getNombreCompleto() + " no esta vinculado a "
+							+ mascota.getNombre() + ", asi que no puede pagar esta comanda. "
+							+ "Pagala el tutor " + comanda.getTutor().getNombreCompleto()
+							+ " o vinculen al tutor a la mascota desde el padron.");
+		}
+
+		return tutor;
 	}
 }

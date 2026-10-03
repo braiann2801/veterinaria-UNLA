@@ -2,6 +2,7 @@ package com.veterinaria.veterinaria_backend.service.impl;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO.MotivoBloqueo;
+import com.veterinaria.veterinaria_backend.dto.MascotaDelDiaResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ConsultaMedica;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
@@ -25,6 +27,7 @@ import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
 import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.EgresoService;
+import com.veterinaria.veterinaria_backend.service.JornadaDelDiaService;
 
 /**
  * Circuito de egreso seguro.
@@ -51,17 +54,27 @@ public class EgresoServiceImpl implements EgresoService {
 	private final TutorMascotaRepository vinculoRepository;
 	private final ConsultaMedicaRepository consultaRepository;
 	private final ComandaCobroService comandaService;
+	private final JornadaDelDiaService jornadaDelDiaService;
 
 	public EgresoServiceImpl(MascotaRepository mascotaRepository,
 			TutorRepository tutorRepository,
 			TutorMascotaRepository vinculoRepository,
 			ConsultaMedicaRepository consultaRepository,
-			ComandaCobroService comandaService) {
+			ComandaCobroService comandaService,
+			JornadaDelDiaService jornadaDelDiaService) {
 		this.mascotaRepository = mascotaRepository;
 		this.tutorRepository = tutorRepository;
 		this.vinculoRepository = vinculoRepository;
 		this.consultaRepository = consultaRepository;
 		this.comandaService = comandaService;
+		this.jornadaDelDiaService = jornadaDelDiaService;
+	}
+
+	@Override
+	public List<MascotaDelDiaResponseDTO> listarPacientesDelDia(LocalDate fecha) {
+		// Sin reglas propias: la definicion de "estuvo hoy" es una sola y la
+		// comparte con la caja del dia.
+		return jornadaDelDiaService.mascotasDelDia(fecha);
 	}
 
 	@Override

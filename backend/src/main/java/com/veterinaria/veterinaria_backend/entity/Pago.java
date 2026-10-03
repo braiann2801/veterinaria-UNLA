@@ -58,6 +58,24 @@ public class Pago {
 	@Column(name = "fecha_hora", nullable = false)
 	private LocalDateTime fechaHora = LocalDateTime.now();
 
+	/**
+	 * Quien pago efectivamente.
+	 *
+	 * <p>Es nullable a proposito: los pagos anteriores a TASK-009 no lo tienen, y
+	 * rellenarlo con el tutor de la comanda seria inventar un dato que nadie
+	 * registro. Cuando el cliente lo omite se asume que pago el deudor de la
+	 * comanda, que es el caso normal y el unico posible antes de esta fase.</p>
+	 *
+	 * <p>No reemplaza al {@code tutor} de la comanda ni lo reassigna: la deuda
+	 * sigue siendo de quien la contrajo. Si un cotutor paga y la comanda queda
+	 * saldada, la deuda desaparece para todos; si queda un saldo, sigue siendo del
+	 * titular. Moverle el deudor al que pago haria que el deudor real apareciera al
+	 * dia y el que pago quedara moroso, que es justo lo contrario de lo justo.</p>
+	 */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "tutor_pagador_id")
+	private Tutor tutorPagador;
+
 	public enum MetodoPago {
 		EFECTIVO,
 		TRANSFERENCIA,

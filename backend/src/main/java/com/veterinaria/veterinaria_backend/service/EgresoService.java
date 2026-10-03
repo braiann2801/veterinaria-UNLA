@@ -1,6 +1,10 @@
 package com.veterinaria.veterinaria_backend.service;
 
+import java.time.LocalDate;
+import java.util.List;
+
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.MascotaDelDiaResponseDTO;
 
 /**
  * Circuito de egreso seguro.
@@ -27,4 +31,20 @@ public interface EgresoService {
 	 * @return veredicto consolidado, con el motivo si esta bloqueado
 	 */
 	EgresoValidacionResponseDTO validarPorTutorId(Long mascotId, Long tutorId);
+
+	/**
+	 * Mascotas con actividad en la fecha, para el checkout del mostrador.
+	 *
+	 * <p>No es el semaforo: es la lista de candidatos. El mostrador no puede
+	 * elegir a quien va a validar si primero tiene que acordarse de que el animal
+	 * esta en el local. Los tutores viajan con su flag de retiro porque la lista
+	 * tiene que poder distinguir de entrada a quien puede llevarselo de a quien solo
+	 * vino a pagar, pero no se usa para autorizar pagos: esa es otra regla.</p>
+	 *
+	 * <p>Delega en {@link JornadaDelDiaService}: la caja del dia necesita la misma
+	 * jornada y las dos tienen que ver exactamente los mismos animales.</p>
+	 *
+	 * @param fecha jornada a listar; null o vacio significa hoy
+	 */
+	List<MascotaDelDiaResponseDTO> listarPacientesDelDia(LocalDate fecha);
 }

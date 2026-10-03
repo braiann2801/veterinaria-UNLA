@@ -3,6 +3,7 @@ package com.veterinaria.veterinaria_backend.controller;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import com.veterinaria.veterinaria_backend.dto.CierreCajaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.TutorDelDiaResponseDTO;
 import com.veterinaria.veterinaria_backend.service.CajaService;
 
 import jakarta.validation.Valid;
@@ -61,5 +63,19 @@ public class CajaController {
 	public ResponseEntity<CierreCajaResponseDTO> cerrarJornada(
 			@RequestParam(required = false) LocalDate fecha) {
 		return ResponseEntity.ok(cajaService.cerrarJornada(fecha));
+	}
+
+	/**
+	 * GET /api/v1/caja/tutores-del-dia?fecha=2026-10-03
+	 *
+	 * <p>Quien estuvo hoy, para cobrarle sin recorrer el padron entero. Sin
+	 * {@code fecha} es hoy, igual que en {@code /comandas/dia}: las dos pantallas
+	 * comparten el mismo dia por defecto a proposito, y por eso comparten el mismo
+	 * servicio de consulta.</p>
+	 */
+	@GetMapping("/tutores-del-dia")
+	public ResponseEntity<List<TutorDelDiaResponseDTO>> tutoresDelDia(
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+		return ResponseEntity.ok(cajaService.tutoresDelDia(fecha));
 	}
 }

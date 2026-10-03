@@ -18,11 +18,26 @@ import jakarta.validation.constraints.NotNull;
  * <p>Todos los pagos de una llamada se aplican en la misma transaccion: si uno
  * falla, no se aplica ninguno. Un cobro parcial silencioso dejaria la caja
  * descuadrada respecto de lo que el cliente cree que pago.</p>
+ *
+ * <p>{@code tutorId} es opcional y aplica a toda la llamada, no a cada pago:
+ * una operacion de mostrador la hace una sola persona aunque la comanda se salde
+ * con tres medios. Cuando viene, el backend exige que ese tutor este vinculado
+ * a la mascota de la comanda; cuando no viene, se asume el deudor.</p>
  */
 public record PagoRequestDTO(
 
 		@NotEmpty(message = "Debe registrar al menos un pago")
-		List<@Valid DetallePagoDTO> pagos) {
+		List<@Valid DetallePagoDTO> pagos,
+
+		/**
+		 * Quien paga. Opcional: null significa el deudor de la comanda.
+		 *
+		 * <p>Se valida la <b>vinculacion</b> con la mascota, no el flag de retiro.
+		 * El flag gobierna quien puede llevarse al animal (regla 2.4); pagar es otra
+		 * puerta, y un cotutor sin autorizacion de retiro es justamente a quien se
+		 * le acepta el pago cuando vino a saldar la cuenta de su familia.</p>
+		 */
+		Long tutorId) {
 
 	public record DetallePagoDTO(
 

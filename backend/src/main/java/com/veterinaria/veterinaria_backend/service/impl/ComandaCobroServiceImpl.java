@@ -3,6 +3,7 @@ package com.veterinaria.veterinaria_backend.service.impl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -77,6 +78,32 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 		return mapper.toComandaResponseList(
 				comandaRepository.findByTutorIdAndEstadoOrderByFechaEmisionDesc(
 						tutorId, parseEstado(estado)));
+	}
+
+	@Override
+	public List<ComandaCobroResponseDTO> listarDelDia(LocalDate fecha, Long tutorId, String estado) {
+		LocalDate dia = fecha != null ? fecha : LocalDate.now();
+		LocalDateTime desde = dia.atStartOfDay();
+		LocalDateTime hasta = dia.plusDays(1).atStartOfDay();
+
+		// Se parte siempre de la consulta de la jornada y no de las derivadas por
+		// tutor: la caja del dia necesita las comandas de todos para poder
+		// seleccionar a quien cobrarle. Anadir un derived query por cada
+		// combinacion de filtros seria multiplicar metodos que solo existen para
+		// saver el filtro en memoria.
+		List<ComandaCobro> delDia = comandaRepository.findDelDia(desde, hasta);
+
+		// El estado se parsea una vez y no dentro del filtro: si viniera
+		// invalido tiene que fallar aunque la jornada no tenga ninguna comanda,
+		// igual que en listarPorTutor. Un 400 silencioso seria peor que un 500.
+		ComandaCobro.EstadoComanda estadoFiltro = estado == null || estado.isBlank()
+				? null
+				: parseEstado(estado);
+
+		return mapper.toComandaResponseList(delDia.stream()
+				.filter(comanda -> tutorId == null || tutorId.equals(comanda.getTutor().getId()))
+				.filter(comanda -> estadoFiltro == null || estadoFiltro.equals(comanda.getEstado()))
+				.toList());
 	}
 
 	@Override
