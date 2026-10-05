@@ -3,10 +3,18 @@
 /**
  * Shell del MVP 1.
  *
- * Las vistas nuevas (Padrón, Agenda, Ficha médica, Caja, Egreso) consumen la
- * API real de `lib/api.ts`. Las que quedaron en modo demo durante TASK-001 a
- * TASK-004 (Balance y el Historial genérico) siguen montadas para no romper el
- * recorrido, pero se avisa en pantalla de que no leen la base.
+ * Todo lo que se ve aca lee la base real salvo dos cosas, y las dos se avisan en
+ * pantalla con `AvisoDemo` para que el operador no tome por real un dato que no
+ * lo es:
+ *
+ * - el Balance del día, que sigue sumando pagos semilla del store (el cierre real
+ *   está en `GET /api/v1/caja/cierre`), y que además es exclusivo del Dueño;
+ * - el tablero de movimiento del Mostrador, que muestra los turnos, reservas y
+ *   deudas semilla del store.
+ *
+ * Los dos modales del Mostrador (Cargar cliente y Agregar turno) sí persisten:
+ * van contra la API. El Historial se migro de lectura en memoria a lectura de la
+ * API en HOTFIX-UI, asi que ya no es una de las pantallas de demo.
  */
 
 import { useEffect, useState } from "react"
@@ -28,7 +36,12 @@ import { Panel } from "@/components/ui/field"
 function Shell() {
   const { role } = useStore()
   const [active, setActive] = useState<TabId>("mostrador")
-  const [fichaDogId, setFichaDogId] = useState<string | null>(null)
+  const [fichaMascotaId, setFichaMascotaId] = useState<number | null>(null)
+
+  // El Balance (recaudacion del dia) es exclusivo del Dueno. El sidebar ya lo
+  // oculta para los otros roles, pero se repite la guarda acá porque este modulo
+  // no debe depender de que la navegacion se mantenga sincronizada.
+  const esDuenio = role === "duenio"
 
   // Si el rol actual no puede ver la pestaña activa, volver a Mostrador.
   useEffect(() => {
@@ -36,8 +49,8 @@ function Shell() {
     if (tab && !tab.roles.includes(role)) setActive("mostrador")
   }, [role, active])
 
-  const verFichas = (dogId: string) => {
-    setFichaDogId(dogId)
+  const verFichas = (mascotaId: number) => {
+    setFichaMascotaId(mascotaId)
     setActive("fichas")
   }
 
@@ -53,7 +66,7 @@ function Shell() {
               <div className="flex flex-col gap-4">
                 <AvisoDemo
                   titulo="Mostrador"
-                  texto="El padrón de profesionales y el resumen de la jornada leen la base real. El alta de tutores y mascotas está en Padrón; el movimiento clínico y de caja, en Agenda, Ficha médica, Caja y Egreso."
+                  texto="«Cargar cliente» y «Agregar turno» guardan en la base: el tutor, la mascota y su vínculo, y el turno que después aparece en Agenda. El padrón de profesionales también lee la base. Lo que NO es real es el tablero de movimiento de abajo (turnos, ingresos, egresan y deudas): muestra datos de demostración."
                 />
                 <Mostrador />
                 {/* El padron de profesionales va en el mostrador porque es la
@@ -67,11 +80,19 @@ function Shell() {
             {active === "consultas" && <FichaMedica />}
             {active === "cobros" && <Caja />}
             {active === "egreso" && <Egreso />}
-            {active === "balance" && (
+            {active === "fichas" && (
+              <Fichas key={fichaMascotaId} initialMascotaId={fichaMascotaId} />
+            )}
+            {/* El Balance va condicional por rol y no solo por pestana: es la
+                unica metrica de recaudacion de la app y tiene que quedarle fuera
+                a Recepcion y Veterinario aunque lleguen con el rol cambiado en
+                la URL. La tarjeta "Total en caja" vive dentro de este modulo, no
+                en Caja: un veterinario que cobra no esta mirando el balance del
+                dia, solo las comandas que tiene delante. */}
+            {active === "balance" && esDuenio && (
               <AvisoDemo titulo="Balance del día" texto="Todavía usa datos en memoria. El cierre de caja real se expone en /api/v1/caja/cierre." />
             )}
-            {active === "balance" && <Balance />}
-            {active === "fichas" && <Fichas key={fichaDogId} initialDogId={fichaDogId} />}
+            {active === "balance" && esDuenio && <Balance />}
           </div>
         </main>
       </div>

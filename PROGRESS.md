@@ -1,11 +1,330 @@
-﻿# PROGRESS.md
+# PROGRESS.md
 
 ## Estado Actual
-- Tarea en curso: [Ninguna] — **TASK-009 (FASE 3) FINALIZADA**
-- Agente asignado: Orquestador -> Implementador -> Revisor/Harness — OK
+- Tarea en curso: [Ninguna] - **HOTFIX-UI FINALIZADA**
+- Agente asignado: Orquestador (diagnóstico) -> Implementador -> Revisor/Harness
 - Bloqueantes: [Ninguno]
+- Base: `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas por el dueño)
 - Harness: `tsc --noEmit` limpio, `next build` OK, **145 tests backend en verde**
-  (121 previos + 24 nuevos)
+- Verificación extra: los 13 casos end-to-end contra `veterinaria_db` real, más 4
+  negativos por contrato. Base devuelta a cero.
+- Cambios **sin commitear**: 6 archivos de frontend + este `PROGRESS.md`. El
+  backend no se tocó.
+
+> Nota de arranque: el `PROGRESS.md` del working tree había quedado sobrescrito con
+> una versión vieja (TASK-005) y perdía el historial de TASK-006 a TASK-009. Se
+> restauró con `git checkout -- PROGRESS.md` antes de arrancar; el trabajo de las
+> fases previas estaba commiteado y no se perdió nada.
+
+## Diagnóstico de HOTFIX-UI (Orquestador)
+
+El encargo tiene cuatro partes. **Dos se aplican tal como están escritas, una
+necesita una corrección que no es negociable, y una tiene un dato de contrato
+equivocado.**
+
+### 0. Dos aclaraciones del dueño que fijan el criterio de aceptación
+
+1. **Lo que realmente se pide en la navegación es que Recepción y Veterinario vean
+   los mismos módulos, en el mismo orden.** "Balance es el único módulo que no
+   tienen que ver ni Recepción ni Veterinario" es la regla, y el orden de 7 ítems
+   es la forma de expresarla. El dueño además habilitó que Balance ocupe el
+   anteúltimo lugar, así que **Egreso queda último** y **Balance, cuando aparece,
+   queda justo antes**. Con esto la lista de Recepción y la de Veterinario son
+   idénticas (7 ítems) y la del Dueño es esa misma más Balance.
+2. **"Agregar turno" también tiene que persistir.** El dueño pipedó que el botón
+   del Mostrador impacte en la base y se vea en Agenda. Se amplía el alcance de la
+   parte C a los dos modales del Mostrador, no solo a "Cargar Cliente".
+
+### 1. La navegación no está unificada — CONFIRMADO, dos módulos se exchanging
+
+`components/sidebar.tsx:49-61` declara roles por módulo y hoy los dos roles
+operativos **no ven lo mismo**:
+
+| Módulo | roles actuales | ¿Recepción? | ¿Veterinario? |
+|---|---|---|---|
+| `mostrador` | recepcion, veterinario, duenio | sí | sí |
+| `agenda` | recepcion, veterinario, duenio | sí | sí |
+| `padron` | recepcion, veterinario, duenio | sí | sí |
+| `consultas` | veterinario, recepcion | sí | sí |
+| `cobros` | recepcion, duenio | sí | **NO** ← falla |
+| `egreso` | recepcion, veterinario, duenio | sí | sí |
+| `balance` | duenio | no | no |
+| `fichas` | veterinario, duenio | **NO** ← falla | sí |
+
+Son exactamente los dos desvíos que describe el encargo: falta `veterinario` en
+Caja y falta `recepcion` en Historial. El **orden** también difiere: `agenda` está
+segundo y `padron` tercero, al revés de lo pedido.
+
+### 2. La fecha del Mostrador está congelada en el código — CONFIRMADO
+
+`lib/store.tsx:117` tiene `const TODAY = "2026-09-23"`, y `Mostrador` lee ese
+`today` del store en las cincoavas (`movimiento de hoy`, `ocupadosPorDia(today)`,
+`turnos.filter(t.fecha === today)`, `reservas.filter(ingreso === today)`, etc.). No
+es un defaults que se pueda pisar desde la vista: la fecha no viene del
+componente, viene de una constante de módulo. Los `seed*` arrastran la misma
+congelación (`2026-09-24`, `2026-09-25`, `2026-08-10`, `2026-07-02`).
+
+**Corrección obligatoria sobre la expresión sugerida.** El encargo propone
+`new Date().toISOString().split('T')[0]`. **Eso ya se sabe que está mal en este
+repositorio**: `toISOString()` devuelve la fecha en UTC, así que entre las 21:00 y
+las 24:00 de una zona UTC-3 devuelve el día de mañana. Ya existe para esto
+`hoyLocal()` (`lib/api.ts:674`), creado en FASE 3 exactamente por este motivo, con
+el motivo escrito al lado. Se usa `hoyLocal()`, que devuelve el mismo formato
+`YYYY-MM-DD` pero en hora local: cumple la intención ("fecha actual del sistema") y
+no reintroduce el bug que este proyecto ya documentoó. **Aplicar la expresión
+literal sería una regresión.**
+
+### 3. "Cargar Cliente" no persiste — CONFIRMADO, y es el riesgo abierto nº1
+
+`CargarClienteModal` (`components/modules/mostrador.tsx:153-228`) llama a
+`addOwnerWithDog`, que escribe en el `useState` del store. La pantalla acepta el
+alta, el operador la ve aparecer y al recargar no hay nada. Es literalmente el
+riesgo que FASE 1 dejó anotado ("queda como trampa conocida: la forma de hacerlo
+bien ya existe en el Padrón").
+
+El `POST /tutores` y el `POST /mascotas` ya están cableados en `lib/api.ts`.
+
+### 4. La "Conducta" del encargo no corresponde a la columna — DATO ERRÓNEO
+
+El encargo pide "Conducta (TRANQUILO, REACTIVO, etc.)". Esos cuatro valores
+**no existen** en `Mascota.conducta`:
+
+- `Mascota.Conducta` = `NORMAL, GRUNE, MUERDE, MIEDOSO`
+  (`MascotaRequestDTO` lo valida con `@Pattern("^(normal|grune|gruñe|muerde|miedoso)$")`).
+- `TRANQUILO, NERVIOSO, REACTIVO, AGRESIVO` son de **`ConsultaMedica.conductaObservada`**,
+  el enum de cómo se comportó el animal *durante una atención*, no de cómo es.
+
+Son dos cosas distintas y el formulario de alta pide la segunda. Mandar
+`"TRANQUILO"` devuelve un 400 cuyo mensaje ("La conducta debe ser normal, gruñe,
+muerde o miedoso") no coincide con lo que el operador tocó. Se implementa el enum
+real de la columna (`normal / gruñe / muerde / miedoso`, el mismo que ya usa
+`alta-mascota.tsx` y el tipo `ConductaMascota` de `lib/api.ts`) y se deja
+constancia. La observación "conducta del paciente" ya tiene su propio lugar, que es
+la ficha médica.
+
+### 5. Dato de contrato relevante para el alta unificada
+
+`TutorRequestDTO.dni` es `@NotBlank` con `@Pattern("\\d{7,10}")`, y `telefono`
+`@Pattern("\\d{6,15}")`. El modal viejo aceptaba nombre/apellido/DNI/teléfono
+libres y además "otros tutores" con **solo nombre y teléfono**, sin DNI. Ese bloque
+no es trasladable tal cual: sin DNI no hay alta de tutor válida. Se reemplaza por
+un vinculo a un tutor **ya cargado**, que además es el caso real (el cotutor que
+acompaña al dueño es alguien que ya está en el padrón).
+
+## Cambios de HOTFIX-UI
+
+**Archivos tocados (7, todos de frontend; el backend no se tocó):**
+
+| Archivo | Qué cambió |
+|---|---|
+| `components/sidebar.tsx` | Orden único de navegación + roles corregidos |
+| `app/page.tsx` | Guarda de rol del Balance, `fichaMascotaId` numérico, avisos honestos |
+| `components/top-bar.tsx` | Búsqueda global contra la API (leía el store) |
+| `components/modules/fichas.tsx` | HistRIAL pasa del store a la API |
+| `components/modules/mostrador.tsx` | Los dos modales pasan del store a la API |
+| `lib/store.tsx` | `TODAY` dinámico, semillas relativas, Functions trampas borradas |
+| `PROGRESS.md` | Este registro |
+
+### A) Navegación y roles
+
+`TABS` es ahora **una sola lista ordenada** de la que salen las tres superficies
+de navegación (lateral de escritorio, barra inferior de móvil y cajón de móvil):
+las tres hacen `TABS.filter(por rol)`, así que no pueden divergir. El filtro se
+aplica *sobre* la lista y nunca al revés, que es lo que garantiza que cambiar de
+rol no mueva nada de su lugar.
+
+Orden final (idéntico para los tres roles):
+
+1. Mostrador · 2. Padrón · 3. Agenda · 4. Ficha médica · 5. Caja ·
+6. Historial · 7. **Balance (solo Dueño)** · 8. Egreso
+
+Al filtrar, Recepción y Veterinario ven **exactamente los mismos 7 módulos en el
+mismo orden** (Balance desaparece), y el Dueño ve esos 7 más Balance. Egreso
+último en los tres casos, y en Recepción/Veterinario el Historial queda
+anteúltimo. Los dos desvíos que existían están corregidos: `veterinario` se
+sumó a `cobros` y `recepcion` a `fichas`.
+
+**Balance.** Es el único módulo que no ven ni Recepción ni Veterinario, y se
+mantiene exclusivo del Dueño. Se agregó una segunda guarda en `app/page.tsx`
+(`esDuenio &&`) además de la del sidebar, para que la métrica de recaudación no
+dependa de que la navegación se mantenga sincronizada. **La tarjeta "Total en
+caja" vive en `balance.tsx`, no en `caja.tsx`**: se verificó que el módulo Caja
+no tiene ninguna métrica de recaudación, así que "habilitar Caja al veterinario
+sin el balance" se resuelve sin tocar Caja. No se inventó una tarjeta para
+ocultar.
+
+### B) Fecha dinámica
+
+`lib/store.tsx` tenía `const TODAY = "2026-09-23"`, y el Mostrador lee ese
+`today` del store en las cincoavas. Ahora `TODAY` se calcula con `hoyLocal()`.
+
+**Se apartó de la expresión sugerida en el encargo a propósito.** El encargo pedía
+`new Date().toISOString().split('T')[0]`; eso devuelve la fecha **en UTC**, así
+que entre las 21:00 y las 24:00 de una zona UTC-3 devuelve el día de mañana y el
+tablero abriría en una jornada que todavía no empezó. Es el bug que FASE 3 ya
+había encontrado y documentado, y para el que existe `hoyLocal()` en
+`lib/api.ts`. Se reutilizó ese helper: mismo formato `YYYY-MM-DD`, hora local.
+Aplicar la expresión literal habría reintroducido la regresión.
+
+Las semillas también estaban congeladas (`2026-09-24`, `2026-09-25`, `2026-08-10`,
+`2026-07-02`): con `TODAY` dinámico quedaban ancladas a días pasados y el tablero
+mostraba cero ocupados y cero turnos. Se pasaron a `relativo(+N)`.
+
+### C) Alta unificada "Cargar cliente" (persistía en memoria)
+
+`CargarClienteModal` llamaba a `addOwnerWithDog`, que escribe en el `useState` del
+store: la pantalla aceptaba el alta, el operador la veía aparecer y al recargar no
+había nada. Es el riesgo abierto nº1 que venía anotado desde FASE 1.
+
+Ahora va contra la API real, en **tres llamadas y en ese orden**:
+
+1. `POST /tutores` — el DNI es `@NotBlank` con 7 a 10 dígitos, así que es primero
+   porque de su id sale el vínculo.
+2. `POST /mascotas` — sola, sin tutor.
+3. `POST /tutores/{id}/mascotas/{mascotaId}?autorizadoRetiro=` — la tupla `$N:M`
+   con su flag explícito (regla 2.4). El cotutor se suma con un segundo POST.
+
+**Por qué tres llamadas y no el `POST /mascotas` anidado que ya usa
+`alta-mascota.tsx`.** Ese anidado hace la alta de la mascota **y** el vínculo en
+una transacción (más limpio), pero **sincroniza la lista completa** de tutores de
+la mascota: lo que no venga en `tutores` queda desvinculado. Con el cotutor
+opcional eso obliga a armar la lista con los dos de entrada. La ruta por tutor
+(`TutorServiceImpl.vincularMascota`) toca **solo** los vínculos de ese tutor, así
+que sumar el cotutor al final no puede pisar el vínculo del titular. Está
+verificado contra la base, no supuesto (ver abajo, caso 6).
+
+El precio de esa decisión es que, si falla el paso 2, queda un tutor creado sin
+animal. El `catch` distingue los dos casos y, cuando el tutor ya se creó, informa
+el DNI para que el operador pueda limpiarlo en el Padrón.
+
+**El bloque "otros tutores" se cambió de contrato.** El modal viejo aceptaba
+nombre y teléfono libres, sin DNI, y con `@NotBlank` sobre el DNI **no hay alta
+de tutor válida sin él**. Ahora es un selector de un tutor **ya cargado** del
+padrón, que además es el caso real (el cotutor que acompaña al dueño ya está en
+el padrón). Se crea con `autorizadoRetiro=false`; el titular nace con `true`.
+
+**Conducta.** El encargo pedía `TRANQUILO, REACTIVO, etc.`; se implementó el enum
+real de la columna (`normal / gruñe / muerde / miedoso`). Está verificado que
+mandar `TRANQUILO` devuelve 400 (ver caso 12b). Los cuatro valores del encargo
+pertenecen a `ConsultaMedica.conductaObservada`, que es cómo se portó el animal en
+*una* atención y tiene su lugar en la ficha médica, no en el alta.
+
+Se agregaron los `maxLength` que faltaban (`@Size` de nombre 80, raza 80,
+observaciones 500, motivo 300) para no gastar un viaje en un 400 previsible, igual
+que ya se hacía con el DNI y el peso.
+
+### D) "Agregar turno" ahora impacta en la base
+
+El dueño pidió que este botón también persista y se vea en Agenda. `AgregarTurnoModal`
+pasó de `addTurno` (store) a `POST /api/v1/turnos`. Como Agenda lee la base, el
+turno aparece ahí. Se agregó el selector de **profesional**, que es
+`@NotNull` en el contrato: sin él el backend rechaza el turno, así que no puede
+ser opcional. Se manda solo `fechaHoraInicio`: el backend deriva el fin (+45) y el
+fin de bloque (+60), y mandarlos sería saltarse la ventana de desinfección. El
+409 de solapamiento se muestra tal cual lo devuelve el dominio.
+
+### E) El Historial tenía que dejar de leer el store
+
+`fichas.tsx` leía de `lib/store.tsx`. Eso rompía el requisito literal de que el
+animal nuevo aparezca en Historial: la pantalla aceptaba el alta, decía que ya
+estaba disponible y el animal no aparecía nunca, porque nunca pasó por el store.
+Pasó a `GET /mascotas` + `GET /consultas/mascota/{id}`.
+
+Como consecuencia, `top-bar.tsx` también pasó a la API: su búsqueda era del store
+así que solo encontraba los datos semilla, y el deep-link a Historial pasaba un id
+de demostración que ya no existe en la base.
+
+**No hizo falta ningún evento global de "refrescar".** Los módulos se montan y
+desmontan al cambiar de pestaña (`app/page.tsx`), así que `useApi` vuelve a pedir
+al entrar. No hay estado compartido que invalidar, y no se inventó un bus de
+eventos para algo que el montaje ya resuelve.
+
+### F) Trampas borradas del store
+
+`addOwnerWithDog` y `addTurno` quedaron sin llamadores y **se eliminaron** de la
+interfaz y de la implementación. `owners` y `dogs` perdieron el setter: ya no se
+mutan. No alcanza con que el modal no las use — si el próximo que las use vuelve
+a construir el mismo truco sin darse cuenta, la falla reaparece sola.
+
+### Revisión del Revisor (HOTFIX-UI)
+
+Cuatro cosas se corrigieron antes de cerrar:
+
+1. **Un comentario que afirmaba algo falso sobre el backend.** Se había escrito
+   que el segundo `POST` de vínculo podía borrar el del titular por
+   `sincronizarTutores`. Se leyó `TutorServiceImpl.vincularMascota`: agrega un solo
+   vínculo y es idempotente por tutor, no sincroniza. El comentario ahora dice la
+   verdad, que además es la razón *mejor* de las tres llamadas.
+2. **Mensaje de éxito que sobrevivía al cierre.** El modal queda abierto tras
+   guardar (para que el operador vea qué se cargó), pero `exito` no se limpiaba al
+   reabrir: se veía el "se cargó" del alta anterior con el formulario vacío y el
+   botón de guardar oculto. Se limpia en el `useEffect` de apertura.
+3. **La acción de éxito que no seonnetía.** `POST /mascotas` acepta
+   `@Pattern` para `sexo` (`Macho`/`Hembra`) y `@Past` para `fechaNacimiento`;
+   el formulario confía en ambos, con el `max={hoyLocal()}` puesto a propósito y
+   el `Select` offering solo valores exactos.
+4. **`top-bar.tsx` roto por un hook mal usado.** Una primera versión tenía los
+    `useStore()` dentro de una función que no era hook, y con condiciones sobre campos del
+   store que no existen. Se rehízo con `useApi` + `useMemo`.
+
+## Verificación end-to-end (base real)
+
+Backend levantado con `mvnw.cmd -o spring-boot:run` contra `veterinaria_db` (vacía
+al arranque), replicando **exactamente** lo que envían los modales nuevos:
+
+| # | Caso | Resultado |
+|---|---|---|
+| 1 | `POST /tutores` (Ana Prueba, DNI 30111222) | 201, id 830 |
+| 2 | `POST /tutores` cotutor (Marco Prueba) | 201, id 831 |
+| 3 | `POST /mascotas` con los 8 campos del formulario (especie CANINO, raza Mestizo, sexo Macho, fecha 2022-05-10, peso 12.5, conducta `gruñe`, observaciones) | 201, id 3714 |
+| 4 | `POST /tutores/830/mascotas/3714?autorizadoRetiro=true` | 201 |
+| 5 | `POST /tutores/831/mascotas/3714?autorizadoRetiro=false` (cotutor) | 201 |
+| 6 | **`GET /mascotas/3714` → ambos vínculos vivos** | **Ana `autorizadoRetiro=true`, Marco `autorizadoRetiro=false`** |
+| 7 | `GET /consultas/mascota/3714` (lo que pide el Historial) | 200, 0 consultas |
+| 8 | `GET /mascotas` (Ficha Médica) | el animal aparece |
+| 9 | `POST /turnos` 09:00 + profesional activo | 201, `fin=09:45`, `finBloque=10:00` (regla 45+15) |
+| 10 | `GET /turnos?fecha=<hoy>` (Agenda) | el turno aparece |
+| 11 | `POST /profesionales` | 201, `activo=true` |
+| 12a | DNI de 5 dígitos | **400** "El DNI debe contener entre 7 y 10 digitos" |
+| 12b | `conducta: "TRANQUILO"` | **400** "La conducta debe ser normal, gruñe, muerde o miedoso" |
+| 12c | `fechaNacimiento` futura | **400** "La fecha de nacimiento no puede ser futura" |
+| 12d | `sexo: "macho"` en minúscula | **400** "El sexo debe ser Macho o Hembra" |
+| 13 | Turno solapado 09:20 con el de 09:00 | **409** con el detalle de la ventana de desinfección |
+
+El caso 12b es la comprobación empírica del dato equivocado del encargo, y el 6 es
+la comprobación de que el orden de las tres llamadas no rompe el vínculo del
+titular.
+
+Base dejada en cero (8 tablas) y proceso de Java detenido.
+
+## Reporte del harness (HOTFIX-UI)
+
+`.\test-harness.ps1` — **todos los controles pasaron**:
+
+- `tsc --noEmit`: limpio.
+- Next.js (webpack build): OK.
+- Backend: `BUILD SUCCESS`, **145 tests en verde** (Failures 0, Errors 0, Skipped 0).
+
+Sin tests nuevos: el backend no se modificó, así que no hay contrato nuevo que
+cubrir del lado del servidor. La cobertura de este hotfix es de integración
+(verificación end-to-end contra la base real, tabla de arriba), no unitaria.
+
+## Riesgos que quedan abiertos (no tocados, fuera del alcance declarado)
+
+1. **El tablero de movimiento del Mostrador sigue siendo demo.** Lee
+   `turnos`/`reservas`/`deuda` del store. Consecuencia concreta: un turno creado
+   desde el mostrador **no aparece en el tablero del mostrador** (sí en Agenda,
+   que es lo que se pidió).
+2. **El Balance sigue sumando pagos semilla** y no usa `GET /api/v1/caja/cierre`.
+   También avisado en pantalla. Sigue siendo exclusivo del Dueño.
+3. **`guarderia.tsx` no se monta** y su alta de reservas sigue escribiendo en el
+   store. Sin cambios en este hotfix.
+4. **`vinculado_desde`** sigue siendo un campo muerto en `entity/TutorMascota.java`:
+   lo setea el servicio y nadie lo lee. Queda pendiente de la decisión del dueño
+   (borrarlo o documentarlo como dato de prueba).
+5. `useStore().query` sigue en el store y **repinta a todos sus consumidores en
+   cada tecla** del buscador. Es preexistente y se dejó como estaba para no tocar
+   la interfaz del store en este hotfix.
 
 ## Revisión de FASE 3 (Revisor)
 

@@ -95,15 +95,15 @@ type Store = {
   enCaja: string[] // ids de turnos enviados a caja
   today: string
   cupoMax: number
-  addOwnerWithDog: (data: {
-    dogNombre: string
-    dni: string
-    telefono: string
-    nombre: string
-    apellido: string
-    tutores: Tutor[]
-  }) => void
-  addTurno: (t: Omit<Turno, "id" | "estado">) => void
+  /**
+   * Sin setters de alta de cliente ni de turno a proposito (HOTFIX-UI).
+   *
+   * `addOwnerWithDog` y `addTurno` vivian aca y no persistian nada: escribian en
+   * el `useState` del navegador, asi que el mostrador aceptaba el alta, el
+   * operador la veia aparecer y al recargar no habia nada. Los dos modales del
+   * mostrador ahora van contra la API real, y borrar las funciones evita que
+   * el proximo que las use vuelva a construir el mismo trouco sin darse cuenta.
+   */
   marcarAtendido: (id: string) => void
   addReserva: (r: Omit<Reserva, "id">) => void
   addFicha: (f: Omit<Ficha, "id">) => void
@@ -114,7 +114,44 @@ type Store = {
 
 const StoreContext = createContext<Store | null>(null)
 
-const TODAY = "2026-09-23"
+/**
+ * Fecha de "hoy" del mostrador, en `YYYY-MM-DD` y en **hora local**.
+ *
+ * <p>No se usa `new Date().toISOString().slice(0, 10)`: `toISOString()` devuelve
+ * la fecha en UTC, así que entre las 21:00 y las 24:00 de una zona UTC-3 devuelve
+ * el día de mañana y el tablero abriría en una jornada que todavía no empezó.
+ * `hoyLocal()` es el helper que ya existe en `lib/api.ts` justamente por esto, y
+ * se reutiliza en vez de volver a escribir la cuenta a mano.</p>
+ *
+ * <p>Se calcula una sola vez al cargar el módulo. La fecha de la jornada no tiene
+ * por qué cambiar a mitad de turno, y releerla en cada render haría que el tablero
+ * saltara de día si la pestaña quedara abierta cruzando la medianoche.</p>
+ */
+function hoyLocal(): string {
+  const ahora = new Date()
+  const mes = String(ahora.getMonth() + 1).padStart(2, "0")
+  const dia = String(ahora.getDate()).padStart(2, "0")
+  return `${ahora.getFullYear()}-${mes}-${dia}`
+}
+
+const TODAY = hoyLocal()
+
+/**
+ * Fecha semilla desplazada `dias` desde hoy, en `YYYY-MM-DD`.
+ *
+ * Las reservas y fichas de demostración tenían fechas escritas a mano
+ * ("2026-09-25"), y con `TODAY` dinámico quedaban ancladas a un día pasado:
+ * el tablero mostraba cero ocupados y cero turnos. Se corren con el día en vez de
+ * fijarlas, para que la demo siga teniendo sentido sin volver a congelar el
+ * calendario.
+ */
+function relativo(dias: number): string {
+  const d = new Date(`${TODAY}T12:00:00`)
+  d.setDate(d.getDate() + dias)
+  const mes = String(d.getMonth() + 1).padStart(2, "0")
+  const dia = String(d.getDate()).padStart(2, "0")
+  return `${d.getFullYear()}-${mes}-${dia}`
+}
 
 export const PRECIO_CONSULTA = 8000
 export const PRECIO_DIA_GUARDERIA = 4000
@@ -145,13 +182,13 @@ const seedTurnos: Turno[] = [
 ]
 
 const seedReservas: Reserva[] = [
-  { id: "r1", dogId: "d2", ownerId: "o2", autorizadoNombre: "Sofía Pérez", autorizadoTelefono: "1156780000", ingreso: TODAY, egreso: "2026-09-25", sena: 5000 },
-  { id: "r2", dogId: "d5", ownerId: "o1", autorizadoNombre: "", autorizadoTelefono: "", ingreso: TODAY, egreso: "2026-09-24", sena: 3000 },
+  { id: "r1", dogId: "d2", ownerId: "o2", autorizadoNombre: "Sofía Pérez", autorizadoTelefono: "1156780000", ingreso: TODAY, egreso: relativo(2), sena: 5000 },
+  { id: "r2", dogId: "d5", ownerId: "o1", autorizadoNombre: "", autorizadoTelefono: "", ingreso: TODAY, egreso: relativo(1), sena: 3000 },
 ]
 
 const seedFichas: Ficha[] = [
-  { id: "f1", dogId: "d1", fecha: "2026-08-10", motivo: "Vacuna", diagnostico: "Sano", tratamiento: "Vacuna séxtuple", peso: "24 kg", conducta: "Tranquilo" },
-  { id: "f2", dogId: "d3", fecha: "2026-07-02", motivo: "Cojera", diagnostico: "Esguince leve", tratamiento: "Antiinflamatorio 5 días", peso: "12 kg", conducta: "Reactivo con extraños" },
+  { id: "f1", dogId: "d1", fecha: relativo(-24), motivo: "Vacuna", diagnostico: "Sano", tratamiento: "Vacuna séxtuple", peso: "24 kg", conducta: "Tranquilo" },
+  { id: "f2", dogId: "d3", fecha: relativo(-63), motivo: "Cojera", diagnostico: "Esguince leve", tratamiento: "Antiinflamatorio 5 días", peso: "12 kg", conducta: "Reactivo con extraños" },
 ]
 
 const seedPagos: Pago[] = [
@@ -161,8 +198,8 @@ const seedPagos: Pago[] = [
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>("recepcion")
   const [query, setQuery] = useState("")
-  const [owners, setOwners] = useState<Owner[]>(seedOwners)
-  const [dogs, setDogs] = useState<Dog[]>(seedDogs)
+  const [owners] = useState<Owner[]>(seedOwners)
+  const [dogs] = useState<Dog[]>(seedDogs)
   const [turnos, setTurnos] = useState<Turno[]>(seedTurnos)
   const [reservas, setReservas] = useState<Reserva[]>(seedReservas)
   const [fichas, setFichas] = useState<Ficha[]>(seedFichas)
@@ -188,28 +225,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       today: TODAY,
       cupoMax: 10,
       ocupadosPorDia,
-      addOwnerWithDog: (data) => {
-        const ownerId = uid("o")
-        const dogId = uid("d")
-        setOwners((prev) => [
-          ...prev,
-          {
-            id: ownerId,
-            nombre: data.nombre,
-            apellido: data.apellido,
-            dni: data.dni,
-            telefono: data.telefono,
-            tutores: data.tutores,
-            deuda: 0,
-          },
-        ])
-        setDogs((prev) => [
-          ...prev,
-          { id: dogId, nombre: data.dogNombre, ownerId, conducta: "normal" },
-        ])
-      },
-      addTurno: (t) =>
-        setTurnos((prev) => [...prev, { ...t, id: uid("t"), estado: "pendiente" }]),
       marcarAtendido: (id) =>
         setTurnos((prev) =>
           prev.map((t) => (t.id === id ? { ...t, estado: "atendido" } : t)),

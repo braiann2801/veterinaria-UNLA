@@ -8,6 +8,10 @@
  * `>= md` aparece la lateral fija. Se elige barra inferior y no hamburguesa
  * porque el mostrador usa el pulgar: abrir un menú lateral con una sola mano
  * mientras se sostiene un perro no es realista.
+ *
+ * <p>Las dos listas (lateral de escritorio y cajón de móvil) se ordenan con el
+ * mismo `TABS` y el mismo filtro por rol, así que no pueden divergir: el orden
+ * que se ve en el escritorio es el mismo que se ve en el cajón.</p>
  */
 
 import { useState } from "react"
@@ -46,22 +50,45 @@ type TabDef = {
   roles: Role[]
 }
 
+/**
+ * Orden de navegación unificado.
+ *
+ * <p>El orden de este array es el orden de la lista lateral y del cajón de móvil,
+ * para todos los roles: no hay una lista por rol que se reordene al cambiar. Eso
+ * es lo que hace que alternar entre Recepción y Veterinario no mueva nada de su
+ * lugar. Para que el orden se mantenga, el filtro por rol se aplica **sobre esta
+ * lista** y nunca al revés.</p>
+ *
+ * <p>Los siete módulos operativos van en el orden pedido, con <b>Historial
+ * anteúltimo y Egreso último</b>. Balance es el octavo y el único que no ven ni
+ * Recepción ni Veterinario: solo existe para el Dueño, así que cuando aparece lo
+ * hace justo antes de Egreso y la lista sigue terminando en el egreso.</p>
+ *
+ * <p>Recepción y Veterinario ven exactamente los mismos siete módulos en el mismo
+ * orden. Antes el veterinarian no tenía Caja y Recepción no tenía Historial, y
+ * los dos veían la misma lista en distinto orden (Agenda antes que Padrón).</p>
+ */
 export const TABS: TabDef[] = [
   { id: "mostrador", label: "Mostrador", icon: LayoutDashboard, roles: ["recepcion", "veterinario", "duenio"] },
-  { id: "agenda", label: "Agenda", icon: CalendarDays, roles: ["recepcion", "veterinario", "duenio"] },
+  { id: "padron", label: "Padrón", icon: Users, roles: ["recepcion", "veterinario", "duenio"] },
   // El veterinario entra al Padron para consultar de quien es cada paciente antes
   // de firmar una ficha clinica. Sin este rol la pestana le era invisible y se
   // quedaba sin forma de resolver el DNI de una emergencia.
-  { id: "padron", label: "Padrón", icon: Users, roles: ["recepcion", "veterinario", "duenio"] },
-  { id: "consultas", label: "Ficha médica", icon: Stethoscope, roles: ["veterinario", "recepcion"] },
-  { id: "cobros", label: "Caja", icon: Wallet, roles: ["recepcion", "duenio"] },
-  { id: "egreso", label: "Egreso", icon: LogOut, roles: ["recepcion", "veterinario", "duenio"] },
+  { id: "agenda", label: "Agenda", icon: CalendarDays, roles: ["recepcion", "veterinario", "duenio"] },
+  { id: "consultas", label: "Ficha médica", icon: Stethoscope, roles: ["recepcion", "veterinario", "duenio"] },
+  // El veterinario entra a Caja: cobra, ve quien debe y genera la comanda. Lo que
+  // no debe ver es el balance, y ese no esta en esta pestana (ver `balance`).
+  { id: "cobros", label: "Caja", icon: Wallet, roles: ["recepcion", "veterinario", "duenio"] },
+  // Recepcion entra al Historial: es quien recibe al paciente de vuelta y necesita
+  // leerle al dueno como venia el animal antes de devolverlo.
+  { id: "fichas", label: "Historial", icon: FileText, roles: ["recepcion", "veterinario", "duenio"] },
+  // Unico modulo que no ven ni Recepcion ni Veterinario.
   { id: "balance", label: "Balance", icon: ClipboardList, roles: ["duenio"] },
-  { id: "fichas", label: "Historial", icon: FileText, roles: ["veterinario", "duenio"] },
+  { id: "egreso", label: "Egreso", icon: LogOut, roles: ["recepcion", "veterinario", "duenio"] },
 ]
 
 /** Módulos visibles en la barra inferior del móvil. */
-const ABAJO = new Set<TabId>(["mostrador", "egreso", "cobros", "agenda"])
+const ABAJO = new Set<TabId>(["mostrador", "agenda", "cobros", "egreso"])
 
 export function Sidebar({
   active,
