@@ -24,7 +24,11 @@ function daysBetween(a: string, b: string): string[] {
   const d = new Date(a + "T00:00:00")
   const end = new Date(b + "T00:00:00")
   while (d <= end) {
-    res.push(d.toISOString().slice(0, 10))
+    // Se arma la cadena a mano y no con `toISOString()`: `toISOString()`
+    // devuelve la fecha en UTC, así que en una zona como UTC-3 la franja del día
+    // corría al día anterior y la tira de días del guardería mostraba un
+    // calendario corrido.
+    res.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)
     d.setDate(d.getDate() + 1)
   }
   return res

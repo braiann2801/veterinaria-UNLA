@@ -3,37 +3,64 @@
 /**
  * Mostrador: movimiento de la jornada y alta de clientes y turnos.
  *
- * <p>El tablero de arriba lee del store en memoria (`lib/store.tsx`) y es una
- * demo; lo que se corrigió en HOTFIX-UI son los dos modales, que antes escribían
- * también en el store y por lo tanto no persistían nada:</p>
+ * <p>TANDA 2: el tablero ya no lee nada de `lib/store.tsx`. Todo lo que se ve acá
+ * sale de la base:</p>
  *
  * <ul>
- *   <li><b>Cargar cliente</b> crea tutor + mascota contra la API real, en una sola
- *       operación, y ya no usa `addOwnerWithDog`.</li>
- *   <li><b>Agregar turno</b> crea el turno con `POST /api/v1/turnos`, así que
- *       aparece en Agenda porque Agenda lee la base.</li>
+ *   <li><code>GET /api/v1/turnos?fecha=</code> — columna "Turnos".</li>
+ *   <li><code>GET /api/v1/guarderia?fecha=</code> — columnas "Ingresan" y
+ *       "Se retiran". Es la misma lista partida en dos: una reserva entra por su
+ *       hora de ingreso y sale por su hora de salida.</li>
+ *   <li><code>GET /api/v1/guarderia/aforo?fecha=</code> — panel de ocupación, en
+ *       vez de `ocupadosPorDia()` del store.</li>
+ *   <li><code>GET /api/v1/egreso/pacientes-hoy?fecha=</code> — una sola llamada
+ *       que trae la conducta de cada mascota presente y sus tutores: de ahí salen
+ *       los avisos de manejo y la lista de tutores del día. No se agregó ningún
+ *       endpoint.</li>
  * </ul>
  *
- * <p>La fecha de la jornada sale de `useStore().today`, que se calcula con
- * `hoyLocal()`: en hora local y no con `toISOString()`, que entre las 21:00 y las
- * 24:00 devolvería mañana.</p>
+ * <p><b>Por qué el componente ya no importa el store.</b> Antes depended de
+ * `turnos`, `reservas`, `dogs`, `owners`, `cupoMax` y `ocupadosPorDia`, todos
+ * semillas en memoria. Consecuencia concreta que motivó el cambio: un turno
+ * creado desde el botón "Agregar turno" aparecía en Agenda (que sí lee la base) y
+ * <b>no</b> en el tablero de arriba, y al recargar la página el tablero mostraba
+ * los datos de demostración de nuevo.</p>
+ *
+ * <p><b>Dos modales, contra la API real (HOTFIX-UI).</b> "Cargar cliente" crea
+ * tutor + mascota y los vincula; "Agregar turno" hace `POST /api/v1/turnos`. Los
+ * dos avisan con `onGuardado` para que el tablero se vuelva a pedir.</p>
+ *
+ * <p>La fecha de la jornada sale de `hoyLocal()`, en hora local y no con
+ * `toISOString()`, que entre las 21:00 y las 24:00 devolvería mañana.</p>
  */
 
-import { useEffect, useState } from "react"
-import { AlertTriangle, UserPlus, CalendarPlus, LogIn, LogOut } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { AlertTriangle, UserPlus, CalendarPlus, LogIn, LogOut, CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Panel, Field, TextInput, Select, TextArea } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
-import { useStore, ownerName, money } from "@/lib/store"
 import {
+  egreso as apiEgreso,
+  guarderia as apiGuarderia,
   mascotas as apiMascotas,
   profesionales as apiProfesionales,
   tutores as apiTutores,
   turnos as apiTurnos,
   hoyLocal,
 } from "@/lib/api"
-import type { EspecieMascota, Mascota, Profesional, Tutor } from "@/lib/api"
-import { TOQUE_MINIMO } from "@/lib/vista"
+import type {
+  AforoGuarderia,
+  DeudaTutor,
+  EspecieMascota,
+  Mascota,
+  MascotaDelDia,
+  Profesional,
+  ReservaGuarderia,
+  Tutor,
+  TurnoClinico,
+} from "@/lib/api"
+import { useApi } from "@/lib/use-api"
+import { Cargando, ErrorBox, Recurso, TOQUE_MINIMO, money } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie` del backend, con la etiqueta que ve el operador. */
 const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
@@ -60,46 +87,103 @@ const CONDUCTAS: { valor: "normal" | "gruñe" | "muerde" | "miedoso"; etiqueta: 
   { valor: "miedoso", etiqueta: "Miedoso" },
 ]
 
+/**
+ * Conductas que encienden el aviso de manejo.
+ *
+ * "Miedoso" y "normal" no avisan: no son un riesgo para el manejo. El backend
+ * manda la grafía con eñe (`EntityMapper.conductaToApi`), que es la que comparan
+ * estas constantes.
+ */
+const CONDUCTAS_DE_RIESGO = new Set(["muerde", "gruñe"])
+
+/**
+ * Reservas que ocupan plaza ese día.
+ *
+ * Es el mismo criterio que usa el backend en `JornadaDelDiaService`: FINALIZADO y
+ * CANCELADO liberan el cupo, así que no pueden aparecer como "ingresa hoy" ni como
+ * "se retira hoy". Copiarlo acá evita que el tablero y el aforo discrepen sobre la
+ * misma fecha.
+ */
+const RESERVAS_QUE_OCUPAN = new Set(["RESERVADO", "INGRESADO"])
+
 export function Mostrador() {
-  const { turnos, reservas, dogs, owners, today, cupoMax, ocupadosPorDia } = useStore()
+  /**
+   * Día del tablero.
+   *
+   * <p>Es estado propio y no el `today` del store: el store quedó con la fecha de
+   * "hoy" y este tablero necesita poder mirar otro día. El selector va arriba, no
+   * escondido, porque el mostrador también necesita ver la guardia de mañana para
+   * preparar los ingresos.</p>
+   */
+  const [fecha, setFecha] = useState(hoyLocal())
   const [openCliente, setOpenCliente] = useState(false)
   const [openTurno, setOpenTurno] = useState(false)
 
-  const dog = (id: string) => dogs.find((d) => d.id === id)
-  const owner = (id: string) => owners.find((o) => o.id === id)
+  // Las cuatro llamadas llevan la fecha como `clave` y no solo como closure:
+  // `useApi` guarda la fn en un ref, así que sin la clave cambiar de día no
+  // dispararía nada y la grilla mostraría el día anterior como si fuera el
+  // pedido. Ver la nota de `clave` en `lib/use-api.ts`.
+  const turnos = useApi<TurnoClinico[]>(() => apiTurnos.listar(fecha), true, fecha)
+  const reservas = useApi<ReservaGuarderia[]>(() => apiGuarderia.listar(fecha), true, fecha)
+  const aforo = useApi<AforoGuarderia>(() => apiGuarderia.aforo(fecha), true, fecha)
+  const jornada = useApi<MascotaDelDia[]>(() => apiEgreso.pacientesDelDia(fecha), true, fecha)
 
-  const turnosHoy = turnos.filter((t) => t.fecha === today)
-  const ingresosHoy = reservas.filter((r) => r.ingreso === today)
-  const egresosHoy = reservas.filter((r) => r.egreso === today)
+  const deudas = useDeudasDelDia(jornada.datos, fecha)
 
-  const ocupados = ocupadosPorDia(today)
+  /**
+   * Relee el tablero después de una mutación hecha desde esta misma pantalla.
+   *
+   * <p>Es la unica invalidacion necesaria: los modulos se montan y desmontan al
+   * cambiar de pestaña (`app/page.tsx`), así que un turno creado desde Agenda se ve
+   * solo al volver al Mostrador. Acá, en cambio, el componente no se desmonta nunca,
+   * y sin este `recargar` el tablero quedaría mostrando la jornada de antes del
+   * alta.</p>
+   */
+  const refrescar = useCallback(async () => {
+    await Promise.all([turnos.recargar(), reservas.recargar(), aforo.recargar(), jornada.recargar()])
+  }, [turnos, reservas, aforo, jornada])
 
-  // Avisos: perros de hoy con conducta de riesgo + dueños con deuda
-  const dogsHoy = new Set<string>([
-    ...turnosHoy.map((t) => t.dogId),
-    ...ingresosHoy.map((r) => r.dogId),
-    ...egresosHoy.map((r) => r.dogId),
-  ])
-  const avisosConducta = [...dogsHoy]
-    .map((id) => dog(id))
-    .filter((d) => d && (d.conducta === "muerde" || d.conducta === "gruñe"))
-  const ownersHoy = new Set<string>([
-    ...turnosHoy.map((t) => t.ownerId),
-    ...ingresosHoy.map((r) => r.ownerId),
-    ...egresosHoy.map((r) => r.ownerId),
-  ])
-  const avisosDeuda = [...ownersHoy]
-    .map((id) => owner(id))
-    .filter((o) => o && o.deuda > 0)
+  const listaTurnos = turnos.datos ?? []
+  const cancelados = listaTurnos.filter((t) => t.estado === "CANCELADO")
+  const turnosVigentes = listaTurnos.filter((t) => t.estado !== "CANCELADO")
+
+  const reservasQueOcupan = (reservas.datos ?? []).filter((r) => RESERVAS_QUE_OCUPAN.has(r.estado))
+  const ingresan = reservasQueOcupan.filter((r) => r.horaEntrada !== null)
+  const seRetiran = reservasQueOcupan.filter((r) => r.horaSalida !== null)
+
+  // Avisos de manejo: la conducta viene en la jornada, ya filtrada por los tutores
+  // que realmente pasaron. Antes se cruzaban las semillas del store.
+  const avisosConducta = (jornada.datos ?? []).filter((m) => m.conducta && CONDUCTAS_DE_RIESGO.has(m.conducta))
+  const avisosDeuda = (jornada.datos ?? [])
+    .flatMap((m) => m.tutores.map((t) => ({ tutorId: t.tutorId, nombreCompleto: t.nombreCompleto })))
+    .filter((t, i, todos) => todos.findIndex((o) => o.tutorId === t.tutorId) === i)
+    .map((t) => ({ ...t, deuda: deudas.porTutor[t.tutorId] }))
+    .filter((t) => t.deuda?.tieneDeuda)
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Mostrador</h1>
-          <p className="text-sm text-muted-foreground">Movimiento de hoy · {today}</p>
+          <p className="text-sm text-muted-foreground">
+            Movimiento del {fecha === hoyLocal() ? "día de hoy" : fecha} · {fecha}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Día del tablero">
+            <TextInput
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value || hoyLocal())}
+              className={TOQUE_MINIMO}
+              aria-label="Día del tablero"
+            />
+          </Field>
+          {fecha !== hoyLocal() && (
+            <Button variant="outline" onClick={() => setFecha(hoyLocal())} type="button">
+              <CalendarDays className="h-4 w-4" /> Hoy
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setOpenCliente(true)}>
             <UserPlus className="h-4 w-4" /> Cargar cliente
           </Button>
@@ -111,74 +195,262 @@ export function Mostrador() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Ocupación guardería" className="lg:col-span-1">
-          <p className="text-3xl font-bold">
-            {ocupados} <span className="text-base font-normal text-muted-foreground">de {cupoMax} ocupados</span>
-          </p>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-foreground transition-all"
-              style={{ width: `${Math.min(100, (ocupados / cupoMax) * 100)}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {cupoMax - ocupados} lugares disponibles hoy
-          </p>
+          <Recurso
+            estado={aforo}
+            textoCarga="Consultando el aforo"
+            onReintentar={aforo.recargar}
+          >
+            {(datos) => (
+              <>
+                <p className="text-3xl font-bold">
+                  {datos.cuposOcupados}{" "}
+                  <span className="text-base font-normal text-muted-foreground">
+                    de {datos.aforoMaximo} ocupados
+                  </span>
+                </p>
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all ${datos.completo ? "bg-destructive" : "bg-foreground"}`}
+                    style={{
+                      width: `${Math.min(100, (datos.cuposOcupados / datos.aforoMaximo) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {datos.cuposDisponibles} lugares disponibles el {fecha}
+                </p>
+              </>
+            )}
+          </Recurso>
         </Panel>
 
         <Panel title="Avisos importantes" className="lg:col-span-2">
-          {avisosConducta.length === 0 && avisosDeuda.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin avisos para hoy.</p>
+          {/*
+            La condicion mira solo `jornada.error` a proposito. Los dos avisos de
+            esta panel salen de `GET /egreso/pacientes-hoy`: el de manejo, de la
+            columna `conducta`; el de morosidad, de los tutores que vienen ahi. Si
+            `turnos` o `reservas` fallan, la grilla de abajo ya lo avisa por su
+            cuenta y tapar estos avisos por eso dejaria al operador sin ver un
+            perro que muerde.
+          */}
+          {jornada.error ? (
+            <ErrorBox error={jornada.error} onReintentar={jornada.recargar} />
           ) : (
-            <ul className="flex flex-col gap-2">
-              {avisosConducta.map((d) => (
-                <li key={`c-${d!.id}`} className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>
-                    <strong>{d!.nombre}</strong> {d!.conducta === "muerde" ? "muerde" : "gruñe"} — manejar con cuidado.
-                  </span>
-                </li>
-              ))}
-              {avisosDeuda.map((o) => (
-                <li key={`d-${o!.id}`} className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>
-                    <strong>{ownerName(o)}</strong> viene con deuda previa de {money(o!.deuda)}.
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              {/* While the debt query is in flight, it must not say "no debt". */}
+              {deudas.cargando && (
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Consultando la deuda de los tutores del {fecha}…
+                </p>
+              )}
+              {avisosConducta.length === 0 && avisosDeuda.length === 0 && !deudas.cargando ? (
+                <p className="text-sm text-muted-foreground">
+                  Sin avisos de manejo ni de morosidad para el {fecha}.
+                </p>
+              ) : (
+                (avisosConducta.length > 0 || avisosDeuda.length > 0) && (
+                <ul className="flex flex-col gap-2">
+                  {avisosConducta.map((m) => (
+                    <li
+                      key={`c-${m.mascotaId}`}
+                      className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+                    >
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>
+                        <strong>{m.nombreMascota}</strong>{" "}
+                        {m.conducta === "muerde" ? "muerde" : "gruñe"} — manejar con cuidado.
+                      </span>
+                    </li>
+                  ))}
+                  {avisosDeuda.map((t) => (
+                    <li
+                      key={`d-${t.tutorId}`}
+                      className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+                    >
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>
+                        <strong>{t.nombreCompleto}</strong> viene con deuda previa de{" "}
+                        {money(t.deuda?.totalDeuda ?? 0)}.
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                )
+              )}
+
+              {/*
+                Un fallo parcial en la consulta de deudas se dice. La alternativa
+                —mostrar "sin avisos" como si nada— convertiría un error de red en
+                una afirmación falsa de que nadie debe nada, que es el peor
+                resultado posible en la pantalla de morosidad (regla 2.5).
+              */}
+              {deudas.fallidos > 0 && (
+                <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                  No se pudo consultar la deuda de {deudas.fallidos}{" "}
+                  {deudas.fallidos === 1 ? "tutor" : "tutores"}: puede faltar algún aviso de
+                  morosidad.{" "}
+                  <button type="button" className="underline" onClick={deudas.recargar}>
+                    Reintentar
+                  </button>
+                </p>
+              )}
+            </>
           )}
         </Panel>
       </div>
 
-      <Panel title="Turnos y estadías de hoy">
-        <div className="grid gap-4 md:grid-cols-3">
-          <TurnoCol title="Turnos" items={turnosHoy.map((t) => ({
-            id: t.id, top: `${dog(t.dogId)?.nombre ?? "—"} · ${t.hora}`, sub: `${ownerName(owner(t.ownerId))} · ${t.motivo}`,
-          }))} icon="turno" />
-          <TurnoCol title="Ingresan (guardería)" items={ingresosHoy.map((r) => ({
-            id: r.id, top: dog(r.dogId)?.nombre ?? "—", sub: `Hasta ${r.egreso}`,
-          }))} icon="in" />
-          <TurnoCol title="Se retiran" items={egresosHoy.map((r) => ({
-            id: r.id, top: dog(r.dogId)?.nombre ?? "—", sub: `Retira: ${r.autorizadoNombre || ownerName(owner(r.ownerId))}`,
-          }))} icon="out" />
-        </div>
+      <Panel
+        title={
+          turnos.cargando || reservas.cargando
+            ? "Turnos y estadías"
+            : `Turnos y estadías del ${fecha}`
+        }
+      >
+        {turnos.cargando && reservas.cargando && turnos.datos === null && reservas.datos === null ? (
+          <Cargando texto="Consultando la jornada" />
+        ) : turnos.error || reservas.error ? (
+          <ErrorBox error={turnos.error ?? reservas.error ?? null} onReintentar={refrescar} />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <TurnoCol
+              title="Turnos"
+              nota={
+                cancelados.length > 0
+                  ? `${cancelados.length} cancelado${cancelados.length === 1 ? "" : "s"} fuera de la lista`
+                  : undefined
+              }
+              items={turnosVigentes.map((t) => ({
+                id: String(t.id),
+                top: `${t.mascota.nombre} · ${t.fechaHoraInicio.slice(11, 16)}`,
+                sub: `${t.profesional.nombreCompleto} · ${t.motivo}`,
+              }))}
+              icon="turno"
+            />
+            <TurnoCol
+              title="Ingresan (guardería)"
+              items={ingresan.map((r) => ({
+                id: `in-${r.id}`,
+                top: r.nombreMascota,
+                sub: `Entra ${hhmm(r.horaEntrada)} · sale ${hhmm(r.horaSalida)}`,
+              }))}
+              icon="in"
+            />
+            <TurnoCol
+              title="Se retiran"
+              items={seRetiran.map((r) => ({
+                id: `out-${r.id}`,
+                top: r.nombreMascota,
+                sub: `Sale ${hhmm(r.horaSalida)}`,
+              }))}
+              icon="out"
+            />
+          </div>
+        )}
+
+        <p className="mt-3 text-xs text-muted-foreground">
+          Las dos columnas de guardería son las reservas <strong>de esa fecha</strong>: una
+          reserva que empezó ayer y termina hoy no aparece acá, porque el endpoint
+          filtra por la fecha de la reserva y no por la hora de salida.
+        </p>
       </Panel>
 
-      <CargarClienteModal open={openCliente} onClose={() => setOpenCliente(false)} />
-      <AgregarTurnoModal open={openTurno} onClose={() => setOpenTurno(false)} />
+      <CargarClienteModal open={openCliente} onClose={() => setOpenCliente(false)} onGuardado={refrescar} />
+      <AgregarTurnoModal open={openTurno} onClose={() => setOpenTurno(false)} onGuardado={refrescar} />
     </div>
   )
+}
+
+/**
+ * Deuda consolidada de los tutores que estuvieron en la jornada.
+ *
+ * <p><b>Por qué es N+1.</b> No existe consulta masiva de deuda: lo único que hay
+ * es `GET /api/v1/tutores/{id}/deuda`, una por tutor. Se deduplica por
+ * `tutorId` y se piden en paralelo con `Promise.allSettled`, así que el costo es
+ * una request por tutor presente y todas vuelan a la vez.</p>
+ *
+ * <p><b>Por qué `allSettled` y no `all`.</b> Con `all`, un tutor al que se le cae
+ * la red tumba el aviso de morosidad de los demás. Con `allSettled` se informa cuántos
+ * quedaron sin consultar y el operador sabe que le puede faltar un aviso; lo
+ * contrario sería mostrar "nadie debe nada" cuando en realidad no se consultó.</p>
+ *
+ * <p><b>Por qué un hook y no un `useApi`.</b> `useApi` resuelve el caso de "una
+ * llamada a un recurso". Esto es "N llamadas derivadas de los datos de otra
+ * llamada", que ya es un segundo nivel. Encerrarlo aparte deja explícito que es un
+ * costo conocido y no un descuido.</p>
+ */
+function useDeudasDelDia(jornada: MascotaDelDia[] | null, fecha: string) {
+  const [estado, setEstado] = useState<{
+    clave: string
+    porTutor: Record<number, DeudaTutor>
+    fallidos: number
+    cargando: boolean
+  }>({ clave: "", porTutor: {}, fallidos: 0, cargando: false })
+
+  const [tique, setTique] = useState(0)
+
+  const ids = useMemo(() => {
+    const unicos = new Set<number>()
+    for (const mascota of jornada ?? []) {
+      for (const tutor of mascota.tutores) unicos.add(tutor.tutorId)
+    }
+    return [...unicos].sort((a, b) => a - b)
+  }, [jornada])
+
+  /**
+   * Los ids se leen de un ref y no se ponen en las dependencias.
+   *
+   * <p>El arreglo cambia de largo según quantos tutores vinieron, y React exige
+   * que el arreglo de dependencias mantenga su tamaño entre renders. Encerrarlo en
+   * una clave de texto y guardar los ids aparte cumple las dos cosas: la clave
+   * dispara el efecto, el ref aporta los valores.</p>
+   */
+  const idsRef = useRef(ids)
+  idsRef.current = ids
+  const clave = `${fecha}:${ids.join(",")}`
+
+  useEffect(() => {
+    const aConsultar = idsRef.current
+    let vigente = true
+
+    if (aConsultar.length === 0) {
+      setEstado({ clave, porTutor: {}, fallidos: 0, cargando: false })
+      return
+    }
+
+    setEstado({ clave, porTutor: {}, fallidos: 0, cargando: true })
+    Promise.allSettled(aConsultar.map((id) => apiTutores.deuda(id))).then((resultados) => {
+      if (!vigente) return
+      const porTutor: Record<number, DeudaTutor> = {}
+      let fallidos = 0
+      resultados.forEach((resultado, i) => {
+        if (resultado.status === "fulfilled") porTutor[aConsultar[i]] = resultado.value
+        else fallidos += 1
+      })
+      setEstado({ clave, porTutor, fallidos, cargando: false })
+    })
+
+    return () => {
+      vigente = false
+    }
+  }, [clave, tique])
+
+  const recargar = useCallback(() => setTique((t) => t + 1), [])
+
+  // Se expone el `cargando` aunque la vista todavia no lo pinte: el dato existe,
+  // y omitirlo obligaria al proximo consumidor a reinventarlo.
+  return { ...estado, recargar }
 }
 
 function TurnoCol({
   title,
   items,
   icon,
+  nota,
 }: {
   title: string
   items: { id: string; top: string; sub: string }[]
   icon: "turno" | "in" | "out"
+  nota?: string
 }) {
   return (
     <div className="rounded-md border border-border">
@@ -199,11 +471,63 @@ function TurnoCol({
           ))
         )}
       </ul>
+      {nota && <p className="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">{nota}</p>}
     </div>
   )
 }
 
-function CargarClienteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * `"08:00:00"` → `"08:00"`.
+ *
+ * Jackson emite las columnas `time` de MySQL con segundos. Mostrar `08:00:00` en
+ * la grilla del mostrador hace ruido y todos los horarios de la pantalla están en
+ * `HH:mm`.
+ */
+function hhmm(hora: string | null): string {
+  return hora ? hora.slice(0, 5) : "sin horario"
+}
+
+/**
+ * Alta unificada de cliente: tutor + mascota en una sola acción.
+ *
+ * <p>Antes escribía en `addOwnerWithDog`, o sea en el `useState` del store: la
+ * pantalla aceptaba el alta, el operador la veía aparecer y al recargar no había
+ * nada. Ahora va contra la API real.</p>
+ *
+ * <p><b>El orden de las tres llamadas importa y no es negociable:</b></p>
+ * <ol>
+ *   <li>`POST /tutores` — el DNI es `@NotBlank` con 7 a 10 dígitos, así que sin él
+ *       no hay alta posible. Es el primero porque de su id sale el vínculo.</li>
+ *   <li>`POST /mascotas` — se crea sola, sin tutor.</li>
+ *   <li>`POST /tutores/{id}/mascotas/{mascotaId}` — el vínculo, que es la tupla
+ *       `$N:M` con su flag de retiro.</li>
+ * </ol>
+ * <p>El paso 3 podría ser un solo `POST /mascotas` con el tutor anidado
+ * en la lista `tutores` (una sola transacción, ver `alta-mascota.tsx`), pero esa
+ * ruta **sincroniza** la lista completa de tutores de la mascota: lo que no venga
+ * en el `tutores` queda desvinculado. Con el cotutor opcional eso obliga a armar
+ * la lista con los dos de entrada. La ruta por tutor agrega de a una
+ * (`TutorServiceImpl.vincularMascota` solo toca los vínculos de ese tutor), así
+ * que sumar el cotutor al final no puede pisar el vínculo del titular.</p>
+ *
+ * <p>El precio de esa decisión es que si el paso 2 falla queda un tutor creado sin
+ * animal. Por eso el `catch` distingue los dos casos y, cuando el tutor ya se
+ * creó, informa el DNI para que el operador pueda limpiarlo en el Padrón.</p>
+ *
+ * <p>El `autorizadoRetiro` viaja explícito en cada tupla (regla 2.4): el titular
+ * arranca prendido —quien carga al cliente en mostrador es el dueño y es quien va
+ * a retirar al animal— y el cotutor se crea con el flag apagado.</p>
+ */
+function CargarClienteModal({
+  open,
+  onClose,
+  onGuardado,
+}: {
+  open: boolean
+  onClose: () => void
+  /** Avisa al tablero que relea la jornada: el cliente recien cargado ya es real. */
+  onGuardado: () => void | Promise<void>
+}) {
   const [tutor, setTutor] = useState({
     nombre: "",
     apellido: "",
@@ -329,6 +653,11 @@ function CargarClienteModal({ open, onClose }: { open: boolean; onClose: () => v
       // El modal queda abierto con el aviso: cerrarlo en el acto dejaría al
       // operador sin confirmación de qué se cargó, y este formulario pide tres
       // pasos. El botón de cerrar queda como "Listo".
+      //
+      // El tablero se relee antes de avisar: si la recarga fallara, el operador
+      // tiene que enterarse en vez de leer un "se cargó" sobre una pantalla que
+      // sigue mostrando la jornada anterior.
+      await onGuardado()
       setExito(
         `${mascotaCreada.nombre} quedó cargada con ${creado.nombreCompleto}. Ya está en Ficha médica, Agenda e Historial.`,
       )
@@ -602,7 +931,22 @@ function CargarClienteModal({ open, onClose }: { open: boolean; onClose: () => v
  * <p>La fecha arranca en `hoyLocal()` y no lleva `min`: los turnos retroactivos se
  * registran a propósito, que es la atención que ya ocurrió y hay que documentar.</p>
  */
-function AgregarTurnoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AgregarTurnoModal({
+  open,
+  onClose,
+  onGuardado,
+}: {
+  open: boolean
+  onClose: () => void
+  /**
+   * Avisa al tablero que relea la jornada.
+   *
+   * <p>Es el caso que sí hace falta: el modal vive dentro del Mostrador, así que
+   * el componente no se desmonta entre el alta y la lectura, y sin esto el turno
+   * recién creado no aparecería en la grilla de arriba.</p>
+   */
+  onGuardado: () => void | Promise<void>
+}) {
   const [mascotas, setMascotas] = useState<Mascota[]>([])
   const [profesionales, setProfesionales] = useState<Profesional[]>([])
   const [mascotaId, setMascotaId] = useState("")
@@ -654,7 +998,10 @@ function AgregarTurnoModal({ open, onClose }: { open: boolean; onClose: () => vo
         mascotaId: Number(mascotaId),
         profesionalId: Number(profesionalId),
       })
-      setExito("Turno guardado. Ya está en Agenda.")
+      // Antes del aviso, nunca después: el turno tiene que verse en la grilla
+      // cuando el operador lee el "guardado".
+      await onGuardado()
+      setExito("Turno guardado. Ya está en Agenda y en el tablero de arriba.")
       setMotivo("")
     } catch (e) {
       // El 409 de solapamiento lo produce el dominio: el mensaje del servidor

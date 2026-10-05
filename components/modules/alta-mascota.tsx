@@ -24,7 +24,7 @@
 import { useState } from "react"
 import { PawPrint, Plus } from "lucide-react"
 
-import { mascotas as apiMascotas } from "@/lib/api"
+import { mascotas as apiMascotas, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { TOQUE_MINIMO } from "@/lib/vista"
@@ -181,7 +181,12 @@ export function AltaMascota({
             <TextInput
               type="date"
               value={fechaNacimiento}
-              max={new Date().toISOString().slice(0, 10)}
+              // `hoyLocal()` y no `new Date().toISOString().slice(0, 10)`:
+              // `toISOString()` devuelve la fecha en UTC, así que entre las 21:00 y
+              // las 24:00 de una zona UTC-3 devuelve mañana y el `max` bloquearía
+              // el nacimiento de un animal nacido hoy. El backend ya rechaza las
+              // fechas futuras con `@Past`; este `max` es solo la ayuda visual.
+              max={hoyLocal()}
               onChange={(e) => setFechaNacimiento(e.target.value)}
               className={TOQUE_MINIMO}
             />

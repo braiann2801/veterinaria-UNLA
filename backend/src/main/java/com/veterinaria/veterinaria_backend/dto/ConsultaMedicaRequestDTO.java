@@ -3,6 +3,9 @@ package com.veterinaria.veterinaria_backend.dto;
 import java.time.LocalDateTime;
 
 import jakarta.validation.constraints.NotBlank;
+import tools.jackson.databind.annotation.JsonDeserialize;
+
+import com.veterinaria.veterinaria_backend.config.FlexibleLocalDateTimeDeserializer;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -31,7 +34,16 @@ public record ConsultaMedicaRequestDTO(
 		@NotNull(message = "El id del profesional es obligatorio")
 		Long profesionalId,
 
-		/** Si no llega, el servidor usa el instante de la atencion. */
+		/**
+		 * Instante de la atencion. Si no llega, el servidor usa el momento de la
+		 * ficha.
+		 *
+		 * <p>Acepta tambien {@code YYYY-MM-DD} a secas, que es lo que entrega el
+		 * {@code <input type="date">} del frontend. Sin esa tolerancia Jackson
+		 * devolvia 400 y la pantalla no podia guardar ninguna ficha: ver
+		 * {@link FlexibleLocalDateTimeDeserializer}.</p>
+		 */
+		@JsonDeserialize(using = FlexibleLocalDateTimeDeserializer.class)
 		LocalDateTime fechaAtencion,
 
 		@NotBlank(message = "La anamnesis es obligatoria")

@@ -142,7 +142,16 @@ export function FichaMedica() {
         turnoClinicoId: turnoId,
         // El backend usa esto como fecha de la ficha cuando no hay turno
         // asociado; mandarlo siempre evita que el servidor la fije a hoy.
-        fechaAtencion: fechaAtencion || undefined,
+        //
+        // `<input type="date">` entrega `YYYY-MM-DD` sin hora y el campo del
+        // backend es `LocalDateTime`: sin la parte horaria Jackson devolvia 400
+        // con `DateTimeParseException` y esta pantalla no podia guardar ninguna
+        // ficha. Se completa a medianoche y se manda siempre el ISO completo.
+        // El backend quedo tolerante a la fecha sola
+        // (`FlexibleLocalDateTimeDeserializer`) para otros clientes, pero
+        // depender de esa tolerancia aca esconderia un cambio futuro en el
+        // contrato.
+        fechaAtencion: fechaAtencion ? `${fechaAtencion}T00:00:00` : undefined,
         anamnesis: anamnesis.trim() || undefined,
         diagnostico: diagnostico.trim() || undefined,
         tratamiento: tratamiento.trim() || undefined,
@@ -233,7 +242,8 @@ export function FichaMedica() {
               className={TOQUE_MINIMO}
             />
             <span className="text-xs text-muted-foreground">
-              Admite fechas pasadas: la consulta se documenta cuando ocurrió.
+              Admite fechas pasadas: la consulta se documenta cuando ocurrio. Como el
+              campo es solo el dia, la hora queda en 00:00.
             </span>
           </label>
 

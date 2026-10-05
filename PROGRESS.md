@@ -1,15 +1,17 @@
 # PROGRESS.md
 
 ## Estado Actual
-- Tarea en curso: [Ninguna] - **HOTFIX-UI FINALIZADA**
+- Tarea en curso: [Ninguna] — **TANDA 2 / FASE 2 FINALIZADA**
 - Agente asignado: Orquestador (diagnóstico) -> Implementador -> Revisor/Harness
 - Bloqueantes: [Ninguno]
 - Base: `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas por el dueño)
-- Harness: `tsc --noEmit` limpio, `next build` OK, **145 tests backend en verde**
-- Verificación extra: los 13 casos end-to-end contra `veterinaria_db` real, más 4
-  negativos por contrato. Base devuelta a cero.
-- Cambios **sin commitear**: 6 archivos de frontend + este `PROGRESS.md`. El
-  backend no se tocó.
+- Harness: `tsc --noEmit` limpio, `next build` OK, **154 tests backend en verde**
+  (145 previos + 9 nuevos de `FechasFlexiblesApiTest`)
+- Entregado en TANDA 2: el tablero del Mostrador contra la API real (**cierra el
+  riesgo abierto nro 1**), el `DateTimeParseException` de `ficha.tsx` reproducido y
+  arreglado, y los turnos retroactivos verificados como ya soportados.
+- Sin commitear: 12 archivos modificados + 2 nuevos, entre ellos los 6 de frontend
+  de HOTFIX-UI, que siguen pendientes del turno anterior.
 
 > Nota de arranque: el `PROGRESS.md` del working tree había quedado sobrescrito con
 > una versión vieja (TASK-005) y perdía el historial de TASK-006 a TASK-009. Se
@@ -309,12 +311,290 @@ Sin tests nuevos: el backend no se modificó, así que no hay contrato nuevo que
 cubrir del lado del servidor. La cobertura de este hotfix es de integración
 (verificación end-to-end contra la base real, tabla de arriba), no unitaria.
 
+## TANDA 2 / FASE 2 — Conexión real del Tablero de Mostrador, Fix de Deserialización de Fechas y Turnos Retroactivos
+
+### Diagnóstico del Orquestador (con evidencia, no por lectura)
+
+El encargo tiene tres partes. **Dos ya estaban hechas y una apuntaba al archivo
+equivocado**: el `DateTimeParseException` existe, pero no donde el encargo supone.
+
+#### 1. `DateTimeParseException` — CONFIRMADO, y es peor de lo que decía el encargo
+
+No es un fallo hipotético: se reprodujo contra `veterinaria_db`.
+
+- **Origen real:** `components/modules/ficha.tsx` manda `fechaAtencion` con el
+  valor crudo de un `<input type="date">`, o sea `YYYY-MM-DD`. El campo del
+  backend, `ConsultaMedicaRequestDTO.fechaAtencion`, es `java.time.LocalDateTime`.
+- **Consecuencia:** `LocalDateTime.parse("2026-10-01")` revienta. **No se puede
+  guardar ninguna ficha médica desde la interfaz.** No es un caso borde: es el
+  camino único que tiene la pantalla.
+
+Evidencia (POST `/api/v1/consultas`, mascota y profesional reales):
+
+```
+fechaAtencion=2026-10-01 -> HTTP 400
+  "La peticion no pudo interpretarse: JSON parse error: Cannot deserialize value of
+   type `java.time.LocalDateTime` from String \"2026-10-01\":
+   (java.time.format.DateTimeParseException) Text '2026-10-01' could not be parsed at index 10"
+```
+
+Lo que **ya** funciona y por eso no se toca (verificado en la misma corrida):
+
+| Payload | Resultado |
+|---|---|
+| `2026-10-01T00:00:00` | deserializa bien |
+| `2026-10-01T09:00` (sin segundos) | deserializa bien |
+| `2026-10-01T09:00:00.000Z` (`toISOString()`) | deserializa bien |
+| `ReservaGuarderia`: `fecha=YYYY-MM-DD`, `horaEntrada=HH:mm` | 201 |
+
+O sea: los otros dos DTO con fecha (`TurnoClinicoRequestDTO`, `ReservaGuarderiaRequestDTO`)
+**no tienen el problema**. El arreglo se concentra donde el bug está.
+
+#### 2. `@JsonFormat` con secciones opcionales: NO SIRVE contra un `LocalDateTime`
+
+La expresión sugerida en el encargo,
+`@JsonFormat(pattern = "[yyyy-MM-dd'T'HH:mm:ss][yyyy-MM-dd'T'HH:mm][yyyy-MM-dd]")`,
+**no puede funcionar** sobre un campo de tipo `LocalDateTime`. Las tres secciones
+son opcionales, así que el `DateTimeFormatter` acepta `2026-10-01`, pero después
+`LocalDateTime.from(...)` no encuentra componente horario y tira
+`DateTimeParseException`: el error se corre de lugar, no se arregla.
+
+Por eso la implementación es un **deserializador propio** (`FlexibleLocalDateTimeDeserializer`)
+con una cadena de intentos explícita, en vez de confiar en la semántica de las
+secciones opcionales. Hace lo mismo y además deja el mensaje de error util.
+
+#### 3. Turnos retroactivos: YA ESTÁ HECHO (no se vuelve a hacer)
+
+El encargo pide "quitar validaciones `@Future`". Se verificó que **no existe ninguna**:
+
+- `TurnoClinicoRequestDTO.fechaHoraInicio` no lleva `@Future`, y su javadoc dice
+  explícitamente que acepta valores pasados a propósito.
+- No hay ningún `@Future` ni comparación contra `LocalDateTime.now()` en todo el
+  backend (`grep` sobre `src/main/java`).
+- Ya existe `TurnoRetroactivoTest` (7 tests) cuya función declarada es justamente
+  ser la barrera: *"si alguien agrega un `@Future` o una comparación contra
+  `LocalDate.now()` al path de turnos, esta clase se pone roja"*.
+- Verificado en vivo: `POST /turnos` con `2026-10-01T09:00` → **201**, y con
+  `2026-12-25T10:00` → **201**. El solapamiento sigue devolviendo 409.
+
+**Se mantiene tal cual y se deja constancia.** Lo único que faltaba del punto C
+era documentarlo, que es lo que hace esta entrada.
+
+#### 4. Los `@RequestParam` de fecha por día: YA ESTÁN BIEN
+
+El encargo pide tipar `GET /api/v1/turnos` con
+`@RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate fecha`.
+**Ya está así**, y en los siete endpoints que filtran por día
+(`TurnoClinicoController` x2, `ReservaGuarderiaController` x2, `CajaController`,
+`EgresoController`, `ComandaCobroController`). Verificado: `?fecha=2026-10-01` → 200.
+No se modifica ninguna firma.
+
+### Decisiones de diseño de la TANDA 2
+
+- **El tablero se arma con 4 llamadas, no con un endpoint nuevo.** El encargo nombra
+  `GET /turnos?fecha=` y `GET /guarderia?fecha=`, y son las que se usan:
+  - `GET /turnos?fecha=` → columna "Turnos".
+  - `GET /guarderia?fecha=` → columnas "Ingresan" y "Se retiran" (misma lista, dos
+    cortes por `horaEntrada` / `horaSalida`).
+  - `GET /guarderia/aforo?fecha=` → panel de ocupación, en vez de `ocupadosPorDia()`
+    del store.
+  - `GET /egreso/pacientes-hoy?fecha=` → una sola llamada que trae `conducta` y los
+    `tutores` de cada mascota presente: con eso salen los avisos de manejo y la
+    lista de tutores del día. No se agregó endpoint.
+- **Los avisos de morosidad hacen N+1 a propósito.** No existe consulta masiva de
+  deuda: `/tutores/{id}/deuda` es por tutor. Se deduplica por `tutorId`, se piden en
+  paralelo con `Promise.allSettled`, y **un fallo parcial se informa en pantalla**
+  en vez de droppear la deuda en silencio (ocultar morosidad es peor que mostrarla
+  con una advertencia).
+- **"Se retiran" significa reservas *de esa fecha*, no de todas las fechas.** El
+  endpoint filtra por `r.fecha`, así que una reserva que empezó ayer y termina hoy
+  no aparece. Se rotula la columna para no mentir, en vez de agregar un finder de
+  `hora_salida` que el encargo no pidió.
+- **No hay bus global de refresco.** Los módulos se montan/desmontan al cambiar de
+  pestaña (`app/page.tsx`), así que `useApi` vuelve a pedir al volver al Mostrador.
+  Lo que sí hace falta —y se implementa— es el `recargar()` explícito después de
+  crear un turno *desde* el Mostrador, que es el único caso en que el componente no
+  se desmonta. Se verificó end-to-end el camino de la Agenda.
+- **`ficha.tsx` manda ISO completo** (`YYYY-MM-DDT00:00:00`), que es lo que el
+  encargo pide del lado del cliente, y el backend queda tolerante igual para
+  cualquier otro cliente (curl, móvil, tests).
+
+### Cambios de TANDA 2 (Implementador)
+
+#### A) El tablero del Mostrador ahora lee la base
+
+`components/modules/mostrador.tsx` fue reescrito en su parte de tablero. **El
+componente ya no importa `lib/store.tsx`**: no queda ni un `useStore()` en el
+archivo. Antes tomaba seis cosas del store (`turnos`, `reservas`, `dogs`,
+`owners`, `today`, `cupoMax`, `ocupadosPorDia`), todas semillas en memoria.
+
+| Antes (demo) | Ahora (API real) |
+|---|---|
+| `turnos.filter(t => t.fecha === today)` | `GET /turnos?fecha={fecha}` |
+| `reservas.filter(r => r.ingreso === today)` | `GET /guarderia?fecha={fecha}`, corte por `horaEntrada` |
+| `reservas.filter(r => r.egreso === today)` | el mismo `GET`, corte por `horaSalida` |
+| `ocupadosPorDia(today)` / `cupoMax` | `GET /guarderia/aforo?fecha={fecha}` |
+| `dogs` + `owners` cruzados a mano | `GET /egreso/pacientes-hoy?fecha={fecha}` |
+| `owners[].deuda` (semilla) | `GET /tutores/{id}/deuda` por tutor presente |
+
+Detalles que quedaron documentados en el código porque son decisiones, no
+accidentes:
+
+- **Las cuatro llamadas llevan la fecha como `clave` de `useApi`, no solo como
+  closure.** `useApi` guarda la fn en un ref, así que sin la clave, cambiar de día
+  no dispararía nada y la grilla mostraría el día anterior. Es el mismo patrón que
+  ya usa `ficha.tsx`.
+- **Se agrega un selector de día** (`<input type="date">` + botón "Hoy"), porque
+  el encargo pide recargar las tablas al cambiar el día y sin selector no había
+  forma de cambiarlo. El store conserva su `today` para el resto de las pantallas.
+- **Se filtra por `RESERVAS_QUE_OCUPAN = {RESERVADO, INGRESADO}`**, que es el
+  criterio del backend en `JornadaDelDiaService`. FINALIZADO y CANCELADO liberan
+  el cupo, así que no pueden figurar como "ingresa hoy". Copiarlo evita que el
+  tablero y el aforo discrepen sobre la misma fecha.
+- **Los turnos CANCELADOS se excluyen de la grilla y se cuentan aparte** en una
+  nota al pie de la columna, en vez de desaparecer sin explicación.
+- **`hhmm()` recorta las horas** que Jackson emite como `"08:00:00"` a `"08:00"`,
+  porque el resto de la pantalla está en `HH:mm`.
+- **El aviso de morosidad no dice "nadie debe" mientras la consulta está en
+  vuelo.** Se pintea un "Consultando la deuda de los tutores del {fecha}…" hasta
+  que `Promise.allSettled` resuelva. Mostrar "sin avisos" durante la carga sería
+  una afirmación falsa, y en la pantalla de morosidad (regla 2.5) es el peor
+  resultado posible.
+- **Un fallo parcial en la deuda se informa** con un contador y un botón de
+  reintento. Con `Promise.all` (en vez de `allSettled`), un tutor sin red tumba
+  los avisos de los demás.
+- **Los dos modales ganan un `onGuardado`.** Es la invalidación que sí hace
+  falta: el modal vive dentro del Mostrador, así que el componente no se desmonta
+  entre el alta y la lectura, y sin esto el turno recién creado no aparecería en la
+  grilla de arriba. El `recargar()` corre **antes** del mensaje de éxito: si la
+  recarga fallara, el operador no debe leer un "guardado" sobre una pantalla que
+  sigue mostrando la jornada anterior.
+
+**No se inventó bus global de refresco.** Los módulos se montan/desmontan al
+cambiar de pestaña (`app/page.tsx`), así que `useApi` vuelve a pedir al volver al
+Mostrador. Ese camino se verificó a mano (sección de verificación, punto 5).
+
+#### B) Fechas: toleradas en el backend, ISO completo desde el frontend
+
+- **Backend, nuevo:** `config/FlexibleLocalDateTimeDeserializer.java`. Extiende
+  `tools.jackson.databind.ValueDeserializer<LocalDateTime>` (Jackson 3) y encadena
+  intentos explícitos: ISO con offset → ISO con espacio → fecha sola a
+  `atStartOfDay()`. Si ninguno sirve, lanza un `InvalidFormatException` que **dice
+  qué formatos acepta**, en vez del inútil `could not be parsed at index 10`.
+- **Backend, aplicado en 2 DTO:** `ConsultaMedicaRequestDTO.fechaAtencion` (el
+  que estaba roto) y `TurnoClinicoRequestDTO.fechaHoraInicio` (por tolerancia de
+  formato, no por permitir el pasado: el frontend ya mandaba ISO).
+- **Frontend:** `ficha.tsx` pasa a mandar `` `${fechaAtencion}T00:00:00` ``, y el
+  texto del campo aclara que la hora queda en 00:00 porque el input es solo de día.
+- **El mensaje de error mejoró de paso**, sin tocar `GlobalExceptionHandler`: el
+  texto nuevo sale del propio `InvalidFormatException`.
+
+#### C) Turnos retroactivos: verificado, no modificado
+
+No se tocó ninguna validación porque no hay ninguna que tocar. Ver la sección de
+diagnóstico, punto 3.
+
+#### Dos bugs de fecha UTC de paso, misma clase que el de HOTFIX-UI
+
+- `alta-mascota.tsx`: `max={new Date().toISOString().slice(0, 10)}` → `max={hoyLocal()}`.
+  El `max` del campo de nacimiento bloqueaba a un animal nacido hoy entre las 21:00
+  y las 24:00 de una zona UTC-3, porque `toISOString()` ya devuelve mañana.
+- `guarderia.tsx`: la tira de días del calendario usaba `d.toISOString().slice(0,10)`
+  y corría el día completo hacia atrás. Ahora arma la cadena con
+  `getFullYear/getMonth/getDate`.
+
+No quedan llamadas a `toISOString()` en el frontend salvo dentro de comentarios que
+explican por qué no se usa.
+
+### Verificación end-to-end contra `veterinaria_db` real
+
+Se levantó el backend y se ejercitó por HTTP, no por lectura de código:
+
+1. **El bug, reproducido antes del arreglo:** `POST /api/v1/consultas` con
+   `fechaAtencion: "2026-10-01"` → **400** con
+   `DateTimeParseException: Text '2026-10-01' could not be parsed at index 10`.
+   O sea, la pantalla de ficha médica no podía guardar nada.
+2. **El mismo POST después del arreglo** → **201**, persistido como
+   `2026-10-04T00:00:00`. Una consulta de 2019 también entra.
+3. **Formato ilegible sigue siendo 400**, y ahora el mensaje sirve:
+   `"Se esperaba 'YYYY-MM-DDTHH:mm:ss', 'YYYY-MM-DDTHH:mm' o 'YYYY-MM-DD'"`.
+4. **Las 4 llamadas del tablero, todas 200** con datos reales: 1 turno; aforo
+   `0/10` antes de la reserva y `1/10` después; `GET /egreso/pacientes-hoy` devolvió
+   `conducta=muerde` y el tutor con `autorizadoRetiro=True`, que es exactamente lo
+   que consume el panel de avisos.
+5. **Selector de día:** `?fecha={hoy-3}` → 3 turnos distintos, `?fecha=2099-01-01`
+   → lista vacía (no un 500), `?fecha=2026-10-01T00:00:00` → **sigue siendo 400**
+   (el contrato de los query params no se ablandó, solo el del body).
+6. **Refresco:** turno creado por el camino de Agenda → el `GET /turnos?fecha=hoy`
+   lo muestra en la llamada siguiente (`n=1` → `n=2`).
+7. **Morosidad:** con dos fichas PENDIENTE, `GET /tutores/{id}/deuda` →
+   `tieneDeuda=True total=16000.00`.
+8. **Ventana 45+15 intacta:** turno de 10:00 → `fin=10:45`, `finBloque=11:00`.
+9. **Base devuelta a cero** (truncate de las 9 tablas de prueba).
+
+### Reporte del harness (TANDA 2)
+
+```
+.\test-harness.ps1
+  1/3  tsc --noEmit .................. sin errores
+  2/3  Next.js build (webpack) ....... OK
+  3/3  Spring Boot ................... BUILD SUCCESS
+        Tests run: 154, Failures: 0, Errors: 0, Skipped: 0
+```
+
+**154 tests, 0 fallos.** Eran 145: los 9 nuevos son de `FechasFlexiblesApiTest`.
+
+### Cierre del riesgo abierto numero 1 — **CERRADO**
+
+> ~~**El tablero de movimiento del Mostrador sigue siendo demo.** Lee
+> `turnos`/`reservas`/`deuda` del store. Consecuencia concreta: un turno creado
+> desde el mostrador **no aparece en el tablero del mostrador**~~
+
+Cerrado por esta tanda. El tablero consulta MySQL, no importa el store, y se
+relee después de cada alta hecha desde el propio Mostrador.
+
+**Corrección al log:** no había ningún aviso en pantalla que dijera "esto es una
+demo". Lo que hay en el tablero es el panel "Avisos importantes", que lista perros
+con conducta de riesgo y tutores con deuda, y no advierte nada sobre datos en
+memoria. El `AvisoDemo` que menciona el registro de FASE 1 más abajo no existe en
+el código: `git show c264145 -- components/modules/mostrador.tsx` no lo tiene y no
+aparece en ningún otro archivo del frontend. Queda la mención, porque ese registro
+ya está commiteado y reescribir historia no es lo que corresponde en esta tanda.
+
+## Archivos tocados en TANDA 2
+
+| Archivo | Qué cambió |
+|---|---|
+| `backend/.../config/FlexibleLocalDateTimeDeserializer.java` | **nuevo**: deserializador tolerante de `LocalDateTime` |
+| `backend/.../dto/ConsultaMedicaRequestDTO.java` | `@JsonDeserialize` en `fechaAtencion` (el campo roto) |
+| `backend/.../dto/TurnoClinicoRequestDTO.java` | `@JsonDeserialize` en `fechaHoraInicio` (tolerancia de formato) |
+| `backend/src/test/.../FechasFlexiblesApiTest.java` | **nuevo**: 9 tests, barrera de regresión del formato |
+| `components/modules/mostrador.tsx` | tablero contra la API, selector de día, `onGuardado`, sin store |
+| `components/modules/ficha.tsx` | manda ISO completo + texto del campo |
+| `components/modules/alta-mascota.tsx` | `max={hoyLocal()}` en vez de UTC |
+| `components/modules/guarderia.tsx` | tira de días sin `toISOString()` |
+
+Sin cambios en firmas de endpoints, sin endpoints nuevos, sin tocar `AGENTS.md`.
+
+### Trampa del entorno que conviene saber (no es un bug del código)
+
+El language server de Java de VS Code compila con Eclipse (ecj) y escribe en
+`backend/target/classes`. Como su classpath no ve todo, deja un `.class` con
+`java.lang.Error("Unresolved compilation problems")` horneado, y maven lo toma
+como actualizado y **no recompila**: `mvn compile` pasa con `exit=0` sobre un
+clase roto y el fallo aparece recién en los tests, como un
+`BeanCreationException` que no señala el error de verdad.
+
+La trampa de este caso: el `.class` enmascaraba un error real de compilación
+(`local variables referenced from a lambda expression must be final or
+effectively final`). Si aparece un `BeanCreationException` raro en un
+`ValueDeserializer` o similar, **borrar el `.class` y recompilar** antes de
+depurar: el error de verdad puede estar tapado.
+
 ## Riesgos que quedan abiertos (no tocados, fuera del alcance declarado)
 
-1. **El tablero de movimiento del Mostrador sigue siendo demo.** Lee
-   `turnos`/`reservas`/`deuda` del store. Consecuencia concreta: un turno creado
-   desde el mostrador **no aparece en el tablero del mostrador** (sí en Agenda,
-   que es lo que se pidió).
+1. ~~El tablero de movimiento del Mostrador sigue siendo demo.~~ **Cerrado en
+   TANDA 2** (ver arriba).
 2. **El Balance sigue sumando pagos semilla** y no usa `GET /api/v1/caja/cierre`.
    También avisado en pantalla. Sigue siendo exclusivo del Dueño.
 3. **`guarderia.tsx` no se monta** y su alta de reservas sigue escribiendo en el
