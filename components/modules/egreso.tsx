@@ -121,7 +121,7 @@ export function Egreso() {
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {m.tutores.length === 0
-                      ? "Sin tutores vinculados: no hay a quién validar."
+                      ? "Sin tutores vinculados: validar por DNI."
                       : m.tutores
                           .map((t) => `${t.nombreCompleto}${t.autorizadoRetiro ? "" : " (sin retiro)"}`)
                           .join(" · ")}
@@ -166,7 +166,8 @@ export function Egreso() {
  * El campo de DNI queda igual, para el caso real de un tutor que no está
  * vinculado en la base y hay que consultarlo por documento. Es el mismo endpoint y
  * la misma validación: dos caminos de entrada, un solo veredicto.
- */function ModalValidar({
+ */
+function ModalValidar({
   mascota,
   abierto,
   onCerrar,
@@ -178,7 +179,11 @@ export function Egreso() {
   onValidado: () => void | Promise<void>
 }) {
   const primero = mascota.tutores[0]
-  const [modo, setModo] = useState<"vinculado" | "dni">("vinculado")
+  // Sin vínculos no hay lista que ofrecer, pero sí hay un endpoint por DNI. Si
+  // el modo arrancara en "vinculado" el modal quedaría con una etiqueta vacía y
+  // sin veredicto: ni rojo ni verde, nada. Arrancar en DNI pinta el bloqueo con
+  // su motivo, que es lo que el mostrador necesita saber.
+  const [modo, setModo] = useState<"vinculado" | "dni">(primero ? "vinculado" : "dni")
   const [tutorId, setTutorId] = useState<string>(primero ? String(primero.tutorId) : "")
   const [dni, setDni] = useState("")
 
@@ -232,6 +237,12 @@ export function Egreso() {
               aria-label="DNI del tutor que se presenta"
               className={TOQUE_MINIMO}
             />
+          )}
+          {mascota.tutores.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Sin tutores vinculados en la base: consultá por DNI. El servidor
+              responderá con el motivo del bloqueo.
+            </p>
           )}
           {tutorElegido && !tutorElegido.autorizadoRetiro && (
             <p className="text-xs text-amber-800">

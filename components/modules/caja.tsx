@@ -141,6 +141,36 @@ export function Caja() {
                 </option>
               ))}
             </Select>
+            {/* Un dropdown vacío no dice si no hubo actividad o si falló la
+                llamada. Sin estas tres líneas el operador solo veía el placeholder
+                y tenía que adivinar, mientras que la lista de comandas de abajo sí
+                informaba su error: dos controles de la misma pantalla con criterios
+                distintos. */}
+            {tutoresDelDia.cargando && (tutoresDelDia.datos ?? []).length === 0 && (
+              <span className="text-xs text-muted-foreground" role="status">
+                Cargando tutores de la jornada…
+              </span>
+            )}
+            {tutoresDelDia.error && (
+              <span className="text-xs text-destructive" role="alert">
+                No se pudieron cargar los tutores de la jornada.{" "}
+                <button
+                  type="button"
+                  onClick={() => void tutoresDelDia.recargar()}
+                  className="underline underline-offset-2"
+                >
+                  Reintentar
+                </button>
+              </span>
+            )}
+            {!tutoresDelDia.cargando &&
+              !tutoresDelDia.error &&
+              tutoresDelDia.datos !== null &&
+              (tutoresDelDia.datos ?? []).length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Nadie pasó por el consultorio ni dejó un perro en esa jornada.
+                </span>
+              )}
           </label>
 
           <label className="flex flex-1 flex-col gap-1.5 text-sm">
@@ -167,6 +197,44 @@ export function Caja() {
           </p>
         )}
       </Panel>
+
+      {/* Silencio ya solo puede significar "consultó y no debe". Mientras la
+          llamada estaba en vuelo, o si fallaba, el banner no se veía y la
+          pantalla mostraba un "nadie debe" que nadie había verificado. Es el
+          mismo criterio que el de morosidad del tablero del Mostrador (TANDA 2):
+          un falso "todo en orden" informado antes de tiempo es peor que dejar
+          un hueco visible. */}
+      {tutorId !== null && deuda.cargando && deuda.datos === null && (
+        <p
+          className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground"
+          role="status"
+        >
+          Consultando la deuda de {tutorElegido?.nombreCompleto ?? "este tutor"}…
+        </p>
+      )}
+
+      {tutorId !== null && deuda.error && deuda.datos === null && (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 p-4"
+          role="alert"
+        >
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-amber-900">DEUDA SIN VERIFICAR</p>
+            <p className="mt-1 text-sm text-amber-800">
+              No se pudo consultar si {tutorElegido?.nombreCompleto ?? "este tutor"} debe.
+              No asumás que está al día: el egreso se valida recién en el checkout.
+            </p>
+            <button
+              type="button"
+              onClick={() => void deuda.recargar()}
+              className={`mt-2 rounded-md border border-amber-400 px-3 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 ${TOQUE_MINIMO}`}
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      )}
 
       {tutorId !== null && deuda.datos && deuda.datos.tieneDeuda && (
         <div
