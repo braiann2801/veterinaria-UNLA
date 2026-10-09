@@ -1,14 +1,15 @@
 ﻿# PROGRESS.md
 
 ## Estado Actual
-- **Fase en curso:** Ninguna — **REFACTOR DE `mostrador.tsx` COMPLETADO** (monolito de 1105 líneas → orquestador de 150 + 9 componentes atómicos, sin cambios de UI ni funcionalidad)
+- **Fase en curso:** Ninguna — **BALANCE: DEUDA ANTERIOR + CALENDARIO TÁCTIL** (el extracto distingue los cobros que saldan deudas de otros días y el `DatePicker` agranda sus celdas a 44×44)
 - **Base Git:** `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas)[cite: 2]
-- **Harness:** `.\test-harness.ps1` en verde (TSC limpio, Next.js build OK, **157 tests de Spring Boot pasando**, 0 fallos)[cite: 2]
-- **Últimos logros (TANDA 2):**
-  - Tablero de movimiento del Mostrador conectado a MySQL vía endpoints reales (`/turnos`, `/guarderia`, `/guarderia/aforo`, `/egreso/pacientes-hoy`)[cite: 2].
-  - Bug `DateTimeParseException` resuelto con `FlexibleLocalDateTimeDeserializer` en backend y armado ISO en `components/modules/ficha.tsx`[cite: 2].
-  - Fechas dinámicas locales estandarizadas con `hoyLocal()` (evitando desfasaje UTC)[cite: 2].
-  - Turnos retroactivos verificados y soportados[cite: 2].
+- **Harness:** `.\test-harness.ps1` en verde (TSC limpio, Next.js build OK, **159 tests de Spring Boot pasando**, 0 fallos)[cite: 2]
+- **Últimos logros (Balance):**
+  - `MovimientoCajaDTO` y el extracto de `/caja/cierre` informan `fechaEmision`; un pago que salda una comanda de otro día se muestra con el distintivo ámbar "Deuda anterior · dd/mm" (tarjeta móvil y tabla de escritorio)[cite: 2].
+  - Calendario `react-day-picker` con celdas de 44×44 (regla 3.4) y panel de 22rem; aplica a Balance, Caja y Agenda[cite: 2].
+  - `GET /api/v1/caja/cierre` ampliado con `saldosPendientes` y `movimientos` (extracto plano de la jornada); agregaciones `SUM()`/`COUNT` y proyección JPQL filtrada por rango `[00:00, 24:00)` en MySQL, sin entidades ni relaciones expuestas[cite: 2].
+  - `balance.tsx` dejó de usar datos mock: 3 tarjetas de resumen + desglose de los 5 medios de pago (incluye Seña) + tabla de movimientos responsive, con esqueletos de carga al cambiar de fecha[cite: 2].
+  - `DatePicker` reutilizable (`components/ui/date-picker.tsx` + `components/ui/calendar.tsx`) sobre `react-day-picker`; reemplaza los `<input type="date">` nativos de Balance, Caja y Agenda[cite: 2].
 
 ---
 
@@ -21,6 +22,9 @@
 - [x] **TASK-008 (FASE 2):** Guardería con horarios (`horaEntrada`/`horaSalida`), grilla de Agenda reactiva por fecha (`useApi` con `clave`), `TurnoRetroactivoTest` y modales operativos[cite: 2].
 - [x] **HOTFIX-UI:** Navegación unificada idéntica para todos los roles (Egreso último, Balance exclusivo Dueño anteúltimo), alta unificada de Cliente en Mostrador contra la API (`/tutores` + `/mascotas` + vínculo)[cite: 2].
 - [x] **TANDA 2:** Deserializador flexible para `LocalDateTime`, eliminación de estado mock en tablero del Mostrador con selector de fechas y refresco automático post-alta[cite: 2].
+- [x] **REFACTOR Mostrador:** monolito `mostrador.tsx` (1105 líneas) dividido en orquestador de 150 + 9 componentes atómicos, sin cambios de UI ni funcionalidad[cite: 2].
+- [x] **BALANCE (cierre real):** `balance.tsx` conectado a `GET /api/v1/caja/cierre` (arqueo, `saldosPendientes`, `movimientos`), con `DatePicker` reutilizable sobre `react-day-picker`[cite: 2].
+- [x] **BALANCE (deuda anterior + calendario):** el extracto informa `fechaEmision` y marca "Deuda anterior · dd/mm"; celdas del calendario a 44×44 y panel de 22rem[cite: 2].
 
 ---
 
@@ -40,7 +44,7 @@
 ---
 
 ## Riesgos y Pendientes Abiertos
-1. **Módulo Balance:** Sigue operando con datos locales simulados y no consume `GET /api/v1/caja/cierre` (exclusivo para rol Dueño)[cite: 2].
+1. **[RESUELTO] Módulo Balance:** ya no usa datos mock; consume `GET /api/v1/caja/cierre` (ver cierre al final del documento).
 2. **`guarderia.tsx` legado:** Componente desactualizado en memoria sin montar; las reservas operativas se gestionan desde los modales de la Agenda y Mostrador[cite: 2].
 3. **Columna sin uso:** `vinculado_desde` en `TutorMascota` sigue sin ser consumida por el frontend[cite: 2].
 4. **Falta de migraciones versionadas:** No se cuenta con Flyway o Liquibase; la base depende de `hibernate.ddl-auto=update`[cite: 2].
@@ -283,3 +287,164 @@ se confirmó con el Dueño y se **eliminó el aviso obsoleto**.
 - `PROGRESS.md` (este registro).
 
 `AGENTS.md` sin tocar. Backend sin cambios. Sin commit: pendiente de tu confirmación.
+
+---
+
+## BALANCE DEL DÍA SOBRE EL CIERRE REAL DE CAJA + `DatePicker` REUTILIZABLE
+
+### Objetivo
+
+Sacar a `components/modules/balance.tsx` de los datos mock del store y conectarlo
+al cierre real de caja, con selección de jornada mediante un calendario
+desplegable. El backend debía exponer el detalle sin filtrar entidades JPA.
+
+### Backend — `GET /api/v1/caja/cierre` ampliado
+
+- `MovimientoCajaDTO` (nuevo, plano): `id`, `fechaHora`, `metodoPago`, `monto`,
+  `concepto`, `nombreTutor`, `nombreMascota`, `estadoComanda`. Los enums viajan
+  como `String`, igual que el resto de los DTOs de cobro.
+- `CierreCajaResponseDTO`: se suman `saldosPendientes` (`BigDecimal`) y
+  `movimientos` (`List<MovimientoCajaDTO>`). Agregar campos a un `record` no rompe
+  los tests existentes que leen `$.totalesPorMetodo.*`.
+- `PagoRepository`:
+  - `sumarTotalDelDia` (`COALESCE(SUM(p.monto), 0)`).
+  - `contarPagosDelDia` (`COUNT(p)`).
+  - `movimientosDelDia`: proyección de interfaz `MovimientoCajaProyeccion`, con
+    `JOIN p.comanda` / `JOIN c.tutor` / `LEFT JOIN c.mascota`, filtrada por rango
+    semiabierto `[desde, hasta)` sobre `fechaHora` (aprovecha el índice nuevo) y
+    ordenada por `fechaHora, id`. El nombre del tutor se arma con `CONCAT` porque
+    `Tutor.nombreCompleto` es un getter derivado, no una columna persistente.
+  - Se eliminó `findByFechaHoraBetweenOrderByFechaHoraAsc`, que traía todas las
+    filas para sumarlas en memoria.
+- `Pago` (entidad): índice `idx_pago_fecha_hora` sobre `fecha_hora`, que es la
+  columna por la que filtran las tres consultas del cierre.
+- `ComandaCobroRepository.sumarSaldoPendienteDelDia`: `SUM(saldoPendiente)` de las
+  comandas `PENDIENTE`/`PARCIAL` emitidas en la jornada.
+- `CajaServiceImpl.cerrarJornada`: ya no usa `.reduce` ni `pagos.size()`; todas las
+  cifras se agregan en MySQL y el extracto se mapea de la proyección al DTO en el
+  servicio (el enum se traduce a `String` ahí, no en JPQL).
+
+### Frontend
+
+- `react-day-picker@10` instalado con **npm** (se actualizó `package-lock.json`).
+- `components/ui/calendar.tsx`: calendario base estilizado con Tailwind y
+  `getDefaultClassNames()` (patrón shadcn/ui), locale `es` y semana iniciando el
+  lunes, sin importar el CSS propio de la librería.
+- `components/ui/date-picker.tsx`: botón-pill con icono de calendario que despliega
+  el calendario y se repliega al elegir un día. Cierra por click afuera y por
+  `Escape` (devolviendo el foco). Atajo "Hoy" con `hoyLocal()`. Recibe y devuelve
+  `YYYY-MM-DD` y acepta `min`/`max`.
+- `components/ui/skeleton.tsx`: bloque de carga reutilizable.
+- `components/modules/balance.tsx`: reescrito sin `useStore`. Arranca en
+  `hoyLocal()`; `useApi(() => apiCaja.cierre(fecha), true, fecha)`. Muestra:
+  - **Total recaudado**, **Saldos pendientes del día** y **Cantidad de movimientos**.
+  - **Desglose por medio de pago** con los 5 métodos (Efectivo, Transferencias,
+    Débito, Crédito y Seña).
+  - **Movimientos de la jornada**: tabla en escritorio y tarjetas apiladas en
+    celular (regla 3.3), con esqueletos mientras carga la fecha nueva.
+- `components/modules/caja.tsx` y `components/modules/agenda.tsx`: se reemplazó el
+  `<input type="date">` nativo por el `DatePicker`. En Caja, cambiar de fecha sigue
+  descartando el tutor elegido.
+- `app/page.tsx`: se eliminó el `AvisoDemo` del Balance (ya lee datos reales) y se
+  actualizó el comentario del shell.
+- `lib/api.ts`: nuevos tipos `MovimientoCaja` y campos `saldosPendientes` /
+  `movimientos` en `CierreCaja`.
+
+### Verificación
+
+- `npx tsc --noEmit` → limpio.
+- `next build --webpack` → OK.
+- `.\test-harness.ps1` → **"Todos los controles pasaron"**: **158 tests de Spring
+  Boot, 0 fallos** (156 previos + `cierreInformaSaldosPendientes` + las aserciones
+  nuevas sobre `movimientos` y `saldosPendientes` en `pagadorNoAfectaElArqueo`).
+- Tests de backend que cubren lo nuevo: el cierre refleja `metodoPago`, `monto`,
+  `concepto`, `estadoComanda` y `nombreMascota` de cada pago, y el saldo que quedó
+  sin cobrar de una comanda parcial.
+
+### Incidente de entorno (post-implementación)
+
+Al abrir la vista en la app, Balance rompía con "la propiedad `datos.movimientos`
+no está definida". La causa no era el código nuevo: el backend que escuchaba en
+`:8080` era el `spring-boot:run` levantado a las 14:40, **anterior** a esta fase,
+así que serializaba el `CierreCajaResponseDTO` viejo sin `saldosPendientes` ni
+`movimientos`. Se detuvo ese proceso y se relanzó el backend con las clases
+recién compiladas; el endpoint ya devuelve ambos campos (verificado por HTTP).
+
+Además, para que una desalineación de versiones (backend viejo, deploy a medio
+actualizar) no vuelva a blanquear la pantalla, `balance.tsx` normaliza la
+respuesta con `?? 0` / `?? []`: ante un campo faltante muestra cero/vacío en vez
+de tumbar el render.
+
+### Archivos (esta fase)
+
+- Backend (nuevos): `dto/MovimientoCajaDTO.java`,
+  `repository/MovimientoCajaProyeccion.java`.
+- Backend (modificados): `dto/CierreCajaResponseDTO.java`, `repository/PagoRepository.java`,
+  `repository/ComandaCobroRepository.java`, `entity/Pago.java`, `service/impl/CajaServiceImpl.java`,
+  `test/.../CajaDelDiaTest.java`.
+- Frontend (nuevos): `components/ui/calendar.tsx`, `components/ui/date-picker.tsx`,
+  `components/ui/skeleton.tsx`.
+- Frontend (modificados): `components/modules/balance.tsx` (reescrito),
+  `components/modules/caja.tsx`, `components/modules/agenda.tsx`, `app/page.tsx`,
+  `lib/api.ts`, `package.json`, `package-lock.json`.
+- `PROGRESS.md` (este registro).
+
+`AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
+
+---
+
+## BALANCE: DEUDA ANTERIOR + CALENDARIO TÁCTIL
+
+Dos ajustes pedidos al probar la vista como usuario.
+
+### 1. Distinguir el cobro de una deuda de otro día
+
+Un pago registrado hoy que salda una comanda emitida el miércoles aparecía en el
+corte de hoy sin ninguna marca: se leía igual que un cobro del día.
+
+- `MovimientoCajaProyeccion` + `PagoRepository.movimientosDelDia`: se proyecta
+  `c.fechaEmision AS fechaEmision` (mismo alias que el getter; las otras
+  agregaciones no cambiaron).
+- `MovimientoCajaDTO`: nuevo campo `fechaEmision`.
+- `CajaServiceImpl.aMovimiento`: lo mapea.
+- `lib/api.ts`: `MovimientoCaja.fechaEmision`.
+- `balance.tsx`: deriva `deudaAnterior = fechaEmision < jornada` contra la fecha
+  elegida (no se guarda en el backend, para que siga siendo válido al cambiar de
+  jornada) y muestra el distintivo ámbar "Deuda anterior · dd/mm" en la tarjeta
+  móvil y en la celda de Estado de la tabla de escritorio. Fecha corta local, sin
+  `Date`, igual que `horaDe`.
+- `CajaDelDiaTest.cobroDeComandaViejaInformaSuEmision`: emite una comanda del
+  16/09, la paga hoy y verifica que el extracto informa esa emisión y la de una
+  comanda del día.
+
+### 2. Calendario más grande
+
+Las celdas medían ~38 px porque el tamaño salía del ancho del panel; por debajo
+del mínimo táctil de 44 px de la regla 3.4.
+
+- `components/ui/calendar.tsx`: celdas de día y botón a `size-11` (44×44) fijos;
+  días de semana y etiqueta del mes un escalón más grandes; chevrones y botones de
+  navegación más grandes.
+- `components/ui/date-picker.tsx`: popover a `w-[min(22rem, calc(100vw-1rem))]`,
+  con tope de alto y scroll para no salirse de la pantalla en móvil apaisado.
+
+Como el `Calendar` es compartido, la mejora llega también a Caja y Agenda.
+
+### Verificación
+
+- `npx tsc --noEmit` → limpio.
+- `next build --webpack` → OK.
+- `.\test-harness.ps1` → **159 tests de Spring Boot, 0 fallos** (158 previos +
+  `cobroDeComandaViejaInformaSuEmision`).
+- Backend reiniciado con el código nuevo.
+
+### Archivos
+
+- Backend: `repository/MovimientoCajaProyeccion.java`, `repository/PagoRepository.java`,
+  `dto/MovimientoCajaDTO.java`, `service/impl/CajaServiceImpl.java`,
+  `test/.../CajaDelDiaTest.java`.
+- Frontend: `lib/api.ts`, `components/modules/balance.tsx`,
+  `components/ui/calendar.tsx`, `components/ui/date-picker.tsx`.
+- `PROGRESS.md` (este registro).
+
+`AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.

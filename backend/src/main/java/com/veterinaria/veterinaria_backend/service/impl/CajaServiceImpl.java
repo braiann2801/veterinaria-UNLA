@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.CierreCajaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.MovimientoCajaDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorDelDiaResponseDTO;
@@ -27,6 +27,7 @@ import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.CobroMapper;
 import com.veterinaria.veterinaria_backend.repository.ComandaCobroRepository;
+import com.veterinaria.veterinaria_backend.repository.MovimientoCajaProyeccion;
 import com.veterinaria.veterinaria_backend.repository.PagoRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
@@ -126,8 +127,6 @@ public class CajaServiceImpl implements CajaService {
 		LocalDateTime desde = dia.atStartOfDay();
 		LocalDateTime hasta = dia.plusDays(1).atStartOfDay();
 
-		List<Pago> pagos = pagoRepository.findByFechaHoraBetweenOrderByFechaHoraAsc(desde, hasta);
-
 		// Se arrancan los cinco metodos en cero para que el cierre no venga con
 		// huecos: el mostrador tiene que ver que el CREDITO dio 0, no que no
 		// existe. Distinguir "no hubo pagos con credito" de "no se consulto" es
@@ -142,16 +141,44 @@ public class CajaServiceImpl implements CajaService {
 					((BigDecimal) fila[1]).setScale(2, RoundingMode.HALF_UP));
 		}
 
-		BigDecimal totalCobrado = pagos.stream()
-				.map(Pago::getMonto)
-				.filter(Objects::nonNull)
-				.reduce(BigDecimal.ZERO, BigDecimal::add)
+		// Todas las cifras se agregan en MySQL: la jornada no se trae fila por
+		// fila para sumar en memoria. El extracto se proyecta plano y acotado al
+		// mismo rango semiabierto.
+		BigDecimal totalCobrado = pagoRepository.sumarTotalDelDia(desde, hasta)
+				.setScale(2, RoundingMode.HALF_UP);
+		long cantidadPagos = pagoRepository.contarPagosDelDia(desde, hasta);
+		long comandasCobradas = pagoRepository.contarComandasCobradas(desde, hasta);
+		BigDecimal saldosPendientes = comandaRepository.sumarSaldoPendienteDelDia(desde, hasta)
 				.setScale(2, RoundingMode.HALF_UP);
 
-		long comandasCobradas = pagoRepository.contarComandasCobradas(desde, hasta);
+		List<MovimientoCajaDTO> movimientos = pagoRepository.movimientosDelDia(desde, hasta)
+				.stream()
+				.map(this::aMovimiento)
+				.toList();
 
-		return new CierreCajaResponseDTO(dia, totalCobrado, pagos.size(),
-				(int) comandasCobradas, porMetodo);
+		return new CierreCajaResponseDTO(dia, totalCobrado, (int) cantidadPagos,
+				(int) comandasCobradas, saldosPendientes, porMetodo, movimientos);
+	}
+
+	/**
+	 * Traduce la proyeccion JPQL al DTO plano.
+	 *
+	 * <p>El mapeo se hace en Java y no con una expresion de constructor JPQL
+	 * porque los enums viajan al DTO como su nombre: una proyeccion sin tipo
+	 * declarado puede devolverlos como enum o como texto segun el driver, y el
+	 * mismo motivo por el que {@link #nombreDeMetodo} existe aplica aca.</p>
+	 */
+	private MovimientoCajaDTO aMovimiento(MovimientoCajaProyeccion fila) {
+		return new MovimientoCajaDTO(
+				fila.getId(),
+				fila.getFechaHora(),
+				fila.getFechaEmision(),
+				fila.getMetodoPago() != null ? fila.getMetodoPago().name() : null,
+				fila.getMonto(),
+				fila.getConcepto() != null ? fila.getConcepto().name() : null,
+				fila.getNombreTutor(),
+				fila.getNombreMascota(),
+				fila.getEstadoComanda() != null ? fila.getEstadoComanda().name() : null);
 	}
 
 	/**

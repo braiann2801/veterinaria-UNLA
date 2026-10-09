@@ -27,6 +27,7 @@ import { CalendarDays, Clock, Dog, Plus, Users } from "lucide-react"
 import { guarderia as apiGuarderia, turnos as apiTurnos } from "@/lib/api"
 import type { AforoGuarderia, ReservaGuarderia, TurnoClinico } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Panel } from "@/components/ui/field"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
 import { NuevoTurnoModal } from "@/components/modules/nuevo-turno"
@@ -81,15 +82,12 @@ export function Agenda() {
     <div className="flex flex-col gap-4">
       <Panel title="Agenda y guardería">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <label className="flex flex-col gap-1.5 text-sm sm:max-w-xs">
-            <span className="text-xs font-medium text-muted-foreground">Fecha</span>
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value || hoy())}
-              className={`rounded-md border border-input bg-background px-3 text-sm ${TOQUE_MINIMO}`}
-            />
-          </label>
+          <DatePicker
+            className="w-full sm:max-w-xs"
+            label="Fecha"
+            value={fecha}
+            onChange={(nueva) => setFecha(nueva)}
+          />
           <button
             onClick={() => setTurnoAbierto(true)}
             className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}

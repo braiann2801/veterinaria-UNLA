@@ -1,0 +1,37 @@
+---
+description: Micro-interacciones, skeletons de carga, toasts y confirmaciones visuales.
+globs: "**/*.{tsx,ts}"
+alwaysApply: true
+---
+
+# UX / Usabilidad
+
+Aplicá estas reglas junto con `AGENTS.md` (mobile-first) en cada pantalla o refactor.
+
+## Feedback de estados
+
+- **Nada de huecos silenciosos.** Cargando → skeleton o `Cargando`; error → `ErrorBox`; vacío → mensaje claro.
+- Distinguí "todavía no cargó" de "no hay datos" de "falló": nunca asumas un falso "todo en orden".
+- Los botones que disparan una acción muestran `cargando`/`disabled` y no se pueden volver a clickear.
+- Tras una mutación: refrescá la lista (`recargar()`) y confirmá con un toast.
+
+## Skeletons de carga
+
+- Reemplazá el "cargando…" por **skeletons** con la forma del contenido final (filas, cards, cabecera).
+- Mostrá skeleton cuando la espera es perceptible; evitá el parpadeo en respuestas instantáneas.
+- Un skeleton por bloque; no un spinner global si podés mostrar la estructura.
+
+## Toasts / notificaciones
+
+- Usá el sistema de toasts (`toast`) para éxito, aviso y error.
+- Éxito: breve y específico ("Turno agregado", "Egreso registrado").
+- Error: qué falló y qué puede hacer el usuario; nunca un toast opaco.
+- Evitá toasts duplicados o para información que ya está en pantalla.
+
+## Confirmaciones visuales
+
+- Acciones destructivas (egresar, cobrar, cancelar) piden **confirmación visual** con el impacto explícito.
+- Estados `hover`/`active`/`focus` visibles (`focus-visible:ring`).
+- Todo click tiene una reacción (estado, toast, disabled o navegación).
+- Botones/inputs ≥ 44px (`min-h-[44px]`) para uso táctil.
+- Accesibilidad: `aria-label` en íconos, `role="alert"` en avisos, `aria-hidden` en decorativos.

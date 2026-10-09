@@ -3,18 +3,13 @@
 /**
  * Shell del MVP 1.
  *
- * Todo lo que se ve aca lee la base real salvo dos cosas, y las dos se avisan en
- * pantalla con `AvisoDemo` para que el operador no tome por real un dato que no
- * lo es:
- *
- * - el Balance del día, que sigue sumando pagos semilla del store (el cierre real
- *   está en `GET /api/v1/caja/cierre`), y que además es exclusivo del Dueño;
- * - el tablero de movimiento del Mostrador, que muestra los turnos, reservas y
- *   deudas semilla del store.
+ * Todas las pantallas leen la base real. El tablero de movimiento del Mostrador
+ * es la ultima excepcion: sigue mostrando turnos, reservas y deudas semilla del
+ * store mientras se termina su migracion a la API.
  *
  * Los dos modales del Mostrador (Cargar cliente y Agregar turno) sí persisten:
- * van contra la API. El Historial se migro de lectura en memoria a lectura de la
- * API en HOTFIX-UI, asi que ya no es una de las pantallas de demo.
+ * van contra la API. El Historial y el Balance del día ya no son pantallas de
+ * demo: el Balance lee el cierre real en `GET /api/v1/caja/cierre`.
  */
 
 import { useEffect, useState } from "react"
@@ -31,7 +26,6 @@ import { Fichas } from "@/components/modules/fichas"
 import { Mostrador } from "@/components/modules/mostrador"
 import { Padron } from "@/components/modules/padron"
 import { Profesionales } from "@/components/modules/profesionales"
-import { Panel } from "@/components/ui/field"
 
 function Shell() {
   const { role } = useStore()
@@ -82,25 +76,14 @@ function Shell() {
             {/* El Balance va condicional por rol y no solo por pestana: es la
                 unica metrica de recaudacion de la app y tiene que quedarle fuera
                 a Recepcion y Veterinario aunque lleguen con el rol cambiado en
-                la URL. La tarjeta "Total en caja" vive dentro de este modulo, no
+                la URL. El resumen de recaudacion vive dentro de este modulo, no
                 en Caja: un veterinario que cobra no esta mirando el balance del
                 dia, solo las comandas que tiene delante. */}
-            {active === "balance" && esDuenio && (
-              <AvisoDemo titulo="Balance del día" texto="Todavía usa datos en memoria. El cierre de caja real se expone en /api/v1/caja/cierre." />
-            )}
             {active === "balance" && esDuenio && <Balance />}
           </div>
         </main>
       </div>
     </div>
-  )
-}
-
-function AvisoDemo({ titulo, texto }: { titulo: string; texto: string }) {
-  return (
-    <Panel title={titulo} className="mb-4">
-      <p className="text-sm text-muted-foreground">{texto}</p>
-    </Panel>
   )
 }
 

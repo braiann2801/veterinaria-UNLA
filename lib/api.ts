@@ -340,12 +340,31 @@ export interface DeudaTutor {
   comandasPendientes: ComandaPendiente[]
 }
 
+export interface MovimientoCaja {
+  id: number
+  fechaHora: string
+  /** Emisión de la comanda: si es anterior a la jornada, el cobro salda una deuda vieja. */
+  fechaEmision: string
+  metodoPago: MetodoPago
+  monto: number
+  concepto: ConceptoCobro
+  /** Deudor de la comanda, no necesariamente quien pagó. */
+  nombreTutor: string
+  /** `null` en las comandas de guardería sin mascota. */
+  nombreMascota: string | null
+  estadoComanda: EstadoComanda
+}
+
 export interface CierreCaja {
   fecha: string
   totalCobrado: number
   cantidadPagos: number
   cantidadComandas: number
+  /** Deuda aún no cobrada de las comandas emitidas ese día. */
+  saldosPendientes: number
   totalesPorMetodo: Record<string, number>
+  /** Extracto de los pagos de la jornada, ordenado por hora ascendente. */
+  movimientos: MovimientoCaja[]
 }
 
 /** Veredicto del circuito de egreso (TASK-006). */

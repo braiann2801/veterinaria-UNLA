@@ -1,0 +1,57 @@
+---
+description: Java/Spring Boot 3 con inyección por constructor, DTOs, transacciones y manejo de excepciones.
+globs: "**/*.java"
+alwaysApply: true
+---
+
+# Java + Spring Boot 3
+
+Basado en `awesome-cursorrules` (Java Spring Boot JPA), `AGENTS.md` y la stack del backend (Java 17, Spring Web/Data JPA, Lombok, Validation, MySQL).
+
+## Inyección de dependencias
+
+- **Inyección por constructor** siempre; nunca `@Autowired` en campos.
+- Preferí Lombok `@RequiredArgsConstructor` + campos `private final`.
+
+```java
+@Service
+@RequiredArgsConstructor
+public class TurnoServiceImpl implements TurnoService {
+    private final TurnoRepository repo;
+    private final ProfesionalRepository profesionales;
+}
+```
+
+## DTOs obligatorios
+
+- Prohibido exponer entidades JPA en request/response.
+- Entrada/salida entre controller y service: **DTOs**. Preferí `record`.
+- Validá con Bean Validation (`@NotNull`, `@NotBlank`, `@Size`, `@Email`, `@Positive`).
+- DTOs separados para entrada y salida cuando haga falta.
+- Usá un mapper; no repitas construcción a mano.
+
+## Capas
+
+- `RestController` → `Service` (interfaz + `Impl`) → `Repository` (`JpaRepository`).
+- El controller no autowirea repositories; el service no queryea SQL directo.
+- Consultas en JPQL; evitá N+1 con `@EntityGraph` / `JOIN FETCH`. Relaciones `FetchType.LAZY`.
+
+## Transacciones
+
+- `@Transactional(readOnly = true)` para consultas (clase o método).
+- `@Transactional` (read-write) para crear/actualizar/borrar o múltiples escrituras.
+- Anotá a nivel de método/servicio; nunca dejes escrituras secuenciales sin transacción.
+
+## Manejo de excepciones
+
+- Errores centralizados en `@RestControllerAdvice` (GlobalExceptionHandler).
+- Códigos: `400` validación, `404` no encontrado, `409` conflicto (p. ej. aforo), `500` inesperado.
+- Excepciones de dominio propias (`NoEncontradoException`, `AforoException`, `ConflictoException`), no `RuntimeException` genérica.
+- Respuesta uniforme (`ApiResponse` / DTO de error) con mensaje útil.
+- No tragar excepciones (`catch` vacío). Si es inevitable: log + relanzar.
+
+## Reglas del dominio (`AGENTS.md`)
+
+- Aforo de guardería: máximo 12 (ver `DataInitializer`).
+- Turnos clínicos: 40/50 min según `AGENTS.md`.
+- Tutor ↔ mascota (N:M) con `autorizado_retiro`.

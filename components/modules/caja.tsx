@@ -21,7 +21,7 @@
  */
 
 import { useMemo, useState } from "react"
-import { AlertTriangle, Ban, CalendarDays, Receipt, Wallet } from "lucide-react"
+import { AlertTriangle, Ban, Receipt, Wallet } from "lucide-react"
 
 import {
   caja as apiCaja,
@@ -39,8 +39,9 @@ import type {
   TutorDelDia,
 } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
-import { Panel, Select, TextInput } from "@/components/ui/field"
+import { Panel, Select } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Recurso, Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
 
 const METODOS: { valor: MetodoPago; etiqueta: string }[] = [
@@ -103,27 +104,18 @@ export function Caja() {
     <div className="flex flex-col gap-4">
       <Panel title="Caja del día" bodyClassName="p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-          <label className="flex flex-1 flex-col gap-1.5 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">Jornada</span>
-            <div className="flex items-center gap-2">
-              <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <TextInput
-                type="date"
-                value={fecha}
-                onChange={(e) => {
-                  const nueva = e.target.value
-                  if (!nueva) return
-                  // Cambiar de dia descarta la seleccion de tutor: el de ayer no
-                  // tiene por que ser el de hoy, y dejarlo puesto mandaria un
-                  // filtro que el operador no eligio.
-                  setFecha(nueva)
-                  setTutorId(null)
-                }}
-                aria-label="Jornada de caja"
-                className={TOQUE_MINIMO}
-              />
-            </div>
-          </label>
+          <DatePicker
+            className="flex-1"
+            label="Jornada"
+            value={fecha}
+            onChange={(nueva) => {
+              // Cambiar de dia descarta la seleccion de tutor: el de ayer no
+              // tiene por que ser el de hoy, y dejarlo puesto mandaria un
+              // filtro que el operador no eligio.
+              setFecha(nueva)
+              setTutorId(null)
+            }}
+          />
 
           <label className="flex flex-1 flex-col gap-1.5 text-sm">
             <span className="text-xs font-medium text-muted-foreground">

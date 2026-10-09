@@ -12,6 +12,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -33,7 +34,7 @@ import lombok.Setter;
  * precision flotante.</p>
  */
 @Entity
-@Table(name = "pago")
+@Table(name = "pago", indexes = @Index(name = "idx_pago_fecha_hora", columnList = "fecha_hora"))
 @Getter
 @Setter
 @NoArgsConstructor

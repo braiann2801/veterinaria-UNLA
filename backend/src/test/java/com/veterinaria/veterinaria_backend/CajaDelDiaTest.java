@@ -371,7 +371,76 @@ class CajaDelDiaTest {
 		// y si lo cambiara el arqueo de boveda dejaria de cuadrar.
 		mockMvc.perform(get("/api/v1/caja/cierre"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.totalesPorMetodo.CREDITO").value(5000.00));
+				.andExpect(jsonPath("$.totalesPorMetodo.CREDITO").value(5000.00))
+				// El extracto del dia refleja el pago con su medio, concepto y
+				// estado: es el detalle que muestra el Balance.
+				.andExpect(jsonPath("$.movimientos", Matchers.hasSize(1)))
+				.andExpect(jsonPath("$.movimientos[0].metodoPago").value("CREDITO"))
+				.andExpect(jsonPath("$.movimientos[0].monto").value(5000.00))
+				.andExpect(jsonPath("$.movimientos[0].concepto").value("CONSULTA_CLINICA"))
+				.andExpect(jsonPath("$.movimientos[0].estadoComanda").value("PAGADA"))
+				.andExpect(jsonPath("$.movimientos[0].nombreMascota").value("Arqueo"))
+				.andExpect(jsonPath("$.movimientos[0].nombreTutor", Matchers.notNullValue()))
+				// La comanda quedo saldada, asi que no arrastra deuda del dia.
+				.andExpect(jsonPath("$.saldosPendientes").value(0.00));
+	}
+
+	@Test
+	@DisplayName("El cierre informa el saldo que quedo sin cobrar de la jornada")
+	void cierreInformaSaldosPendientes() throws Exception {
+		long tutorId = crearTutor();
+		long mascotaId = crearMascotaConDuenio("Pendiente", tutorId);
+		long comandaId = emitirComandaParaMascota(tutorId, mascotaId);
+
+		mockMvc.perform(post("/api/v1/caja/pagos/{id}", comandaId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"pagos":[{"metodoPago":"EFECTIVO","monto":2000}],"tutorId":%d}
+								""".formatted(tutorId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estado").value("PARCIAL"));
+
+		mockMvc.perform(get("/api/v1/caja/cierre"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.totalCobrado").value(2000.00))
+				// De los 5000 facturados se cobraron 2000: el cierre tiene que
+				// mostrar los 3000 que quedaron pendientes.
+				.andExpect(jsonPath("$.saldosPendientes").value(3000.00))
+				.andExpect(jsonPath("$.cantidadPagos").value(1))
+				.andExpect(jsonPath("$.movimientos", Matchers.hasSize(1)))
+				.andExpect(jsonPath("$.movimientos[0].metodoPago").value("EFECTIVO"));
+	}
+
+	@Test
+	@DisplayName("El extracto informa la emision: distingue un saldo de otro dia de un cobro del dia")
+	void cobroDeComandaViejaInformaSuEmision() throws Exception {
+		long tutorId = crearTutor();
+		// Comanda emitida un miercoles, pagada hoy: el pago entra en la jornada de
+		// hoy pero la deuda es de otro dia. El extracto tiene que informar la
+		// emision para que la vista pueda marcarlo como "deuda anterior".
+		long vieja = crearComandaEnFecha(tutorId, "2026-09-16T10:00:00");
+		mockMvc.perform(post("/api/v1/caja/pagos/{id}", vieja)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"pagos":[{"metodoPago":"EFECTIVO","monto":3000}]}"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estado").value("PAGADA"));
+
+		// Una comanda del dia, para contrastar la emision.
+		long deHoy = emitirComanda(tutorId, "GUARDERIA", 8000);
+		mockMvc.perform(post("/api/v1/caja/pagos/{id}", deHoy)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"pagos":[{"metodoPago":"EFECTIVO","monto":8000}]}"""))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(get("/api/v1/caja/cierre"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.movimientos", Matchers.hasSize(2)))
+				.andExpect(jsonPath("$.movimientos[*].fechaEmision",
+						Matchers.hasItem(Matchers.startsWith("2026-09-16T"))))
+				.andExpect(jsonPath("$.movimientos[*].fechaEmision",
+						Matchers.hasItem(Matchers.startsWith(LocalDate.now().toString()))));
 	}
 
 	// ------------------------------------------------------------- helpers

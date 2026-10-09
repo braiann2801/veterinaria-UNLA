@@ -1,0 +1,41 @@
+---
+description: Reglas de Next.js (App Router), React y TypeScript estricto para el frontend.
+globs: "**/*.{ts,tsx}"
+alwaysApply: true
+---
+
+# Next.js + React + TypeScript
+
+Basado en `awesome-cursorrules` (Next.js App Router / React + TS) y adaptado a `AGENTS.md`.
+
+## Server Components vs Client Components
+
+- **Server Components por defecto.** En App Router toda página/layout es server salvo que se indique lo contrario.
+- Usá `"use client"` **solo** cuando necesites: estado (`useState`/`useReducer`), efectos (`useEffect`), manejo de eventos, refs, contexto de React o APIs del navegador (`window`, `document`, `localStorage`).
+- `"use client"` va **siempre en la primera línea** del archivo, a nivel de módulo (arrastra todo el árbol de imports client).
+- No importes código server-only (acceso a secrets, `fs`, `headers()`/`cookies()`) en componentes client.
+- Bajá el límite client lo más posible: dejá la página como server y extraé el interactivo a componentes client hijos.
+
+## TypeScript estricto
+
+- **Prohibido `any`.** Usá `unknown` + narrowing, genéricos o tipos de dominio; en su defecto un `type`/DTO explícito.
+- **Prohibido `@ts-ignore`.** Si es inevitable, `@ts-expect-error` con un comentario que explique por qué.
+- Prohibido `as any` y castings a la fuerza: validá o hacé narrowing.
+- Tipos explícitos en **props y retornos** de funciones exportadas; evitá inferencias ambiguas en APIs públicas.
+- `interface` para props/contratos; `type` para uniones/alias. Preferí uniones discriminadas antes que varios booleanos opcionales.
+- No desactivar `strict` en `tsconfig`.
+
+## React
+
+- Componentes **funcionales**; hooks con prefijo `use` y archivos kebab-case (`use-deudas-del-dia.ts`).
+- Nada de lógica de datos dentro del JSX: va en hooks/`lib`.
+- Toda llamada a la API (`useApi` / `lib/api.ts`) maneja `cargando`, `error` y `datos` con `EstadoApi<T>`.
+- No dejes estados silenciosos: mientras carga o si falla, mostralo (`Cargando`, `ErrorBox`, `Recurso`).
+- Keys estables en listas; evitar índices cuando el orden cambia.
+- Componentes presentacionales reciben **props tipadas**; el fetch/estado queda en el contenedor.
+
+## Convenciones del repo
+
+- Archivos kebab-case; componentes PascalCase.
+- Fechas con `hoyLocal()`; nunca `new Date().toISOString()` para días locales.
+- Antes de cerrar: `npx tsc --noEmit` limpio (el build de Next **no** valida tipos).

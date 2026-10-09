@@ -41,6 +41,24 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 			""")
 	BigDecimal sumarDeudaPendiente(@Param("tutorId") Long tutorId);
 
+	/**
+	 * Saldo por cobrar de las comandas emitidas en una jornada.
+	 *
+	 * <p>Alimenta la tarjeta "saldos pendientes" del cierre: de lo facturado ese
+	 * dia, cuanto quedo sin cobrar. Se suman solo PENDIENTE y PARCIAL porque una
+	 * comanda CANCELADA no debe nada y una PAGADA esta saldada. Igual que
+	 * {@code findDelDia}, filtra por {@code fechaEmision} (la unica fecha de la
+	 * comanda) y con rango semiabierto {@code [inicio, fin)}.</p>
+	 */
+	@Query("""
+			SELECT COALESCE(SUM(c.saldoPendiente), 0)
+			FROM ComandaCobro c
+			WHERE c.fechaEmision >= :inicio AND c.fechaEmision < :fin
+			  AND c.estado IN (com.veterinaria.veterinaria_backend.entity.ComandaCobro$EstadoComanda.PENDIENTE,
+			                   com.veterinaria.veterinaria_backend.entity.ComandaCobro$EstadoComanda.PARCIAL)
+			""")
+	BigDecimal sumarSaldoPendienteDelDia(@Param("inicio") LocalDateTime inicio, @Param("fin") LocalDateTime fin);
+
 	/** Comanda emitida para una ficha clinica, si ya existe. */
 	Optional<ComandaCobro> findByConsultaMedicaId(Long consultaMedicaId);
 

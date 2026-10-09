@@ -1,0 +1,38 @@
+---
+description: Componentes modernos con shadcn/ui, lucide-react, bordes rounded-xl y animaciones.
+globs: "**/*.{tsx,ts}"
+alwaysApply: true
+---
+
+# Tailwind + shadcn/ui
+
+Basado en `awesome-cursorrules` (React + TypeScript + shadcn/ui) y en `AGENTS.md`.
+
+## Componentes modernos
+
+- Usá **componentes shadcn/ui** en lugar de HTML obsoleto:
+  - `<button>` → `Button` (`components/ui/button`).
+  - `<input>` → `Input` / `TextInput`.
+  - `<select>` → `Select` (shadcn/Radix).
+  - `<textarea>` → `Textarea`.
+  - Checkboxes/radios → `Checkbox` / `RadioGroup`.
+  - Modales propios → `Dialog` (desktop) o `Sheet` / bottom-sheet (móvil).
+  - Notificaciones → `Sonner` / toast.
+- **Íconos con lucide-react** (`import { ... } from "lucide-react"`); nada de SVGs sueltos ni emojis.
+- Reutilizá `lib/vista.tsx` (`Cargando`, `ErrorBox`, `Recurso`) y `TOQUE_MINIMO`.
+
+## Estilos
+
+- Bordes `rounded-xl` en contenedores, botones e inputs.
+- Transiciones: `transition-colors` / `transition-all`, `duration-200`.
+- Hover/active: `hover:bg-*`, `hover:shadow-md`, `active:scale-95`.
+- Área táctil ≥ 44px (`min-h-[44px]`) según `AGENTS.md`.
+- Mobile-first: `flex-col` en móvil y `sm:flex-row` / `md:grid` en desktop.
+- Tablas densas: en móvil como cards o dentro de `overflow-x-auto` local (sin scroll horizontal de página).
+- Sin estilos inline ni `!important`.
+
+## Evitá
+
+- Inputs/selects/botones nativos cuando ya existe el componente del design system.
+- SVG a mano pudiendo usar un ícono de `lucide-react`.
+- Spinners globales si podés mostrar la estructura con un skeleton.
