@@ -45,11 +45,14 @@ export function Panel({
   title,
   children,
   className,
+  bodyClassName,
   action,
 }: {
   title?: string
   children: ReactNode
   className?: string
+  /** Overrides del relleno del cuerpo (`p-4` por defecto). Para paneles compactos. */
+  bodyClassName?: string
   action?: ReactNode
 }) {
   return (
@@ -60,7 +63,7 @@ export function Panel({
           {action}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className={cn("p-4", bodyClassName)}>{children}</div>
     </section>
   )
 }

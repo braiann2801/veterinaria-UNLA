@@ -101,8 +101,8 @@ export function Caja() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Panel title="Caja del día">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <Panel title="Caja del día" bodyClassName="p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <label className="flex flex-1 flex-col gap-1.5 text-sm">
             <span className="text-xs font-medium text-muted-foreground">Jornada</span>
             <div className="flex items-center gap-2">
@@ -163,14 +163,6 @@ export function Caja() {
                 </button>
               </span>
             )}
-            {!tutoresDelDia.cargando &&
-              !tutoresDelDia.error &&
-              tutoresDelDia.datos !== null &&
-              (tutoresDelDia.datos ?? []).length === 0 && (
-                <span className="text-xs text-muted-foreground">
-                  Nadie pasó por el consultorio ni dejó un perro en esa jornada.
-                </span>
-              )}
           </label>
 
           <label className="flex flex-1 flex-col gap-1.5 text-sm">

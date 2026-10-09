@@ -1,7 +1,7 @@
 ﻿# PROGRESS.md
 
 ## Estado Actual
-- **Fase en curso:** Ninguna — **RIESGOS 6 y 7 RESUELTOS** (semilla de tarifas + aislamiento de la base de tests)
+- **Fase en curso:** Ninguna — **REFACTOR DE `mostrador.tsx` COMPLETADO** (monolito de 1105 líneas → orquestador de 150 + 9 componentes atómicos, sin cambios de UI ni funcionalidad)
 - **Base Git:** `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas)[cite: 2]
 - **Harness:** `.\test-harness.ps1` en verde (TSC limpio, Next.js build OK, **157 tests de Spring Boot pasando**, 0 fallos)[cite: 2]
 - **Últimos logros (TANDA 2):**
@@ -219,3 +219,67 @@ muertos que ningún flujo emite ni la UI puede seleccionar.
 - `PROGRESS.md` (este cierre).
 
 `AGENTS.md` sin tocar. Sin commit: queda pendiente de tu confirmación.
+
+---
+
+## REFACTOR DE `mostrador.tsx`: Extracción a Componentes Atómicos
+
+### Objetivo y contrato
+
+Dividir el monolito `components/modules/mostrador.tsx` (**1105 líneas**) en piezas
+atómicas bajo `components/modules/mostrador/`, **sin cambiar UI ni funcionalidad**,
+dejando `mostrador.tsx` como orquestador (**150 líneas**). La ruta pública
+`app/page.tsx` → `import { Mostrador } from "@/components/modules/mostrador"` se
+preserva (no se creó `index.ts` en la carpeta para no competir con el archivo).
+
+### Diseño de la extracción
+
+- **El orquestador conserva el estado y el fetch.** Los 4 `useApi`
+  (`turnos`, `reservas`, `aforo`, `jornada`), el hook `useDeudasDelDia` y el
+  `refrescar` (`Promise.all` de los 4 `recargar`) siguen en `mostrador.tsx`. Los
+  hijos son presentacionales y reciben props tipadas con `EstadoApi<T>`, así que
+  el fetch, la `clave=fecha` y la recarga post-mutación son exactamente los mismos.
+- **Modales:** `cargar-cliente-modal.tsx` (460) y `agregar-turno-modal.tsx` (212),
+  movidos **verbatim** (verificado con `git diff`).
+- **Vistas:** `tabla-turnos.tsx` (38), `tabla-guarderia.tsx` (64),
+  `widget-aforo.tsx` (47), `avisos-importantes.tsx` (118) y `tablero-jornada.tsx`
+  (50), que compone las tablas y conserva la condición de carga/error del panel.
+- **Auxiliares:** `columna-lista.tsx` (50, ex `TurnoCol`) y `use-deudas-del-dia.ts`
+  (90, incluye `export type DeudasDelDia = ReturnType<typeof useDeudasDelDia>`).
+- **Constantes y helpers** (`ESPECIES`, `CONDUCTAS`, `CONDUCTAS_DE_RIESGO`,
+  `RESERVAS_QUE_OCUPAN`, `hhmm()`) se colocaron junto a su único consumidor; no se
+  creó `constantes.ts`.
+
+### Incidente y corrección
+
+En la primera pasada de `cargar-cliente-modal.tsx` se reescribió JSX y estado en
+vez de copiarlos; se detectó con `git diff --no-index` contra el monolito y se
+restauró el contenido **verbatim** (incluidos los comentarios). Lo mismo se hizo
+para `agregar-turno-modal.tsx`. Los archivos de panel se validaron por diff
+normalizado.
+
+### Bloqueo ajeno resuelto (con confirmación del Dueño)
+
+`app/page.tsx` tenía, en el worktree y **fuera del alcance del refactor**, un
+`<AvisoDemo titulo="Mostrador" />` sin el prop `texto`, lo que rompía
+`npx tsc --noEmit`. Dado que el tablero del Mostrador ya usa datos reales (TANDA 2),
+se confirmó con el Dueño y se **eliminó el aviso obsoleto**.
+
+### Verificación
+
+- `npx tsc --noEmit` → limpio.
+- `.\test-harness.ps1` → **"Todos los controles pasaron"**: TSC limpio, build de
+  Next.js OK, **157 tests de Spring Boot, 0 fallos**.
+- Sin tests de frontend: la equivalencia visual se sostiene por construcción (JSX
+  y clases copiados del original y verificados por diff).
+
+### Archivos (esta fase)
+
+- `components/modules/mostrador.tsx` (reescrito como orquestador, 150 líneas).
+- `components/modules/mostrador/{widget-aforo,avisos-importantes,tablero-jornada,
+  tabla-turnos,tabla-guarderia,columna-lista,cargar-cliente-modal,
+  agregar-turno-modal}.tsx` y `use-deudas-del-dia.ts` (nuevos).
+- `app/page.tsx` (eliminación del `AvisoDemo` de Mostrador sin `texto`).
+- `PROGRESS.md` (este registro).
+
+`AGENTS.md` sin tocar. Backend sin cambios. Sin commit: pendiente de tu confirmación.

@@ -64,10 +64,6 @@ function Shell() {
           <div className="mx-auto max-w-5xl">
             {active === "mostrador" && (
               <div className="flex flex-col gap-4">
-                <AvisoDemo
-                  titulo="Mostrador"
-                  texto="«Cargar cliente» y «Agregar turno» guardan en la base: el tutor, la mascota y su vínculo, y el turno que después aparece en Agenda. El padrón de profesionales también lee la base. Lo que NO es real es el tablero de movimiento de abajo (turnos, ingresos, egresan y deudas): muestra datos de demostración."
-                />
                 <Mostrador />
                 {/* El padron de profesionales va en el mostrador porque es la
                     pantalla donde se da de alta a quien atiende, no un modulo
