@@ -45,6 +45,14 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Tema claro (opt-in con la clase `.light`).
+ *
+ * <p>El tema por defecto del sistema es OSCURO azul/negro (se aplica con la clase
+ * `dark` en `<html>`). Estos tokens quedan disponibles por si más adelante se
+ * quiere un toggle claro/oscuro: con la clase `.light` en la raíz se gana este
+ * set. El azul #2563EB es el mismo en ambos temas para que la marca no cambie.</p>
+ */
 :root {
   color-scheme: light;
   --background: oklch(1 0 0);
@@ -53,8 +61,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.546 0.245 262.881);
+  --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -64,93 +72,65 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --ring: oklch(0.623 0.214 259.815);
+  --chart-1: oklch(0.546 0.245 262.881);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.488 0.243 264.376);
+  --chart-4: oklch(0.707 0.165 254.624);
+  --chart-5: oklch(0.792 0.115 250.412);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.546 0.245 262.881);
+  --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
 }
 
+/*
+ * Tema OSCURO azul/negro: el default del sistema.
+ *
+ * <p>La app arranca con la clase `dark` en `<html>` (ver `app/layout.tsx`), así
+ * que estos tokens son los que se ven por defecto. Fondo negro azulado, paneles
+ * un escalón más claros y primario azul #2563EB. Se eliminó el bloque
+ * `@media (prefers-color-scheme: dark)` que hacía que el tema dependiera del
+ * sistema operativo: el oscuro es la identidad elegida, no una preferencia.</p>
+ */
 .dark {
   color-scheme: dark;
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.15 0.012 265);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.19 0.014 265);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.19 0.014 265);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: oklch(0.546 0.245 262.881);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.27 0.02 265);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --muted: oklch(0.24 0.015 265);
+  --muted-foreground: oklch(0.72 0.02 265);
+  --accent: oklch(0.27 0.02 265);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.623 0.214 259.815);
+  --chart-1: oklch(0.623 0.214 259.815);
+  --chart-2: oklch(0.546 0.245 262.881);
+  --chart-3: oklch(0.488 0.243 264.376);
+  --chart-4: oklch(0.707 0.165 254.624);
+  --chart-5: oklch(0.792 0.115 250.412);
+  --sidebar: oklch(0.17 0.014 265);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.546 0.245 262.881);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.27 0.02 265);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    color-scheme: dark;
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
+  --sidebar-ring: oklch(0.623 0.214 259.815);
 }
 
 @layer base {

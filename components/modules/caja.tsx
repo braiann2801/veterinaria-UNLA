@@ -199,20 +199,20 @@ export function Caja() {
 
       {tutorId !== null && deuda.error && deuda.datos === null && (
         <div
-          className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 p-4"
+          className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-500/10"
           role="alert"
         >
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-amber-900">DEUDA SIN VERIFICAR</p>
-            <p className="mt-1 text-sm text-amber-800">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">DEUDA SIN VERIFICAR</p>
+            <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
               No se pudo consultar si {tutorElegido?.nombreCompleto ?? "este tutor"} debe.
               No asumás que está al día: el egreso se valida recién en el checkout.
             </p>
             <button
               type="button"
               onClick={() => void deuda.recargar()}
-              className={`mt-2 rounded-md border border-amber-400 px-3 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 ${TOQUE_MINIMO}`}
+              className={`mt-2 rounded-md border border-amber-400 px-3 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/15 ${TOQUE_MINIMO}`}
             >
               Reintentar
             </button>
@@ -222,13 +222,13 @@ export function Caja() {
 
       {tutorId !== null && deuda.datos && deuda.datos.tieneDeuda && (
         <div
-          className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 p-4"
+          className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-500/40 dark:bg-red-500/10"
           role="alert"
         >
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-700" aria-hidden />
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-700 dark:text-red-400" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-red-900">TUTOR MOROSO</p>
-            <p className="mt-1 text-sm text-red-800">
+            <p className="text-sm font-semibold text-red-900 dark:text-red-300">TUTOR MOROSO</p>
+            <p className="mt-1 text-sm text-red-800 dark:text-red-300">
               {deuda.datos.nombreTutor} debe {money(deuda.datos.totalDeuda)} en{" "}
               {deuda.datos.cantidadComandas} comanda
               {deuda.datos.cantidadComandas === 1 ? "" : "s"} pendiente
@@ -237,7 +237,7 @@ export function Caja() {
             </p>
             <ul className="mt-2 flex flex-col gap-0.5">
               {deuda.datos.comandasPendientes.map((c) => (
-                <li key={c.id} className="text-xs text-red-800">
+                <li key={c.id} className="text-xs text-red-800 dark:text-red-300">
                   #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto} ·{" "}
                   {money(c.saldoPendiente)} · {c.diasDeAntiguedad} día
                   {c.diasDeAntiguedad === 1 ? "" : "s"} de atraso
@@ -522,7 +522,7 @@ function ModalCobro({
         <div className="rounded-lg border border-border p-3 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Total a cobrar</span>
-            <span className={excede ? "font-medium text-red-700" : "font-medium"}>
+            <span className={excede ? "font-medium text-red-700 dark:text-red-300" : "font-medium"}>
               {money(total)}
             </span>
           </div>

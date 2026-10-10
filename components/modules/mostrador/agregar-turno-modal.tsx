@@ -187,7 +187,7 @@ export function AgregarTurnoModal({
           </p>
         )}
         {exito && (
-          <p className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900" role="status">
+          <p className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">
             {exito}
           </p>
         )}

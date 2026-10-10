@@ -57,10 +57,10 @@ export function TopBar({
   }, [query, tutores.datos])
 
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-background px-4 py-3">
-      <div className="relative flex-1 max-w-xl">
+    <header className="flex items-center gap-3 border-b border-border bg-background px-4 py-3 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,56rem)_minmax(0,1fr)]">
+      <div className="relative flex-1 max-w-2xl md:col-start-2 md:row-start-1 md:mx-auto md:max-w-none">
         <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
           aria-hidden
         />
         <input
@@ -68,10 +68,10 @@ export function TopBar({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar por DNI, teléfono o nombre"
           aria-label="Buscar por DNI, teléfono o nombre"
-          className="min-h-[44px] w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-ring"
+          className="min-h-[52px] w-full rounded-xl border border-input bg-background pl-12 pr-4 text-base outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
         />
         {resultados.length > 0 && (
-          <ul className="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+          <ul className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
             {resultados.map(({ mascota, tutor }) => (
               <li
                 key={`${tutor.id}-${mascota.id}`}
@@ -95,7 +95,7 @@ export function TopBar({
                     onVerFichas(mascota.id)
                     setQuery("")
                   }}
-                  className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-border px-3 text-xs transition-colors hover:bg-muted"
+                  className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-xl border border-border px-3 text-xs transition-colors hover:bg-muted"
                 >
                   <FileText className="h-3 w-3" aria-hidden />
                   Fichas
@@ -105,14 +105,14 @@ export function TopBar({
           </ul>
         )}
         {tutores.cargando && tutores.datos === null && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             <span className="sr-only">Buscando</span>
           </span>
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-2 md:col-start-3 md:row-start-1 md:ml-0 md:justify-self-end">
         <label htmlFor="selector-rol" className="hidden text-xs text-muted-foreground sm:inline">
           Usuario
         </label>
@@ -120,7 +120,7 @@ export function TopBar({
           id="selector-rol"
           value={role}
           onChange={(e) => setRole(e.target.value as Role)}
-          className="min-h-[44px] rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-ring"
+          className="min-h-[44px] rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
         >
           {(Object.keys(roleLabels) as Role[]).map((r) => (
             <option key={r} value={r}>

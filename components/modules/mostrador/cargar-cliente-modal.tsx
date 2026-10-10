@@ -81,6 +81,8 @@ export function CargarClienteModal({
     apellido: "",
     dni: "",
     telefono: "",
+    email: "",
+    direccion: "",
   })
   const [mascota, setMascota] = useState({
     nombre: "",
@@ -128,7 +130,7 @@ export function CargarClienteModal({
   }, [open])
 
   function limpiar() {
-    setTutor({ nombre: "", apellido: "", dni: "", telefono: "" })
+    setTutor({ nombre: "", apellido: "", dni: "", telefono: "", email: "", direccion: "" })
     setMascota({
       nombre: "",
       especie: "CANINO",
@@ -171,7 +173,11 @@ export function CargarClienteModal({
         nombre: tutor.nombre.trim(),
         apellido: tutor.apellido.trim(),
         dni,
+        // Los opcionales van como `undefined` y no como "": el backend los valida
+        // con @Pattern y un string vacío no pasa la validación.
         telefono: tutor.telefono.trim() || undefined,
+        email: tutor.email.trim() || undefined,
+        direccion: tutor.direccion.trim() || undefined,
       })
       tutorId = creado.id
 
@@ -270,6 +276,22 @@ export function CargarClienteModal({
                 value={tutor.telefono}
                 onChange={(e) => setTutor((f) => ({ ...f, telefono: e.target.value }))}
                 inputMode="tel"
+                className={TOQUE_MINIMO}
+              />
+            </Field>
+            <Field label="Email">
+              <TextInput
+                value={tutor.email}
+                onChange={(e) => setTutor((f) => ({ ...f, email: e.target.value }))}
+                inputMode="email"
+                className={TOQUE_MINIMO}
+              />
+            </Field>
+            <Field label="Dirección">
+              <TextInput
+                value={tutor.direccion}
+                onChange={(e) => setTutor((f) => ({ ...f, direccion: e.target.value }))}
+                maxLength={200}
                 className={TOQUE_MINIMO}
               />
             </Field>
@@ -432,7 +454,7 @@ export function CargarClienteModal({
           </p>
         )}
         {exito && (
-          <p className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900" role="status">
+          <p className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">
             {exito}
           </p>
         )}

@@ -98,4 +98,7 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 			""")
 	long contarComandasCobradas(@Param("desde") LocalDateTime desde,
 			@Param("hasta") LocalDateTime hasta);
+
+	/** ¿El tutor pago alguna comanda como pagador? Bloquea su borrado. */
+	boolean existsByTutorPagadorId(Long tutorId);
 }

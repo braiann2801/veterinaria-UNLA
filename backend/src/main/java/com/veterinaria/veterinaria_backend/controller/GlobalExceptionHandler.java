@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -60,6 +61,24 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.CONFLICT)
 				.body(ApiErrorResponse.of(HttpStatus.CONFLICT.value(), "Conflict",
 						ex.getMessage(), request.getRequestURI()));
+	}
+
+	/**
+	 * 409: una operacion de borrado choca con una clave foranea.
+	 *
+	 * <p>Red de seguridad: los servicios ya validan las dependencias y responden
+	 * con {@link BusinessConflictException}, pero si algo se escapa, la violacion
+	 * de integridad debe llegar como conflicto y no como un 500 generico.</p>
+	 */
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ApiErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
+			HttpServletRequest request) {
+		log.warn("Violacion de integridad en {} {}: {}", request.getMethod(), request.getRequestURI(),
+				ex.getMostSpecificCause().getMessage());
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(ApiErrorResponse.of(HttpStatus.CONFLICT.value(), "Conflict",
+						"No se puede completar la operacion: hay registros asociados que dependen de este dato.",
+						request.getRequestURI()));
 	}
 
 	/**

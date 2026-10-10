@@ -41,7 +41,7 @@ export function ErrorBox({
   if (!error) return null
   return (
     <div
-      className="flex flex-col gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+      className="flex flex-col gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm"
       role="alert"
     >
       <div className="flex items-start gap-2">
@@ -126,9 +126,9 @@ export function Semforo({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-        tono === "verde" && "bg-emerald-100 text-emerald-900",
-        tono === "ambar" && "bg-amber-100 text-amber-900",
-        tono === "rojo" && "bg-red-100 text-red-900",
+        tono === "verde" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+        tono === "ambar" && "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+        tono === "rojo" && "bg-red-500/15 text-red-700 dark:text-red-300",
       )}
     >
       {children}

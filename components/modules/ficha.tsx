@@ -310,7 +310,7 @@ export function FichaMedica() {
               ))}
             </Select>
             {CONDUCTAS_CON_ALERTA.has(conducta) && (
-              <p className="flex items-center gap-1.5 text-xs text-amber-800">
+              <p className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
                 <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
                 Esta conducta va a quedar marcada como alerta en el retiro.
               </p>
@@ -323,7 +323,7 @@ export function FichaMedica() {
             </p>
           )}
           {exito && (
-            <p className="text-sm text-emerald-800" role="status">
+            <p className="text-sm text-emerald-800 dark:text-emerald-300" role="status">
               {exito}
             </p>
           )}

@@ -1,14 +1,15 @@
 ﻿# PROGRESS.md
 
 ## Estado Actual
-- **Fase en curso:** Ninguna — **MIGRACIÓN DE FECHAS NATIVAS AL `DatePicker` + SELECTOR DE MES/AÑO** (los 8 `<input type="date">` restantes usan el calendario táctil y su encabezado abre un panel Mes/Año)
+- **Fase en curso:** **REESTILO VISUAL AZUL/NEGRO** (tema oscuro por defecto, primario `#2563EB`, botones/inputs `rounded-xl` y barra de búsqueda centrada en el TopBar del Mostrador)
+- **Fase previa:** **ALTA DE TUTOR UNIFICADA** (mismos campos en Mostrador y Padrón, con email y dirección)
 - **Base Git:** `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas)[cite: 2]
-- **Harness:** `.\test-harness.ps1` en verde (TSC limpio, Next.js build OK, **159 tests de Spring Boot pasando**, 0 fallos)[cite: 2]
-- **Últimos logros (migración de fechas):**
-  - Los 8 `<input type="date">` de operación (egreso, ficha, padrón/alta de mascota, reserva de guardería, turno de agenda, día del tablero, agregar turno, alta de cliente) fueron reemplazados por el `DatePicker` (44 px, regla 3.4).
-  - El encabezado del calendario es clickeable y despliega un panel con columnas Mes y Año navegables con flechas ▲/▼, sin selects nativos[cite: 2].
-  - `DatePicker` gana la prop `limpiable`; solo la usan las dos fechas de nacimiento opcionales. El rango de años se deriva de `min`/`max`[cite: 2].
-  - `guarderia.tsx` (legacy, no montado) queda intacto a propósito[cite: 2].
+- **Harness:** `.\test-harness.ps1` en verde (TSC limpio, Next.js build OK, **165 tests de Spring Boot pasando**, 0 fallos)[cite: 2]
+- **Últimos logros (reestilo visual):**
+  - `globals.css` pasa a tema oscuro azul/negro por defecto vía `<html className="dark">`; se eliminó el bloque `@media (prefers-color-scheme: dark)` (el oscuro es identidad del sistema, no preferencia del SO). El tema claro queda disponible opt-in con `.light`.
+  - Primario `#2563EB` en ambos temas; píldora de navegación activa, barra de aforo, ícono activo móvil y logo en azul.
+  - Búsqueda global **centrada en md+** (grilla de 3 columnas en el `TopBar`) y **ampliada** (input de 52px de alto, `text-base` y columna de 56rem en desktop).
+  - Alertas y chips semánticos (morosidad, conducta, estados de comanda) con variantes `dark:` para que se lean bien sobre fondo negro.
 
 ---
 
@@ -25,6 +26,8 @@
 - [x] **BALANCE (cierre real):** `balance.tsx` conectado a `GET /api/v1/caja/cierre` (arqueo, `saldosPendientes`, `movimientos`), con `DatePicker` reutilizable sobre `react-day-picker`[cite: 2].
 - [x] **BALANCE (deuda anterior + calendario):** el extracto informa `fechaEmision` y marca "Deuda anterior · dd/mm"; celdas del calendario a 44×44 y panel de 22rem[cite: 2].
 - [x] **MIGRACIÓN DE FECHAS:** los 8 `<input type="date">` operativos pasan al `DatePicker`; el calendario gana un selector Mes/Año con flechas ▲/▼ y la prop `limpiable`[cite: 2].
+- [x] **ABM DEL PADRÓN:** editar/eliminar tutores y mascotas contra la API real; regla del huérfano (una mascota no queda sin tutor) y bloqueo 409 ante historial clínico/contable[cite: 2].
+- [x] **REESTILO VISUAL AZUL/NEGRO:** tema oscuro por defecto (primario #2563EB, sin `prefers-color-scheme`), botones/inputs/modal a `rounded-xl`, navegación activa y aforo en azul, alertas semánticas con variantes `dark:`, y barra de búsqueda global centrada en md+[cite: 2].
 
 ---
 
@@ -522,6 +525,233 @@ El `Calendar` es compartido, así que el cambio llega a todos los módulos y al
   `components/modules/nuevo-turno.tsx`, `components/modules/mostrador.tsx`,
   `components/modules/mostrador/agregar-turno-modal.tsx`,
   `components/modules/mostrador/cargar-cliente-modal.tsx`.
+- `PROGRESS.md` (este registro).
+
+Backend sin cambios, `AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
+
+---
+
+## ABM DEL PADRÓN (editar y eliminar tutores y mascotas)
+
+Cierre del hueco funcional del padrón: hasta acá se podía **crear** tutores y
+mascotas y **vincularlos**, pero no corregir un dato mal cargado ni dar de baja a
+nadie. La UI del padrón sólo tenía alta; el backend ya exponía
+`PUT`/`DELETE` para ambos, así que la fase fue conectar la UI y endurecer el
+borrado, que hasta entonces habría respondido con un **500 opaco** al chocar con
+una clave foránea.
+
+### Regla de negocio nueva (inviolable)
+
+**Una mascota no puede quedar sin ningún tutor.** Al eliminar un tutor, las
+mascotas que sólo estaban vinculadas a él quedan huérfanas y **se eliminan con
+él**. Si una de esas mascotas tiene historial (turnos, reservas, consultas o
+comandas), no se puede borrar y, como tampoco puede quedar sin tutor, **se aborta
+el borrado completo del tutor** con `409` en una única transacción: nunca queda
+el padrón a medias.
+
+### Backend
+
+- `service/HistorialMascota.java` (nuevo `@Component`): responde si una mascota
+  tiene turnos, reservas, consultas o comandas. Centraliza la lista de
+  dependencias para que el servicio de mascotas y el de tutores no tengan cada uno
+  su copia.
+- `MascotaServiceImpl.eliminar`: rechaza con `BusinessConflictException` (409) si
+  la mascota tiene historial; si no, borra y el `CascadeType.ALL` limpia el N:M.
+- `TutorServiceImpl.eliminar`:
+  1. 409 si el tutor tiene comandas a su nombre o pagos como pagador (los
+     movimientos contables no pueden quedar sin titular).
+  2. Calcula las mascotas huérfanas (las que sólo tienen a este tutor) y, si
+     alguna tiene historial, 409.
+  3. Corta los vínculos explícitamente (la tupla tiene dos propietarios: dejarla
+     al `cascade` produciría colisiones), vacía la colección del otro lado,
+     `flush()`, borra las huérfanas y recién ahí el tutor.
+- Repositorios: `existsByMascotaId` en `TurnoClinicoRepository`,
+  `ReservaGuarderiaRepository`, `ConsultaMedicaRepository` y
+  `ComandaCobroRepository`; `existsByTutorId` en `ComandaCobroRepository`;
+  `existsByTutorPagadorId` en `PagoRepository`.
+- `GlobalExceptionHandler`: nuevo handler de `DataIntegrityViolationException`
+  → 409 como red de seguridad (si algún servicio no cubre una FK, no explota en
+  un 500).
+
+### Frontend (`components/modules/padron.tsx`)
+
+- Cada fila de tutor y de mascota gana botones de **editar** y **eliminar**
+  (iconos, 44×44 px, `aria-label`). Se reestructuró la fila del tutor para no
+  anidar botones.
+- `ModalEditarTutor`: edita nombre, apellido, DNI, teléfono, email y dirección.
+  Los opcionales se mandan como `undefined` (nunca `""`, que el `@Pattern` del
+  DTO rechaza).
+- `ModalEditarMascota`: edita los datos propios de la mascota. Reenvía
+  `tutores` con la lista actual porque el backend sincroniza el N:M completo:
+  omitirla los desvincularía a todos. Un aviso explica que el vínculo se gestiona
+  desde el modal del tutor.
+- `ModalEliminar` (genérico): confirmación antes de borrar y, si el backend
+  responde 409, muestra el motivo (huérfana con historial, movimientos
+  contables, etc.) sin cerrar el diálogo.
+- `alta-mascota.tsx`: `ESPECIES` y `CONDUCTAS` se exportan para reusarlas en el
+  modal de edición y no duplicarlas.
+
+### Tests (`PadronAbmTest.java`, 6 casos)
+
+Borrar un tutor con mascota compartida la mantiene viva; borrar al único tutor de
+una mascota sin historial la elimina; una huérfana con historial bloquea el
+borrado del tutor con 409 y no borra nada (atomicidad); mascota sin historial se
+elimina; mascota con turno no se elimina (409); tutor con comandas no se elimina
+(409). `TutorControllerTest` se ajustó: al borrar el último tutor la mascota se
+auto-elimina, así que el `DELETE /mascotas` posterior ahora espera 404.
+
+### Verificación
+
+- `npx tsc --noEmit` → limpio.
+- `npx next build --webpack` → OK.
+- `.\test-harness.ps1` → **165 tests de Spring Boot, 0 fallos** (159 previos + 6
+  nuevos). Backend detenido antes (`mvnw clean test` borra `target/`) y reiniciado
+  después con las clases recién compiladas.
+
+### Archivos (esta fase)
+
+- Backend: `service/HistorialMascota.java` (nuevo),
+  `service/impl/TutorServiceImpl.java`, `service/impl/MascotaServiceImpl.java`,
+  `controller/GlobalExceptionHandler.java`, `repository/TurnoClinicoRepository.java`,
+  `repository/ReservaGuarderiaRepository.java`, `repository/ConsultaMedicaRepository.java`,
+  `repository/ComandaCobroRepository.java`, `repository/PagoRepository.java`,
+  `test/.../PadronAbmTest.java` (nuevo), `test/.../TutorControllerTest.java`.
+- Frontend: `components/modules/padron.tsx`, `components/modules/alta-mascota.tsx`.
+- `PROGRESS.md` (este registro).
+
+`AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
+
+---
+
+## ALTA DE TUTOR UNIFICADA (email y dirección en Mostrador y Padrón)
+
+### Objetivo
+
+Los dos caminos de alta de tutor debían pedir **los mismos datos**. El padrón
+pedía nombre, apellido, DNI y teléfono; faltaban **email** y **dirección**, que
+el backend ya admitía (`TutorRequestDTO`) y que el modal de edición del padrón ya
+usaba. Se agregaron también al alta del Mostrador ("Cargar cliente") para que
+ambos formularios queden idénticos.
+
+### Cambios (solo frontend)
+
+- `components/modules/padron.tsx` → `ModalAltaTutorNuevo`: se suman los estados y
+  campos **Email** (`inputMode="email"`) y **Dirección**, y se envían en
+  `apiTutores.crear`. Los seis campos quedan en una grilla de dos columnas
+  (`sm:grid-cols-2`).
+- `components/modules/mostrador/cargar-cliente-modal.tsx`: el estado `tutor` y el
+  `limpiar()` incorporan `email`/`direccion`; `guardar()` los manda a
+  `apiTutores.crear`; la grilla "Datos del tutor" pasa de 4 a 6 campos.
+
+Los opcionales viajan como `undefined` (nunca `""`, que el `@Pattern` del DTO
+rechaza), igual que ya se hacía con el teléfono. Backend sin cambios; `AGENTS.md`
+sin tocar.
+
+### Verificación
+
+- `npx tsc --noEmit` → limpio.
+- `npx next build --webpack` → OK.
+- `.\test-harness.ps1` → **165 tests de Spring Boot, 0 fallos** (fase solo
+  frontend). Backend detenido antes (`mvnw clean test` borra `target/`) y
+  reiniciado después.
+
+### Archivos (esta fase)
+
+- `components/modules/padron.tsx`.
+- `components/modules/mostrador/cargar-cliente-modal.tsx`.
+- `PROGRESS.md` (este registro).
+
+Sin commit: pendiente de tu confirmación.
+
+---
+
+## REESTILO VISUAL AZUL/NEGRO + BÚSQUEDA CENTRADA EN EL TOPBAR
+
+Encargo del dueño: cambiar la identidad cromática del sistema a **azul y negro**,
+refinar botones y demás controles para que la experiencia sea más agradable, y
+**centrar la barra de búsqueda** (que se ve en el Mostrador, porque el `TopBar` es
+global). Todo sobre las reglas de negocio inviolables de `AGENTS.md`: ningún
+cambio toca lógica de negocio, endpoints ni reglas de aforo/turnos/egreso.
+
+### Paleta y tema (tokens, no componentes)
+
+El frontend ya centralizaba todo el theming en variables shadcn de
+`app/globals.css`, así que la paleta nueva se resuelve casi enteramente ahí:
+
+- **Oscuro por defecto.** `app/layout.tsx` pone `<html lang="en" className="dark">`
+  y se **eliminó el bloque `@media (prefers-color-scheme: dark)`**: antes el tema
+  dependía del sistema operativo, ahora el oscuro es la identidad elegida. El
+  tema claro sigue disponible como opt-in futuro con la clase `.light` en la raíz
+  (los tokens de `:root` quedan completos, también con el azul nuevo).
+- **Azul vivo `#2563EB`** (`oklch(0.546 0.245 262.881)`) como `--primary` en ambos
+  temas; `--ring` y `--sidebar-primary` en azul; `--chart-1..5` en escala de azules.
+- **Fondo negro azulado** (`oklch(0.15 0.012 265)`), `--card`/`--popover`/`--sidebar`
+  un escalón más claros, bordes blancos al 10%.
+- `viewport` de `layout.tsx`: `colorScheme: 'dark'` y `themeColor: '#131320'`.
+
+### Componentes del design system
+
+- `components/ui/button.tsx`: `rounded-lg` → **`rounded-xl`** (consistente con la
+  skill `.opencode/tailwind-shadcn`); la variante `default` gana
+  `shadow-sm hover:shadow-md` y hover un punto más suave (`/85`).
+- `components/ui/field.tsx`: inputs, select, textarea y el contenedor `Panel` a
+  `rounded-xl`.
+- `components/ui/modal.tsx`: diálogo a `rounded-xl` con botón de cerrar acorde.
+- `lib/vista.tsx`: los `Semforo` (verde/ámbar/rojo) y el `ErrorBox` pasan a variantes
+  semitransparentes con `dark:` — se leen igual de bien en oscuro y en claro.
+
+### Navegación
+
+- `components/sidebar.tsx`: la píldora de pestaña activa pasa de blanco/negro a
+  **`bg-primary text-primary-foreground`** (azul con sombra sutil); en la barra
+  inferior de móvil el ícono/label activo se pinta de azul; el logo gana borde e
+  ícono `border-primary/40` / `text-primary`.
+
+### Búsqueda centrada (TopBar)
+
+- `components/top-bar.tsx`: en **`md+`** el header pasa a grilla de 3 columnas
+  `[1fr, buscador 56rem, 1fr]` con `col-start` explícitos, de modo que el input
+  queda **visualmente centrado** y el selector de rol alineado a la derecha. En
+  móvil (`< md`) se conserva el layout flex con el buscador a todo lo ancho
+  (mobile-first, AGENTS.md 3.1). Input, select y botón "Fichas" a `rounded-xl`
+  con focus ring azul.
+- **Agrandada a pedido del dueño:** el input pasa a `min-h-[52px]` y `text-base`
+  (icono `h-5 w-5`, padding `pl-12 pr-4`), y la columna del buscador en desktop
+  sube de `28rem` a `56rem` (con `max-w-2xl` en móvil). El desplegable de
+  resultados pasa a anclarse con `top-[calc(100%+0.5rem)]` para seguir pegado al
+  input sin importar su alto.
+
+### Refinamiento del Mostrador y alertas theme-aware
+
+- `mostrador/widget-aforo.tsx`: la barra de ocupación ahora es **azul**
+  (`bg-primary`) y solo se pinta de rojo con `completo` (la regla de aforo de 10
+  sigue resolviéndose en backend, sin tocarla).
+- `mostrador/columna-lista.tsx`: contenedor a `rounded-lg`.
+- Barrido de avisos y chips con colores claros fijos que quedarían como cajas
+  blancas sobre el fondo negro — todos ganaron variantes `dark:` **sin tocar
+  lógica**: `caja.tsx` (DEUDA SIN VERIFICAR y TUTOR MOROSO), `egreso.tsx`
+  (chip de conducta, deuda y alerta), `balance.tsx` (Deuda anterior y estados de
+  comanda), `fichas.tsx`, `ficha.tsx`, `padron.tsx` (chip de conducta y mensajes
+  de éxito), `alta-mascota.tsx`, `agenda.tsx` (aforo completo),
+  `mostrador/avisos-importantes.tsx` y los dos modales del mostrador.
+
+### Verificación (quality gate AGENTS.md §5)
+
+- `npx tsc --noEmit` → limpio.
+- `npx next build --webpack` → OK.
+- `.\test-harness.ps1` → **"Todos los controles pasaron exitosamente"**:
+  tsc limpio, build OK y **165 tests de Spring Boot, 0 fallos** (fase solo
+  frontend, sin cambios de backend).
+
+### Archivos (esta fase)
+
+- Frontend: `app/globals.css`, `app/layout.tsx`, `components/ui/button.tsx`,
+  `components/ui/field.tsx`, `components/ui/modal.tsx`, `components/sidebar.tsx`,
+  `components/top-bar.tsx`, `lib/vista.tsx`,
+  `components/modules/{mostrador.tsx, widget-aforo, columna-lista,
+  avisos-importantes, agregar-turno-modal, cargar-cliente-modal}` y
+  `components/modules/{caja, egreso, balance, fichas, ficha, padron,
+  alta-mascota, agenda}.tsx`.
 - `PROGRESS.md` (este registro).
 
 Backend sin cambios, `AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.

@@ -30,7 +30,7 @@ export function WidgetAforo({ aforo, fecha }: { aforo: EstadoApi<AforoGuarderia>
             </p>
             <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
-                className={`h-full rounded-full transition-all ${datos.completo ? "bg-destructive" : "bg-foreground"}`}
+                className={`h-full rounded-full transition-all ${datos.completo ? "bg-destructive" : "bg-primary"}`}
                 style={{
                   width: `${Math.min(100, (datos.cuposOcupados / datos.aforoMaximo) * 100)}%`,
                 }}

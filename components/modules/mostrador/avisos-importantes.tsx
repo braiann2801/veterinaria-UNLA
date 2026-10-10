@@ -102,7 +102,7 @@ export function AvisosImportantes({
             resultado posible en la pantalla de morosidad (regla 2.5).
           */}
           {deudas.fallidos > 0 && (
-            <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-800 dark:border-amber-500/50 dark:bg-amber-500/15 dark:text-amber-300">
               No se pudo consultar la deuda de {deudas.fallidos}{" "}
               {deudas.fallidos === 1 ? "tutor" : "tutores"}: puede faltar algún aviso de
               morosidad.{" "}

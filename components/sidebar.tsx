@@ -137,7 +137,7 @@ export function Sidebar({
                 aria-current={activo ? "page" : undefined}
                 className={cn(
                   "flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] transition-colors",
-                  activo ? "text-foreground" : "text-muted-foreground",
+                  activo ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 <Icon className="size-5" aria-hidden />
@@ -212,7 +212,7 @@ function BotonNav({
       className={cn(
         "flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
         activo
-          ? "bg-foreground font-medium text-background"
+          ? "bg-primary font-medium text-primary-foreground shadow-sm"
           : "text-foreground/80 hover:bg-muted",
       )}
     >
@@ -225,8 +225,8 @@ function BotonNav({
 function Marca() {
   return (
     <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-      <div className="flex size-8 items-center justify-center rounded-md border border-foreground/20">
-        <Dog className="size-4" />
+      <div className="flex size-8 items-center justify-center rounded-md border border-primary/40">
+        <Dog className="size-4 text-primary" />
       </div>
       <div className="leading-tight">
         <p className="text-sm font-semibold">Veterinaria</p>

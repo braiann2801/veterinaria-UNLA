@@ -204,8 +204,10 @@ class TutorControllerTest {
 				.andExpect(status().isBadRequest());
 
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorA)).andExpect(status().isNoContent());
+		// Al borrar el ultimo tutor, la mascota queda sin tutor y se elimina en
+		// cascada (regla inviolable del padron).
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorB)).andExpect(status().isNoContent());
-		mockMvc.perform(delete("/api/v1/mascotas/{id}", mascotaId)).andExpect(status().isNoContent());
+		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId)).andExpect(status().isNotFound());
 	}
 
 	@Test

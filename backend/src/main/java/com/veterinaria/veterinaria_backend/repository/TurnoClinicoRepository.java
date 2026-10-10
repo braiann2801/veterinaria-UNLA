@@ -32,6 +32,9 @@ public interface TurnoClinicoRepository extends JpaRepository<TurnoClinico, Long
 
 	List<TurnoClinico> findByMascotaId(Long mascotaId);
 
+	/** ¿La mascota tiene turnos clinicos? Bloquea su borrado desde el padron. */
+	boolean existsByMascotaId(Long mascotaId);
+
 	/**
 	 * Detecta solapamiento del bloque completo (atencion + desinfeccion).
 	 *

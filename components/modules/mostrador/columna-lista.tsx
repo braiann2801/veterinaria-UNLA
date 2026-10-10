@@ -26,7 +26,7 @@ export function ColumnaLista({
   nota?: string
 }) {
   return (
-    <div className="rounded-md border border-border">
+    <div className="rounded-lg border border-border">
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2 text-xs font-medium">
         {icon === "in" && <LogIn className="h-3.5 w-3.5" />}
         {icon === "out" && <LogOut className="h-3.5 w-3.5" />}

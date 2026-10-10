@@ -65,6 +65,12 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 	/** Evita emitir una segunda comanda para la misma consulta. */
 	boolean existsByConsultaMedicaId(Long consultaMedicaId);
 
+	/** ¿El tutor tiene comandas emitidas a su nombre? Bloquea su borrado. */
+	boolean existsByTutorId(Long tutorId);
+
+	/** ¿Hay alguna comanda asociada a la mascota? Bloquea su borrado. */
+	boolean existsByMascotaId(Long mascotaId);
+
 	List<ComandaCobro> findByEstado(ComandaCobro.EstadoComanda estado);
 
 	/**

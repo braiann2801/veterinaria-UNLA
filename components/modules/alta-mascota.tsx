@@ -31,7 +31,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { TOQUE_MINIMO } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie`. La etiqueta es la que ve el operador. */
-const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
+export const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
   { valor: "CANINO", etiqueta: "Canino" },
   { valor: "FELINO", etiqueta: "Felino" },
   { valor: "AVE", etiqueta: "Ave" },
@@ -40,7 +40,7 @@ const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
   { valor: "OTRO", etiqueta: "Otro" },
 ]
 
-const CONDUCTAS = [
+export const CONDUCTAS = [
   { valor: "normal", etiqueta: "Normal" },
   { valor: "gruñe", etiqueta: "Gruñe" },
   { valor: "muerde", etiqueta: "Muerde" },
@@ -280,7 +280,7 @@ export function AltaMascota({
           </p>
         )}
         {exito && (
-          <p className="text-sm text-emerald-700" role="status">
+          <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
             {exito}
           </p>
         )}

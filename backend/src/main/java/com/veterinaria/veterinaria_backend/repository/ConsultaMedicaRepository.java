@@ -24,4 +24,7 @@ public interface ConsultaMedicaRepository extends JpaRepository<ConsultaMedica, 
 	Optional<ConsultaMedica> findByTurnoClinicoId(Long turnoClinicoId);
 
 	boolean existsByTurnoClinicoId(Long turnoClinicoId);
+
+	/** ¿La mascota tiene consultas registradas? Bloquea su borrado desde el padron. */
+	boolean existsByMascotaId(Long mascotaId);
 }

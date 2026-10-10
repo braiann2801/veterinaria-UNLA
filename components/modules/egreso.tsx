@@ -79,7 +79,7 @@ export function Egreso() {
                   <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                     {m.nombreMascota}
                     {m.conducta && m.conducta !== "normal" && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-500/15 dark:text-amber-300">
                         <TriangleAlert className="size-3" aria-hidden />
                         {ETIQUETA_CONDUCTA[m.conducta] ?? m.conducta}
                       </span>
@@ -227,7 +227,7 @@ function ModalValidar({
             </p>
           )}
           {tutorElegido && !tutorElegido.autorizadoRetiro && (
-            <p className="text-xs text-amber-800">
+            <p className="text-xs text-amber-800 dark:text-amber-300">
               Este tutor está vinculado pero no tiene autorización de retiro. Puede
               hacer consultas y pagos; el retiro se valida aparte.
             </p>
@@ -302,14 +302,14 @@ function Veredicto({ veredicto }: { veredicto: EgresoValidacion }) {
       </div>
 
       {veredicto.tieneDeuda && (
-        <p className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+        <p className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
           <span>Deuda pendiente del tutor</span>
           <span className="font-medium">{money(veredicto.saldoDeuda)}</span>
         </p>
       )}
 
       {veredicto.alertaConducta && (
-        <p className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
           <TriangleAlert className="size-4 shrink-0" aria-hidden />
           <span>
             Ficha de conducta: {ETIQUETA_CONDUCTA[veredicto.conducta ?? "normal"] ?? "—"}

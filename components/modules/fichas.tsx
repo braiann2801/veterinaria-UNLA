@@ -207,7 +207,7 @@ export function Fichas({ initialMascotaId }: { initialMascotaId?: number | null 
                 className={cn(
                   "mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
                   esAlerta(seleccionada.conducta)
-                    ? "border-amber-400 bg-amber-50 font-medium text-amber-900"
+                    ? "border-amber-400 bg-amber-50 font-medium text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
                     : "border-border text-muted-foreground",
                 )}
               >
@@ -235,7 +235,7 @@ export function Fichas({ initialMascotaId }: { initialMascotaId?: number | null 
                           {c.fechaAtencion}
                           <span>· {c.profesional.nombreCompleto}</span>
                           {c.alertaConducta && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900 dark:bg-amber-500/15 dark:text-amber-300">
                               <AlertTriangle className="size-3" aria-hidden />
                               Conducta en la atención:{" "}
                               {CONDUCTA_OBSERVADA[c.conductaObservada]}

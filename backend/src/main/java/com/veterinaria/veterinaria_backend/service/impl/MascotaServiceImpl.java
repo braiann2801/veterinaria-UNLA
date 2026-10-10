@@ -20,11 +20,13 @@ import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
+import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
+import com.veterinaria.veterinaria_backend.service.HistorialMascota;
 import com.veterinaria.veterinaria_backend.service.MascotaService;
 
 /**
@@ -38,13 +40,16 @@ public class MascotaServiceImpl implements MascotaService {
 	private final TutorRepository tutorRepository;
 	private final TutorMascotaRepository tutorMascotaRepository;
 	private final EntityMapper mapper;
+	private final HistorialMascota historialMascota;
 
 	public MascotaServiceImpl(MascotaRepository mascotaRepository, TutorRepository tutorRepository,
-			TutorMascotaRepository tutorMascotaRepository, EntityMapper mapper) {
+			TutorMascotaRepository tutorMascotaRepository, EntityMapper mapper,
+			HistorialMascota historialMascota) {
 		this.mascotaRepository = mascotaRepository;
 		this.tutorRepository = tutorRepository;
 		this.tutorMascotaRepository = tutorMascotaRepository;
 		this.mapper = mapper;
+		this.historialMascota = historialMascota;
 	}
 
 	@Override
@@ -97,7 +102,14 @@ public class MascotaServiceImpl implements MascotaService {
 	@Override
 	@Transactional
 	public void eliminar(Long id) {
-		mascotaRepository.delete(obtenerEntidad(id));
+		Mascota mascota = obtenerEntidad(id);
+		// La mascota no se borra si tiene actividad: la FK lo impediria en la
+		// base con un 500 opaco. Se rechaza con 409 y un motivo legible.
+		if (historialMascota.tieneHistorial(id)) {
+			throw new BusinessConflictException("No se puede eliminar la mascota " + mascota.getNombre()
+					+ ": tiene historial clinico o contable asociado (turnos, reservas, consultas o cobros).");
+		}
+		mascotaRepository.delete(mascota);
 	}
 
 	@Override

@@ -23,14 +23,14 @@ export function Modal({
       onMouseDown={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg border border-border bg-card shadow-lg"
+        className="w-full max-w-lg rounded-xl border border-border bg-card shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="rounded-xl p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Cerrar"
           >
             <X className="h-4 w-4" />

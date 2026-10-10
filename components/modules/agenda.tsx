@@ -111,7 +111,7 @@ export function Agenda() {
                   <Users className="size-3.5" aria-hidden />
                   {a.cuposOcupados} de {a.aforoMaximo} cupos
                 </Semforo>
-                {a.completo && <span className="text-xs text-red-700">Aforo completo</span>}
+                {a.completo && <span className="text-xs text-red-700 dark:text-red-300">Aforo completo</span>}
               </div>
               <MeterAforo aforo={a} />
             </div>

@@ -19,7 +19,7 @@ export function Field({
 }
 
 const baseControl =
-  "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-foreground focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+  "h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-foreground focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(baseControl, props.className)} />
@@ -34,7 +34,7 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
     <textarea
       {...props}
       className={cn(
-        "min-h-[72px] w-full rounded-md border border-input bg-background p-3 text-sm outline-none transition-colors focus:border-foreground focus:ring-1 focus:ring-ring",
+        "min-h-[72px] w-full rounded-xl border border-input bg-background p-3 text-sm outline-none transition-colors focus:border-foreground focus:ring-1 focus:ring-ring",
         props.className,
       )}
     />
@@ -56,7 +56,7 @@ export function Panel({
   action?: ReactNode
 }) {
   return (
-    <section className={cn("rounded-lg border border-border bg-card shadow-sm", className)}>
+    <section className={cn("rounded-xl border border-border bg-card shadow-sm", className)}>
       {title && (
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
