@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Field, TextInput, Select, TextArea } from "@/components/ui/field"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { mascotas as apiMascotas, tutores as apiTutores, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
@@ -326,18 +327,13 @@ export function CargarClienteModal({
                 <option value="Hembra">Hembra</option>
               </Select>
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-xs font-medium text-muted-foreground">
-                Fecha de nacimiento
-              </span>
-              <TextInput
-                type="date"
-                value={mascota.fechaNacimiento}
-                max={hoyLocal()}
-                onChange={(e) => setMascota((f) => ({ ...f, fechaNacimiento: e.target.value }))}
-                className={TOQUE_MINIMO}
-              />
-            </label>
+            <DatePicker
+              label="Fecha de nacimiento"
+              value={mascota.fechaNacimiento}
+              max={hoyLocal()}
+              onChange={(nueva) => setMascota((f) => ({ ...f, fechaNacimiento: nueva }))}
+              limpiable
+            />
             <Field label="Peso (kg)">
               <TextInput
                 value={mascota.peso}

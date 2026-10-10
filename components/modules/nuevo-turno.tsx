@@ -22,6 +22,7 @@ import type { Mascota, Profesional } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Modal } from "@/components/ui/modal"
 import { Panel, Select, TextInput } from "@/components/ui/field"
+import { DatePicker } from "@/components/ui/date-picker"
 import { TOQUE_MINIMO } from "@/lib/vista"
 
 /** `Matriz DNI 12345678 · Laura Sosa`. */
@@ -144,15 +145,7 @@ export function NuevoTurnoModal({
         </label>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">Fecha</span>
-            <TextInput
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className={TOQUE_MINIMO}
-            />
-          </label>
+          <DatePicker label="Fecha" value={fecha} onChange={setFecha} />
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-xs font-medium text-muted-foreground">Hora</span>
             <TextInput

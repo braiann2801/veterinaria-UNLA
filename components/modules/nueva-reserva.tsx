@@ -32,6 +32,7 @@ import { ApiError } from "@/lib/api"
 import type { AforoGuarderia, Mascota, TipoEstadiaGuarderia } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Modal } from "@/components/ui/modal"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Select, TextArea, TextInput } from "@/components/ui/field"
 import { Semforo, TOQUE_MINIMO } from "@/lib/vista"
 
@@ -62,14 +63,6 @@ const HORARIOS_SUGERIDOS: Record<TipoEstadiaGuarderia, { entrada: string; salida
 function etiquetaMascota(m: Mascota): string {
   const tutor = m.tutores?.[0]
   return tutor ? `${m.nombre} · ${tutor.nombre} ${tutor.apellido}` : `${m.nombre} · sin tutor`
-}
-
-/** Fecha local en `YYYY-MM-DD`; `toISOString()` devolvería mañana de noche. */
-function hoy(): string {
-  const d = new Date()
-  const mes = String(d.getMonth() + 1).padStart(2, "0")
-  const dia = String(d.getDate()).padStart(2, "0")
-  return `${d.getFullYear()}-${mes}-${dia}`
 }
 
 function tonoDeAforo(aforo: AforoGuarderia) {
@@ -174,15 +167,7 @@ export function NuevaReservaGuarderia({
         </label>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">Fecha</span>
-            <TextInput
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value || hoy())}
-              className={TOQUE_MINIMO}
-            />
-          </label>
+          <DatePicker label="Fecha" value={fecha} onChange={setFecha} />
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-xs font-medium text-muted-foreground">Tipo de estadía</span>
             <Select

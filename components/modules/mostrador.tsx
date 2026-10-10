@@ -43,7 +43,7 @@
 import { useCallback, useState } from "react"
 import { UserPlus, CalendarPlus, CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Field, TextInput } from "@/components/ui/field"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   egreso as apiEgreso,
   guarderia as apiGuarderia,
@@ -57,7 +57,6 @@ import type {
   TurnoClinico,
 } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
-import { TOQUE_MINIMO } from "@/lib/vista"
 
 import { AgregarTurnoModal } from "./mostrador/agregar-turno-modal"
 import { AvisosImportantes } from "./mostrador/avisos-importantes"
@@ -113,15 +112,11 @@ export function Mostrador() {
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="Día del tablero">
-            <TextInput
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value || hoyLocal())}
-              className={TOQUE_MINIMO}
-              aria-label="Día del tablero"
-            />
-          </Field>
+          <DatePicker
+            label="Día del tablero"
+            value={fecha}
+            onChange={(nueva) => setFecha(nueva || hoyLocal())}
+          />
           {fecha !== hoyLocal() && (
             <Button variant="outline" onClick={() => setFecha(hoyLocal())} type="button">
               <CalendarDays className="h-4 w-4" /> Hoy

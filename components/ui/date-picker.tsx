@@ -42,6 +42,8 @@ export interface DatePickerProps {
   disabled?: boolean
   className?: string
   placeholder?: string
+  /** Muestra un boton "Limpiar" para vaciar la fecha (`onChange("")`). */
+  limpiable?: boolean
 }
 
 /**
@@ -66,6 +68,7 @@ export function DatePicker({
   disabled = false,
   className,
   placeholder = "Elegir fecha",
+  limpiable = false,
 }: DatePickerProps) {
   const [abierto, setAbierto] = useState(false)
   const contenedorRef = useRef<HTMLDivElement>(null)
@@ -152,6 +155,8 @@ export function DatePicker({
             mode="single"
             selected={fechaSeleccionada}
             defaultMonth={fechaSeleccionada ?? new Date()}
+            startMonth={min ? aFecha(min) : undefined}
+            endMonth={max ? aFecha(max) : undefined}
             disabled={noSeleccionables.length > 0 ? noSeleccionables : undefined}
             onSelect={(dia) => {
               if (!dia) return
@@ -160,16 +165,30 @@ export function DatePicker({
             }}
           />
           <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
-            <button
-              type="button"
-              onClick={() => {
-                onChange(hoyLocal())
-                setAbierto(false)
-              }}
-              className="rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted"
-            >
-              Hoy
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(hoyLocal())
+                  setAbierto(false)
+                }}
+                className="rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted"
+              >
+                Hoy
+              </button>
+              {limpiable && fechaSeleccionada && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange("")
+                    setAbierto(false)
+                  }}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setAbierto(false)}

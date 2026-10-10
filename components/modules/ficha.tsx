@@ -26,6 +26,7 @@ import type {
 } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
 
 const CONDUCTAS: { valor: ConductaObservada; etiqueta: string }[] = [
@@ -230,22 +231,20 @@ export function FichaMedica() {
             </label>
           </div>
 
-          <label className="flex flex-col gap-1.5 text-sm sm:max-w-[220px]">
-            <span className="text-xs font-medium text-muted-foreground">Fecha de la atención</span>
-            <TextInput
-              type="date"
+          <div className="flex flex-col gap-1.5 text-sm sm:max-w-[220px]">
+            <DatePicker
+              label="Fecha de la atención"
               value={fechaAtencion}
-              onChange={(e) => {
-                setFechaAtencion(e.target.value || hoy())
+              onChange={(nueva) => {
+                setFechaAtencion(nueva || hoy())
                 setTurnoId(null)
               }}
-              className={TOQUE_MINIMO}
             />
             <span className="text-xs text-muted-foreground">
               Admite fechas pasadas: la consulta se documenta cuando ocurrio. Como el
               campo es solo el dia, la hora queda en 00:00.
             </span>
-          </label>
+          </div>
 
           {mascotaId !== null && turnosDeLaMascota.length > 0 && (
             <label className="flex flex-col gap-1.5 text-sm">

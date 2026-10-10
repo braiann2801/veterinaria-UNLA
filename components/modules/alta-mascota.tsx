@@ -27,6 +27,7 @@ import { PawPrint, Plus } from "lucide-react"
 import { mascotas as apiMascotas, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
+import { DatePicker } from "@/components/ui/date-picker"
 import { TOQUE_MINIMO } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie`. La etiqueta es la que ve el operador. */
@@ -176,21 +177,18 @@ export function AltaMascota({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">Fecha de nacimiento</span>
-            <TextInput
-              type="date"
-              value={fechaNacimiento}
-              // `hoyLocal()` y no `new Date().toISOString().slice(0, 10)`:
-              // `toISOString()` devuelve la fecha en UTC, así que entre las 21:00 y
-              // las 24:00 de una zona UTC-3 devuelve mañana y el `max` bloquearía
-              // el nacimiento de un animal nacido hoy. El backend ya rechaza las
-              // fechas futuras con `@Past`; este `max` es solo la ayuda visual.
-              max={hoyLocal()}
-              onChange={(e) => setFechaNacimiento(e.target.value)}
-              className={TOQUE_MINIMO}
-            />
-          </label>
+          <DatePicker
+            label="Fecha de nacimiento"
+            value={fechaNacimiento}
+            // `hoyLocal()` y no `new Date().toISOString().slice(0, 10)`:
+            // `toISOString()` devuelve la fecha en UTC, así que entre las 21:00 y
+            // las 24:00 de una zona UTC-3 devuelve mañana y el `max` bloquearía
+            // el nacimiento de un animal nacido hoy. El backend ya rechaza las
+            // fechas futuras con `@Past`; este `max` es solo la ayuda visual.
+            max={hoyLocal()}
+            onChange={setFechaNacimiento}
+            limpiable
+          />
           <Campo
             etiqueta="Peso (kg)"
             valor={peso}

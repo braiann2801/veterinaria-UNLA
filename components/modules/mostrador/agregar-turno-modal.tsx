@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Field, TextInput, Select } from "@/components/ui/field"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import {
   turnos as apiTurnos,
@@ -160,14 +161,7 @@ export function AgregarTurnoModal({
         </Field>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Fecha">
-            <TextInput
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className={TOQUE_MINIMO}
-            />
-          </Field>
+          <DatePicker label="Fecha" value={fecha} onChange={setFecha} />
           <Field label="Hora">
             <TextInput
               type="time"

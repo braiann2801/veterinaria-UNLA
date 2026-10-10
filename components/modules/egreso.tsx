@@ -18,7 +18,6 @@
 
 import { useState } from "react"
 import {
-  CalendarDays,
   Clock,
   Home,
   LogOut,
@@ -32,6 +31,7 @@ import { egreso as apiEgreso, hoyLocal } from "@/lib/api"
 import type { EgresoValidacion, MascotaDelDia } from "@/lib/api"
 import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Panel, Select, TextInput } from "@/components/ui/field"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { ErrorBox, Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
 
@@ -52,25 +52,7 @@ export function Egreso() {
     <div className="flex flex-col gap-4">
       <Panel title="Checkout de egreso">
         <div className="flex flex-col gap-1.5 text-sm sm:max-w-xs">
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">Jornada</span>
-            <div className="flex items-center gap-2">
-              <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <TextInput
-                type="date"
-                value={fecha}
-                onChange={(e) => {
-                  const nueva = e.target.value
-                  // Un input de fecha vacio no es una jornada: sin valor no hay
-                  // contra qué consultar, y mandar "" seria pedir "hoy" por
-                  // accidento mientras el operador cree que esta viendo otra cosa.
-                  if (nueva) setFecha(nueva)
-                }}
-                aria-label="Jornada de egreso"
-                className={TOQUE_MINIMO}
-              />
-            </div>
-          </label>
+          <DatePicker label="Jornada" value={fecha} onChange={setFecha} />
           <p className="text-xs text-muted-foreground">
             Pacientes con turno o guardería en esa fecha. Un retiro de ayer quedó
             pendiente, cambiá la fecha para encontrarlo.

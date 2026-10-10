@@ -1,15 +1,14 @@
 ﻿# PROGRESS.md
 
 ## Estado Actual
-- **Fase en curso:** Ninguna — **BALANCE: DEUDA ANTERIOR + CALENDARIO TÁCTIL** (el extracto distingue los cobros que saldan deudas de otros días y el `DatePicker` agranda sus celdas a 44×44)
+- **Fase en curso:** Ninguna — **MIGRACIÓN DE FECHAS NATIVAS AL `DatePicker` + SELECTOR DE MES/AÑO** (los 8 `<input type="date">` restantes usan el calendario táctil y su encabezado abre un panel Mes/Año)
 - **Base Git:** `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas)[cite: 2]
 - **Harness:** `.\test-harness.ps1` en verde (TSC limpio, Next.js build OK, **159 tests de Spring Boot pasando**, 0 fallos)[cite: 2]
-- **Últimos logros (Balance):**
-  - `MovimientoCajaDTO` y el extracto de `/caja/cierre` informan `fechaEmision`; un pago que salda una comanda de otro día se muestra con el distintivo ámbar "Deuda anterior · dd/mm" (tarjeta móvil y tabla de escritorio)[cite: 2].
-  - Calendario `react-day-picker` con celdas de 44×44 (regla 3.4) y panel de 22rem; aplica a Balance, Caja y Agenda[cite: 2].
-  - `GET /api/v1/caja/cierre` ampliado con `saldosPendientes` y `movimientos` (extracto plano de la jornada); agregaciones `SUM()`/`COUNT` y proyección JPQL filtrada por rango `[00:00, 24:00)` en MySQL, sin entidades ni relaciones expuestas[cite: 2].
-  - `balance.tsx` dejó de usar datos mock: 3 tarjetas de resumen + desglose de los 5 medios de pago (incluye Seña) + tabla de movimientos responsive, con esqueletos de carga al cambiar de fecha[cite: 2].
-  - `DatePicker` reutilizable (`components/ui/date-picker.tsx` + `components/ui/calendar.tsx`) sobre `react-day-picker`; reemplaza los `<input type="date">` nativos de Balance, Caja y Agenda[cite: 2].
+- **Últimos logros (migración de fechas):**
+  - Los 8 `<input type="date">` de operación (egreso, ficha, padrón/alta de mascota, reserva de guardería, turno de agenda, día del tablero, agregar turno, alta de cliente) fueron reemplazados por el `DatePicker` (44 px, regla 3.4).
+  - El encabezado del calendario es clickeable y despliega un panel con columnas Mes y Año navegables con flechas ▲/▼, sin selects nativos[cite: 2].
+  - `DatePicker` gana la prop `limpiable`; solo la usan las dos fechas de nacimiento opcionales. El rango de años se deriva de `min`/`max`[cite: 2].
+  - `guarderia.tsx` (legacy, no montado) queda intacto a propósito[cite: 2].
 
 ---
 
@@ -25,6 +24,7 @@
 - [x] **REFACTOR Mostrador:** monolito `mostrador.tsx` (1105 líneas) dividido en orquestador de 150 + 9 componentes atómicos, sin cambios de UI ni funcionalidad[cite: 2].
 - [x] **BALANCE (cierre real):** `balance.tsx` conectado a `GET /api/v1/caja/cierre` (arqueo, `saldosPendientes`, `movimientos`), con `DatePicker` reutilizable sobre `react-day-picker`[cite: 2].
 - [x] **BALANCE (deuda anterior + calendario):** el extracto informa `fechaEmision` y marca "Deuda anterior · dd/mm"; celdas del calendario a 44×44 y panel de 22rem[cite: 2].
+- [x] **MIGRACIÓN DE FECHAS:** los 8 `<input type="date">` operativos pasan al `DatePicker`; el calendario gana un selector Mes/Año con flechas ▲/▼ y la prop `limpiable`[cite: 2].
 
 ---
 
@@ -448,3 +448,80 @@ Como el `Calendar` es compartido, la mejora llega también a Caja y Agenda.
 - `PROGRESS.md` (este registro).
 
 `AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
+
+---
+
+## MIGRACIÓN DE FECHAS NATIVAS AL `DatePicker` + SELECTOR DE MES/AÑO
+
+Cierre de la deuda de UX que quedó abierta en la fase anterior: el `DatePicker`
+existía pero no se lo usaba en todos lados, y el calendario no permitía saltar de
+mes/año sin ir click a click.
+
+### 1. Los 8 `<input type="date">` operativos → `DatePicker`
+
+Se relevaron todos los `<input type="date">` reales del frontend (el `<input>` de
+la librería nativa aparecía en 10 lugares, pero dos eran `guarderia.tsx` legado y
+los comentarios). Los 8 operativos se migraron al `DatePicker` existente, con su
+calendario táctil de 44 px:
+
+| Módulo | Campo |
+| --- | --- |
+| `egreso.tsx` | Jornada |
+| `ficha.tsx` | Fecha de la atención |
+| `alta-mascota.tsx` | Fecha de nacimiento (`max` + `limpiable`) |
+| `nueva-reserva.tsx` | Fecha de la reserva |
+| `nuevo-turno.tsx` | Fecha del turno |
+| `mostrador.tsx` (tablero) | Día del tablero |
+| `mostrador/agregar-turno-modal.tsx` | Fecha |
+| `mostrador/cargar-cliente-modal.tsx` (fecha de nacimiento, `limpiable` + `max`) |
+
+- `guarderia.tsx` (legacy, no montado, Riesgo 2) **no se tocó**: sigue con su
+  `<input type="date">` a propósito, para no reescribir código muerto.
+- Se adaptaron los `onChange` (antes `e.target.value`, ahora el string directo) y
+  se limpiaron los imports/helpers que quedaron sin uso (`CalendarDays`,
+  `Field`/`TextInput`, el helper `hoy()` de `nueva-reserva.tsx`).
+
+### 2. Selector de Mes/Año en el encabezado del calendario
+
+El `Calendar` es compartido, así que el cambio llega a todos los módulos y al
+`DatePicker`.
+
+- `components/ui/calendar.tsx`:
+  - `CapituloMes` reemplaza al `MonthCaption` por defecto: el encabezado "octubre
+    2026" es ahora un **botón** que abre un panel sobre la grilla con dos
+    columnas, **Mes** y **Año**, y flechas `▲`/`▼` que desplazan el scroll de a
+    un ítem (44 px). No hay `<select>` nativos.
+  - Se navega con `goToMonth()` de `react-day-picker` (única vía soportada).
+  - El rango de años se deriva de `startMonth`/`endMonth`; sin límites cae a
+    `[año actual − 100, año actual + 10]`. La columna arranca centrada en el valor
+    activo.
+  - `month` gana `relative` para anclar el panel (si no, se posicionaría contra el
+    popover del `DatePicker`); la barra de navegación pasa a `pointer-events-none`
+    con los botones prev/next en `pointer-events-auto`, así el click del centro
+    llega al botón de mes/año sin romper los chevrones.
+- `components/ui/date-picker.tsx`: nueva prop `limpiable` (botón "Limpiar" que
+  emite `onChange("")`) y `startMonth`/`endMonth` derivados de `min`/`max`. La
+  usan solo las dos fechas de nacimiento, que son opcionales.
+
+`guarderia.tsx` (legacy, no montado) queda intacto a propósito.
+
+### Verificación
+
+- `npx tsc --noEmit` → limpio.
+- `next build --webpack` → OK.
+- `.\test-harness.ps1` → **159 tests de Spring Boot, 0 fallos** (misma cuenta: la
+  fase es solo frontend). Backend detenido antes (`mvnw clean test` borra
+  `target/`) y reiniciado después con las clases recién compiladas.
+
+### Archivos (esta fase)
+
+- `components/ui/calendar.tsx` (selector Mes/Año: `CapituloMes` + `ColumnaSelector`).
+- `components/ui/date-picker.tsx` (`limpiable`, `startMonth`/`endMonth`).
+- `components/modules/egreso.tsx`, `components/modules/ficha.tsx`,
+  `components/modules/alta-mascota.tsx`, `components/modules/nueva-reserva.tsx`,
+  `components/modules/nuevo-turno.tsx`, `components/modules/mostrador.tsx`,
+  `components/modules/mostrador/agregar-turno-modal.tsx`,
+  `components/modules/mostrador/cargar-cliente-modal.tsx`.
+- `PROGRESS.md` (este registro).
+
+Backend sin cambios, `AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
