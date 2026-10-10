@@ -1,5 +1,14 @@
 "use client"
 
+/**
+ * Estado de sesión global (rol + búsqueda del TopBar).
+ *
+ * <p>Este store nació como un mock en memoria con perros, tutores, turnos,
+ * reservas y pagos de juguete. Ese mundo de datos ya no existe: todo el dato
+ * operativo se lee y escribe contra la API Spring Boot (`lib/api.ts`), y acá
+ * solo queda el estado de UI compartido entre pantallas.</p>
+ */
+
 import {
   createContext,
   useContext,
@@ -10,232 +19,29 @@ import {
 
 export type Role = "recepcion" | "veterinario" | "duenio"
 
-export type Tutor = {
-  nombre: string
-  telefono: string
-}
-
-export type Owner = {
-  id: string
-  nombre: string
-  apellido: string
-  dni: string
-  telefono: string
-  tutores: Tutor[]
-  deuda: number
-}
-
-export type Conducta = "normal" | "gruñe" | "muerde" | "miedoso"
-
-export type Dog = {
-  id: string
-  nombre: string
-  ownerId: string
-  conducta: Conducta
-}
-
-export type Turno = {
-  id: string
-  dogId: string
-  ownerId: string
-  hora: string
-  motivo: string
-  fecha: string // YYYY-MM-DD
-  estado: "pendiente" | "atendido"
-}
-
-export type Reserva = {
-  id: string
-  dogId: string
-  ownerId: string
-  autorizadoNombre: string
-  autorizadoTelefono: string
-  ingreso: string // YYYY-MM-DD
-  egreso: string // YYYY-MM-DD
-  sena: number
-}
-
-export type Ficha = {
-  id: string
-  dogId: string
-  fecha: string
-  motivo: string
-  diagnostico: string
-  tratamiento: string
-  peso: string
-  conducta: string
-}
-
-export type Pago = {
-  id: string
-  sourceId: string // id del turno o reserva cobrado
-  ownerId: string
-  dogId: string
-  detalle: string
-  total: number
-  sena: number
-  efectivo: number
-  transferencia: number
-  saldoPendiente: number
-  retiraPor: string
-  fecha: string
+export const roleLabels: Record<Role, string> = {
+  recepcion: "Recepción",
+  veterinario: "Veterinario",
+  duenio: "Dueño",
 }
 
 type Store = {
   role: Role
-  setRole: (r: Role) => void
+  setRole: (role: Role) => void
   query: string
-  setQuery: (q: string) => void
-  owners: Owner[]
-  dogs: Dog[]
-  turnos: Turno[]
-  reservas: Reserva[]
-  fichas: Ficha[]
-  pagos: Pago[]
-  enCaja: string[] // ids de turnos enviados a caja
-  today: string
-  cupoMax: number
-  /**
-   * Sin setters de alta de cliente ni de turno a proposito (HOTFIX-UI).
-   *
-   * `addOwnerWithDog` y `addTurno` vivian aca y no persistian nada: escribian en
-   * el `useState` del navegador, asi que el mostrador aceptaba el alta, el
-   * operador la veia aparecer y al recargar no habia nada. Los dos modales del
-   * mostrador ahora van contra la API real, y borrar las funciones evita que
-   * el proximo que las use vuelva a construir el mismo trouco sin darse cuenta.
-   */
-  marcarAtendido: (id: string) => void
-  addReserva: (r: Omit<Reserva, "id">) => void
-  addFicha: (f: Omit<Ficha, "id">) => void
-  enviarACaja: (turnoId: string) => void
-  addPago: (p: Omit<Pago, "id">) => void
-  ocupadosPorDia: (fecha: string) => number
+  setQuery: (query: string) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
 
-/**
- * Fecha de "hoy" del mostrador, en `YYYY-MM-DD` y en **hora local**.
- *
- * <p>No se usa `new Date().toISOString().slice(0, 10)`: `toISOString()` devuelve
- * la fecha en UTC, así que entre las 21:00 y las 24:00 de una zona UTC-3 devuelve
- * el día de mañana y el tablero abriría en una jornada que todavía no empezó.
- * `hoyLocal()` es el helper que ya existe en `lib/api.ts` justamente por esto, y
- * se reutiliza en vez de volver a escribir la cuenta a mano.</p>
- *
- * <p>Se calcula una sola vez al cargar el módulo. La fecha de la jornada no tiene
- * por qué cambiar a mitad de turno, y releerla en cada render haría que el tablero
- * saltara de día si la pestaña quedara abierta cruzando la medianoche.</p>
- */
-function hoyLocal(): string {
-  const ahora = new Date()
-  const mes = String(ahora.getMonth() + 1).padStart(2, "0")
-  const dia = String(ahora.getDate()).padStart(2, "0")
-  return `${ahora.getFullYear()}-${mes}-${dia}`
-}
-
-const TODAY = hoyLocal()
-
-/**
- * Fecha semilla desplazada `dias` desde hoy, en `YYYY-MM-DD`.
- *
- * Las reservas y fichas de demostración tenían fechas escritas a mano
- * ("2026-09-25"), y con `TODAY` dinámico quedaban ancladas a un día pasado:
- * el tablero mostraba cero ocupados y cero turnos. Se corren con el día en vez de
- * fijarlas, para que la demo siga teniendo sentido sin volver a congelar el
- * calendario.
- */
-function relativo(dias: number): string {
-  const d = new Date(`${TODAY}T12:00:00`)
-  d.setDate(d.getDate() + dias)
-  const mes = String(d.getMonth() + 1).padStart(2, "0")
-  const dia = String(d.getDate()).padStart(2, "0")
-  return `${d.getFullYear()}-${mes}-${dia}`
-}
-
-export const PRECIO_CONSULTA = 8000
-export const PRECIO_DIA_GUARDERIA = 4000
-
-function uid(prefix: string) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`
-}
-
-const seedOwners: Owner[] = [
-  { id: "o1", nombre: "María", apellido: "Gómez", dni: "30111222", telefono: "1145678901", tutores: [{ nombre: "Juan Gómez", telefono: "1145678902" }], deuda: 0 },
-  { id: "o2", nombre: "Carlos", apellido: "Pérez", dni: "27888444", telefono: "1156781234", tutores: [], deuda: 3500 },
-  { id: "o3", nombre: "Lucía", apellido: "Fernández", dni: "33444555", telefono: "1167894567", tutores: [{ nombre: "Ana Fernández", telefono: "1167894500" }], deuda: 0 },
-  { id: "o4", nombre: "Diego", apellido: "Rossi", dni: "29555666", telefono: "1178945612", tutores: [], deuda: 0 },
-]
-
-const seedDogs: Dog[] = [
-  { id: "d1", nombre: "Rocky", ownerId: "o1", conducta: "normal" },
-  { id: "d2", nombre: "Luna", ownerId: "o2", conducta: "muerde" },
-  { id: "d3", nombre: "Toby", ownerId: "o3", conducta: "gruñe" },
-  { id: "d4", nombre: "Kira", ownerId: "o4", conducta: "miedoso" },
-  { id: "d5", nombre: "Simón", ownerId: "o1", conducta: "normal" },
-]
-
-const seedTurnos: Turno[] = [
-  { id: "t1", dogId: "d1", ownerId: "o1", hora: "09:00", motivo: "Vacuna anual", fecha: TODAY, estado: "pendiente" },
-  { id: "t2", dogId: "d3", ownerId: "o3", hora: "10:00", motivo: "Control general", fecha: TODAY, estado: "pendiente" },
-  { id: "t3", dogId: "d4", ownerId: "o4", hora: "11:00", motivo: "Otitis", fecha: TODAY, estado: "pendiente" },
-]
-
-const seedReservas: Reserva[] = [
-  { id: "r1", dogId: "d2", ownerId: "o2", autorizadoNombre: "Sofía Pérez", autorizadoTelefono: "1156780000", ingreso: TODAY, egreso: relativo(2), sena: 5000 },
-  { id: "r2", dogId: "d5", ownerId: "o1", autorizadoNombre: "", autorizadoTelefono: "", ingreso: TODAY, egreso: relativo(1), sena: 3000 },
-]
-
-const seedFichas: Ficha[] = [
-  { id: "f1", dogId: "d1", fecha: relativo(-24), motivo: "Vacuna", diagnostico: "Sano", tratamiento: "Vacuna séxtuple", peso: "24 kg", conducta: "Tranquilo" },
-  { id: "f2", dogId: "d3", fecha: relativo(-63), motivo: "Cojera", diagnostico: "Esguince leve", tratamiento: "Antiinflamatorio 5 días", peso: "12 kg", conducta: "Reactivo con extraños" },
-]
-
-const seedPagos: Pago[] = [
-  { id: "p1", sourceId: "seed1", ownerId: "o3", dogId: "d3", detalle: "Consulta", total: 8000, sena: 0, efectivo: 8000, transferencia: 0, saldoPendiente: 0, retiraPor: "Lucía Fernández", fecha: TODAY },
-]
-
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>("recepcion")
   const [query, setQuery] = useState("")
-  const [owners] = useState<Owner[]>(seedOwners)
-  const [dogs] = useState<Dog[]>(seedDogs)
-  const [turnos, setTurnos] = useState<Turno[]>(seedTurnos)
-  const [reservas, setReservas] = useState<Reserva[]>(seedReservas)
-  const [fichas, setFichas] = useState<Ficha[]>(seedFichas)
-  const [pagos, setPagos] = useState<Pago[]>(seedPagos)
-  const [enCaja, setEnCaja] = useState<string[]>([])
 
-  const value = useMemo<Store>(() => {
-    const ocupadosPorDia = (fecha: string) =>
-      reservas.filter((r) => fecha >= r.ingreso && fecha <= r.egreso).length
-
-    return {
-      role,
-      setRole,
-      query,
-      setQuery,
-      owners,
-      dogs,
-      turnos,
-      reservas,
-      fichas,
-      pagos,
-      enCaja,
-      today: TODAY,
-      cupoMax: 10,
-      ocupadosPorDia,
-      marcarAtendido: (id) =>
-        setTurnos((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, estado: "atendido" } : t)),
-        ),
-      addReserva: (r) => setReservas((prev) => [...prev, { ...r, id: uid("r") }]),
-      addFicha: (f) => setFichas((prev) => [...prev, { ...f, id: uid("f") }]),
-      enviarACaja: (turnoId) =>
-        setEnCaja((prev) => (prev.includes(turnoId) ? prev : [...prev, turnoId])),
-      addPago: (p) => setPagos((prev) => [...prev, { ...p, id: uid("p") }]),
-    }
-  }, [role, query, owners, dogs, turnos, reservas, fichas, pagos, enCaja])
+  const value = useMemo<Store>(
+    () => ({ role, setRole, query, setQuery }),
+    [role, query],
+  )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
@@ -244,27 +50,4 @@ export function useStore() {
   const ctx = useContext(StoreContext)
   if (!ctx) throw new Error("useStore debe usarse dentro de StoreProvider")
   return ctx
-}
-
-// Helpers compartidos
-export function ownerName(o: Owner | undefined) {
-  return o ? `${o.nombre} ${o.apellido}` : "—"
-}
-
-export function money(n: number) {
-  return "$" + n.toLocaleString("es-AR")
-}
-
-// Días de guardería (mínimo 1) entre ingreso y egreso
-export function daysBetween(ingreso: string, egreso: string) {
-  const a = new Date(ingreso + "T00:00:00")
-  const b = new Date(egreso + "T00:00:00")
-  const diff = Math.round((b.getTime() - a.getTime()) / 86400000)
-  return Math.max(1, diff)
-}
-
-export const roleLabels: Record<Role, string> = {
-  recepcion: "Recepción",
-  veterinario: "Veterinario",
-  duenio: "Dueño",
 }

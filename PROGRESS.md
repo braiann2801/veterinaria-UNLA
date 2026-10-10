@@ -1,757 +1,95 @@
 ﻿# PROGRESS.md
 
+Memoria operativa del proyecto **veterinaria-UNLA**. Se mantiene corta a
+propósito: solo lo que un agente necesita para retomar el trabajo sin repetir
+exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
+
 ## Estado Actual
-- **Fase en curso:** **REESTILO VISUAL AZUL/NEGRO** (tema oscuro por defecto, primario `#2563EB`, botones/inputs `rounded-xl` y barra de búsqueda centrada en el TopBar del Mostrador)
-- **Fase previa:** **ALTA DE TUTOR UNIFICADA** (mismos campos en Mostrador y Padrón, con email y dirección)
-- **Base Git:** `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas)[cite: 2]
-- **Harness:** `.\test-harness.ps1` en verde (TSC limpio, Next.js build OK, **165 tests de Spring Boot pasando**, 0 fallos)[cite: 2]
-- **Últimos logros (reestilo visual):**
-  - `globals.css` pasa a tema oscuro azul/negro por defecto vía `<html className="dark">`; se eliminó el bloque `@media (prefers-color-scheme: dark)` (el oscuro es identidad del sistema, no preferencia del SO). El tema claro queda disponible opt-in con `.light`.
-  - Primario `#2563EB` en ambos temas; píldora de navegación activa, barra de aforo, ícono activo móvil y logo en azul.
-  - Búsqueda global **centrada en md+** (grilla de 3 columnas en el `TopBar`) y **ampliada** (input de 52px de alto, `text-base` y columna de 56rem en desktop).
-  - Alertas y chips semánticos (morosidad, conducta, estados de comanda) con variantes `dark:` para que se lean bien sobre fondo negro.
 
----
+- **Fase en curso:** Ninguna en ejecución. Último trabajo aplicado: optimización
+  de código (poda de código muerto legacy) + reestilo visual azul/negro.
+- **Base Git:** `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas). Cambios
+  posteriores al commit: **sin commitear**, pendientes de confirmación del Dueño.
+- **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
+  165 tests de Spring Boot, 0 fallos).
 
-## Historial de Tareas y Fases Completadas
-- [x] **TASK-001 a TASK-003:** Setup base Next.js/Spring Boot, persistencia MySQL, modelo Tutor-Mascota N:M[cite: 2].
-- [x] **TASK-004 + HOTFIX:** Turnos (bloques 45+15 min), aforo de guardería (tope 10 con lock pesimista)[cite: 2].
-- [x] **TASK-005:** Ficha Médica (conducta) y Comanda de Cobro desacoplada de precios (catálogo en `Tarifa`) con caja multipago[cite: 2].
-- [x] **TASK-006 (MVP 1):** Circuito de egreso seguro consolidado (`GET /api/v1/egreso/validar`), semáforo y navegación mobile-first[cite: 2].
-- [x] **TASK-007 (FASE 1):** ABM y persistencia de `Profesional` (DNI/matrícula normalizados), alta real de mascotas asociadas a tutores, Padrón visible para Veterinario[cite: 2].
-- [x] **TASK-008 (FASE 2):** Guardería con horarios (`horaEntrada`/`horaSalida`), grilla de Agenda reactiva por fecha (`useApi` con `clave`), `TurnoRetroactivoTest` y modales operativos[cite: 2].
-- [x] **HOTFIX-UI:** Navegación unificada idéntica para todos los roles (Egreso último, Balance exclusivo Dueño anteúltimo), alta unificada de Cliente en Mostrador contra la API (`/tutores` + `/mascotas` + vínculo)[cite: 2].
-- [x] **TANDA 2:** Deserializador flexible para `LocalDateTime`, eliminación de estado mock en tablero del Mostrador con selector de fechas y refresco automático post-alta[cite: 2].
-- [x] **REFACTOR Mostrador:** monolito `mostrador.tsx` (1105 líneas) dividido en orquestador de 150 + 9 componentes atómicos, sin cambios de UI ni funcionalidad[cite: 2].
-- [x] **BALANCE (cierre real):** `balance.tsx` conectado a `GET /api/v1/caja/cierre` (arqueo, `saldosPendientes`, `movimientos`), con `DatePicker` reutilizable sobre `react-day-picker`[cite: 2].
-- [x] **BALANCE (deuda anterior + calendario):** el extracto informa `fechaEmision` y marca "Deuda anterior · dd/mm"; celdas del calendario a 44×44 y panel de 22rem[cite: 2].
-- [x] **MIGRACIÓN DE FECHAS:** los 8 `<input type="date">` operativos pasan al `DatePicker`; el calendario gana un selector Mes/Año con flechas ▲/▼ y la prop `limpiable`[cite: 2].
-- [x] **ABM DEL PADRÓN:** editar/eliminar tutores y mascotas contra la API real; regla del huérfano (una mascota no queda sin tutor) y bloqueo 409 ante historial clínico/contable[cite: 2].
-- [x] **REESTILO VISUAL AZUL/NEGRO:** tema oscuro por defecto (primario #2563EB, sin `prefers-color-scheme`), botones/inputs/modal a `rounded-xl`, navegación activa y aforo en azul, alertas semánticas con variantes `dark:`, y barra de búsqueda global centrada en md+[cite: 2].
+## Hitos completados
 
----
+- [x] **Setup base** — Next.js (port 3000, webpack) + Spring Boot 3.x (8080) +
+      MySQL 8 (3306, `veterinaria_db`), CORS local/vercel.
+- [x] **Dominio core** — Tutor-Mascota $N:M$ con `autorizado_retiro`; turnos
+      45+15 min; aforo guardería tope 10 con lock pesimista; ficha clínica
+      desacoplada de cobro (comanda diferida a mostrador); caja multipago;
+      egreso validado por identidad + deuda + conducta.
+- [x] **TASK-007 (FASE 1)** — ABM `Profesional`, alta real de mascotas, Padrón.
+- [x] **TASK-008 (FASE 2)** — Guardería con horarios, Agenda reactiva por fecha.
+- [x] **TASK-009 (FASE 3)** — Caja del día (`/comandas/dia`, `/caja/tutores-del-dia`),
+      checkout de egreso filtrable; fix "camino por DNI" y estados de carga en caja.
+- [x] **Cierre de Riesgos 6 y 7** — `DataInitializer` siembra tarifas
+      idempotente (3 conceptos); tests aislados en `veterinaria_test`.
+- [x] **Refactor Mostrador** — monolito de 1105 líneas → orquestador de 150 +
+      componentes atómicos en `components/modules/mostrador/`.
+- [x] **Balance real** — `GET /api/v1/caja/cierre` (arqueo, saldos, movimientos);
+      `DatePicker` reutilizable sobre `react-day-picker` (celdas 44×44).
+- [x] **Migración de fechas** — los 8 `<input type="date">` operativos → `DatePicker`
+      (con selector mes/año).
+- [x] **ABM del Padrón** — editar/eliminar tutores y mascotas; regla del huérfano
+      (una mascota no queda sin tutor; con historial bloquea 409 atómico).
+- [x] **Alta de tutor unificada** — mismos campos (email/dirección) en Mostrador y Padrón.
+- [x] **Reestilo visual** — tema oscuro azul/negro por defecto (primario #2563EB,
+      sin `prefers-color-scheme`), `rounded-xl`, navegación activa y aforo azul.
+- [x] **Optimización (poda de código muerto)** — backend sin cambios. Frontend:
+      se eliminaron 3 módulos legacy montados en el store mock
+      (`consultas.tsx`, `cobros.tsx`, `guarderia.tsx`) y el store quedó solo con
+      estado de sesión (rol + búsqueda); helpers sin uso de `lib/api.ts`
+      (`aTexto`, `aFechaLocal`, `aHoraLocal`, `esFechaHoy`) eliminados.
 
-## Decisiones Críticas de Arquitectura y Convenciones
-1. **Rutas del Repositorio:**
-   - Frontend: `app/`, `components/`, `lib/` (no existe carpeta `frontend/src/`)[cite: 1, 2].
-   - Backend: `backend/src/main/java/com/veterinaria/veterinaria_backend/`[cite: 2].
-2. **Manejo de Fechas:** Prohibido usar `new Date().toISOString().split('T')[0]` en frontend (genera salto de día UTC en husos UTC-3). Usar siempre helper `hoyLocal()` de `lib/api.ts`[cite: 2].
-3. **Desacople Clínico-Contable:** La consulta médica y la ficha jamás manejan dinero ni precios. La facturación se deriva transaccionalmente hacia `ComandaCobro` buscando el valor en `Tarifa`[cite: 2].
-4. **Conducta del Paciente:**
-   - Paciente base (`Mascota.conducta`): `normal`, `gruñe`, `muerde`, `miedoso`[cite: 2].
-   - Consulta clínica puntual (`ConsultaMedica.conductaObservada`): `TRANQUILO`, `NERVIOSO`, `REACTIVO`, `AGRESIVO`[cite: 2].
-5. **Egreso Seguro vs. Cobro:**
-   - Retiro de paciente: Gobernado por `tutor_mascota.autorizado_retiro = true` y validación de deuda[cite: 2].
-   - Cobro en Caja: Cualquier tutor vinculado en `tutor_mascota` puede pagar la comanda, sin requerir autorización de retiro[cite: 2].
+## Decisiones Críticas de Arquitectura
 
----
+1. **Rutas:** frontend en `app/` + `components/` + `lib/` (sin `frontend/src/`);
+   backend en `backend/src/main/java/com/veterinaria/veterinaria_backend/`.
+2. **Fechas:** prohibido `new Date().toISOString().split('T')[0]` en frontend
+   (salto de día UTC en UTC-3). Siempre `hoyLocal()` de `lib/api.ts`.
+3. **Desacople clínico-contable:** la ficha jamás maneja dinero; la facturación
+   deriva a `ComandaCobro` con precio desde `Tarifa`.
+4. **Conducta:** `Mascota.conducta` = normal/gruñe/muerde/miedoso;
+   `ConsultaMedica.conductaObservada` = TRANQUILO/NERVIOSO/REACTIVO/AGRESIVO.
+5. **Egreso vs. Cobro:** retiro exige `autorizado_retiro=true` + sin deuda;
+   cualquier tutor vinculado puede pagar la comanda.
+6. **Arquitectura en capas estricta:** Controller → Service → Repository,
+   DTOs planos (sin entidades serializadas), errores HTTP semánticos
+   (400/404/409/500) vía `GlobalExceptionHandler`.
+7. **Store global:** `lib/store.tsx` es SOLO estado de sesión (rol + query del
+   TopBar). Todo dato operativo sale de `lib/api.ts` + `lib/use-api.ts`
+   (triplete `{datos, cargando, error, recargar}`).
 
 ## Riesgos y Pendientes Abiertos
-1. **[RESUELTO] Módulo Balance:** ya no usa datos mock; consume `GET /api/v1/caja/cierre` (ver cierre al final del documento).
-2. **`guarderia.tsx` legado:** Componente desactualizado en memoria sin montar; las reservas operativas se gestionan desde los modales de la Agenda y Mostrador[cite: 2].
-3. **Columna sin uso:** `vinculado_desde` en `TutorMascota` sigue sin ser consumida por el frontend[cite: 2].
-4. **Falta de migraciones versionadas:** No se cuenta con Flyway o Liquibase; la base depende de `hibernate.ddl-auto=update`[cite: 2].
-5. **Colisión de compilación VS Code / Maven:** El Language Server de Java (Eclipse ecj) genera clases con errores en `backend/target/classes`. Se recomienda compilar siempre con `mvnw clean` si surgen `BeanCreationException` anómalos[cite: 2].
-6. **[RESUELTO] Tarifa vacía bloqueaba toda la facturación:** ver cierre al final del documento (`DataInitializer`).
-7. **[RESUELTO] El harness mutaba la base de desarrollo compartida:** ver cierre al final del documento (`veterinaria_test`).
 
----
-
-## FASE 3: Vista de Caja del Día (Turnos/Guardería de Hoy) y Checkout de Egreso Filtrado por Fecha
-
-### Diagnóstico del Orquestador (leído, no supuesto)
-
-El encargo tiene tres bloques. **Medio y medio ya estaba implementado y con tests**
-antes de arrancar: fue `TASK-009`, commiteado en `c264145`. Reimplementarlo habría
-sido ruido, así que el trabajo se concentró en lo que **no** estaba.
-
-**Ya existía y quedó verificado, sin rehacerlo:**
-
-- `GET /api/v1/comandas/dia?fecha=&estado=&tutorId=` con `fecha` opcional por
-  defecto a hoy y filtro de estado. `GET /api/v1/comandas` sigue exigiendo
-  `tutorId` a propósito: es el historial completo de una persona, y meter la fecha
-  en esa ruta mezclaría dos alcances distintos en el mismo endpoint. La caja
-  del día es el endpoint `/dia`.
-- `GET /api/v1/caja/tutores-del-dia?fecha=`: consolidado sobre
-  `JornadaDelDiaService`, agrupado en backend (un tutor con dos mascotas aparece
-  una sola vez) y compartiendo la misma definición de "estuvo hoy" que el egreso.
-- `POST /api/v1/caja/pagos/{id}` con `tutorId` opcional, validando **vínculo en
-  `tutor_mascota`** y sin exigir `autorizado_retiro`. `CajaDelDiaTest` ya cubre
-  `cotutorVinculadoPuedePagar`, `elDeudorNoCambia` y `terceroSinVinculoRechazado`.
-- `GET /api/v1/egreso/pacientes-hoy?fecha=` con default hoy, y
-  `GET /api/v1/egreso/validar` exigiendo estrictamente `autorizado_retiro = true`
-  y sin deuda. `EgresoSeguroTest` cubre el semáforo completo (verde/rojo/ámbar),
-  la precedencia identidad-antes-que-dinero y que la alerta de conducta **avisa
-  pero no bloquea**.
-- Frontend: `caja.tsx` con `hoyLocal()`, filtro de estado, alerta TUTOR MOROSO y
-  modal multipago con selector de pagador entre tutores vinculados; `egreso.tsx`
-  con `hoyLocal()`, listado de la jornada y botón "Validar egreso" por fila.
-
-**Diagnóstico de los tres huecos que sí había:**
-
-1. **`egreso.tsx` — callejón sin salida para un paciente sin tutores vinculados.**
-   El `Select` "Quién se presenta" solo se renderiza si hay vínculos, y es ese
-   `Select` el que contiene la opción "Otro (buscar por DNI)". Con cero vínculos
-   el modal queda con una etiqueta vacía, `tutorId = ""`, el `useApi` deshabilitado
-   y **ningún veredicto**: ni botón, ni semáforo, ni motivo. La fila en la lista
-   dice "Sin tutores vinculados: no hay a quién validar", que contradice la
-   documentación del propio componente, donde se explica que el camino por DNI
-   queda "para el caso real de un tutor que no está vinculado en la base". El
-   endpoint por DNI sí existe y sí responde.
-2. **`caja.tsx` — el selector de tutores del día no tiene estado de carga ni de
-   error.** Si `GET /caja/tutores-del-dia` falla o tarda, el `Select` muestra solo
-   "Todos los tutores de la jornada" y nada más. El operador no puede distinguir
-   "no hubo actividad hoy" de "no se pudo consultar", y la lista de comandas
-   debajo sí informa su error: dos controles de la misma pantalla con criterios
-   distintos.
-3. **`caja.tsx` — el banner TUTOR MOROSO se apaga en la carga y en el error.**
-   La condición es `deuda.datos && deuda.datos.tieneDeuda`: mientras la llamada
-   está en vuelo o si falla, el banner **no se ve**, y la pantalla muestra un
-   "nadie debe" silencioso. Es exactamente el defecto que ya se corrigió en el
-   tablero del Mostrador en TANDA 2 ("durante la carga no dice nadie debe, dice
-   que está calculando"), presente acá porque este módulo no se tocó en esa tanda.
-
-### Cambios de FASE 3
-
-- `components/modules/egreso.tsx`: el camino por DNI queda siempre a mano, con o
-  sin vínculos, para que el semáforo se pinte y el operador vea el motivo del
-  bloqueo en vez de una caja vacía.
-- `components/modules/caja.tsx`: estado de carga y de error visibles en el
-  selector de tutores del día, y aviso de morosidad que distingue "calculando"
-  y "no se pudo consultar" de "está al día", con reintento.
-
-Sin cambios en backend, sin endpoints nuevos, sin tocar `AGENTS.md`.
-
-### Verificación E2E (contra la base real, sembrada y luego restaurada)
-
-Backend levantado contra MySQL y datos sembrados **por la API** (no por SQL), para
-ejercitar el negocio: un tutor con dos vínculos —uno `autorizado_retiro = true` y
-otro `false`— y una segunda mascota **sin tutores**, cada una con un turno en la
-jornada.
-
-- `caja.tsx`: `/comandas/dia` con fecha por defecto y con filtro de estado (200), y
-  estado inválido → 400; `/caja/tutores-del-dia` agrupa a la tutora en una sola
-  fila con `motivos: ["TURNO_CLINICO"]`; `/mascotas/{id}` expone los dos vínculos
-  con su `autorizadoRetiro`, que es lo que pinta el selector de pagador.
-- `egreso.tsx`: `/egreso/pacientes-hoy` trae a Luna (2 tutores) y a Toby (**0
-  tutores**). El punto que arregla la fase: `GET /egreso/validar?mascotaId=<Toby>&
-  tutorDni=...` responde **200 con veredicto rojo `TUTOR_NO_AUTORIZADO`** en vez del
-  modal en blanco de antes. El cotutor sin autorización da rojo y el tutor
-  autorizado sin deuda da verde.
-- El cobro por el cotutor **sin** `autorizado_retiro` no pudo cerrarse por el
-  bloqueo del Riesgo 6 (no hay tarifa para emitir la comanda), no por la regla de
-  negocio: `CajaDelDiaTest.cotutorVinculadoPuedePagar` la cubre con tarifa sembrada.
-
-Base devuelta exactamente al estado inicial (todo en 0 salvo `control_aforo_diario`,
-6 contadores por fecha) y archivos temporales eliminados.
-
-### Resultado del Harness
-
-- `.\test-harness.ps1` → **"Todos los controles pasaron"**: `tsc --noEmit` limpio,
-  build de Next.js OK, **154 tests de Spring Boot, 0 fallos**.
-- Incidente resuelto durante la fase: el primer intento dio 154 errores de contexto
-  Spring (`Failed to load ApplicationContext`) y **no era el código**: MySQL no
-  estaba levantado en la máquina (puerto 3306 cerrado, sin proceso `mysqld`). Se
-  levantó y el harness pasó. Se anota porque el mensaje de error no lo sugiere.
-
-### Archivos modificados
-
-- `components/modules/caja.tsx` (2 bloqueantes de UI: estados de carga/error del
-  selector de tutores y del aviso de morosidad).
-- `components/modules/egreso.tsx` (1: camino por DNI siempre alcanzable).
-- `PROGRESS.md` (registro y cierre de la fase).
-
-Backend sin cambios, `AGENTS.md` sin tocar.
-
----
-
-## CIERRE DE RIESGOS 6 y 7: Semilla de Tarifas y Aislamiento de la Base de Tests
-
-### Hallazgo previo (verificado, no supuesto)
-
-El encargo pedía sembrar **cinco** conceptos: `CONSULTA_CLINICA`,
-`CONSULTA_URGENCIA`, `GUARDERIA_DIURNA`, `GUARDERIA_COMPLETA_24H` y
-`CONTROL_POSTOPERATORIO`. **Cuatro de esos cinco no existen en el dominio**: el
-único enum que usan `Tarifa.concepto` y `ComandaCobro` es
-`ComandaCobro.Concepto` = `{CONSULTA_CLINICA, GUARDERIA, OTRO}`, y los otros
-nombres no aparecen en ningún archivo del repo. Como `Tarifa.concepto` es
-`@Enumerated(STRING)`, escribir esos strings reventaría en runtime. Se consultó
-al Dueño: **decisión = sembrar los 3 conceptos reales** sin inventar conceptos
-muertos que ningún flujo emite ni la UI puede seleccionar.
-
-### Riesgo 6 — Semilla de tarifas (`config/DataInitializer.java`)
-
-- `@Component implements CommandLineRunner`; en el arranque llama a
-  `sembrar()`, que si `tarifaRepository.count() == 0` inserta las tarifas base
-  de `CONSULTA_CLINICA`, `GUARDERIA` y `OTRO` y no hace nada si ya hay precios.
-- Idempotente y **no pisa** precios cargados/editados: los montos vigentes siguen
-  siendo el dato del negocio (`PUT /api/v1/comandas/tarifas/{concepto}`).
-- Los montos salen de `veterinaria.tarifas.*` en `application.properties`
-  (defaults 8000 / 10000 / 5000), no de constantes hardcodeadas, respetando la
-  razón por la que existe `Tarifa` (AGENTS.md 2.3 / decálogo del propio javadoc).
-  Ajustar el precio base no requiere recompilar.
-- `run()` es `@Transactional`; `sembrar()` es público para poder testearlo directo.
-
-### Riesgo 7 — Aislamiento de tests (`backend/src/test/resources/application.properties`)
-
-- Nuevo `application.properties` de test apuntando a la base **`veterinaria_test`**
-  (`createDatabaseIfNotExist=true`), separada de `veterinaria_db`. El classpath
-  de test reemplaza al principal, por eso el archivo re-declara las claves
-  (datasource, ddl-auto, pool de 20 conexiones).
-- Se eligió **esquema MySQL aislado y no H2** (el encargo permitía ambos):
-  `ControlAforoDiarioRepository` y `ComandaCobroRepository` usan `SELECT ... FOR
-  UPDATE` nativo y el servicio maneja `innodb_lock_wait_timeout`; `AforoConcurrenteTest`
-  mide el lock real. En H2 cambiaría la semántica y los tests dejarían de probar
-  lo que dicen probar. Con el esquema aislado el comportamiento es idéntico.
-- Verificado en vivo: los tests corren contra `veterinaria_test` (creada, 11
-  tablas) y **`veterinaria_db.tarifa` permaneció en 0** tras correr la suite.
-
-### Verificación
-
-- `DataInitializerTest` (nuevo): siembra sobre tabla vacía, **no pisa** una tarifa
-  existente con otro monto, e idempotencia (sembrar dos veces deja 3, no 6).
-- `.\test-harness.ps1` → **"Todos los controles pasaron"**: `tsc --noEmit` limpio,
-  build de Next.js OK, **157 tests de Spring Boot, 0 fallos** (154 previos + 3
-  nuevos). El aislamiento no rompió ningún test de concurrencia.
-- Sembrador verificado contra la base real: al reiniciar el backend con el código
-  nuevo, `veterinaria_db.tarifa` pasa de 0 a las 3 tarifas base y
-  `POST /api/v1/consultas` / `POST /api/v1/comandas` ya encuentran tarifa.
-
-### Archivos modificados (esta fase)
-
-- `backend/src/main/java/com/veterinaria/veterinaria_backend/config/DataInitializer.java` (nuevo).
-- `backend/src/test/resources/application.properties` (nuevo — aislamiento de tests).
-- `backend/src/test/java/com/veterinaria/veterinaria_backend/DataInitializerTest.java` (nuevo).
-- `backend/src/main/resources/application.properties` (montos de la semilla `veterinaria.tarifas.*`).
-- `PROGRESS.md` (este cierre).
-
-`AGENTS.md` sin tocar. Sin commit: queda pendiente de tu confirmación.
-
----
-
-## REFACTOR DE `mostrador.tsx`: Extracción a Componentes Atómicos
-
-### Objetivo y contrato
-
-Dividir el monolito `components/modules/mostrador.tsx` (**1105 líneas**) en piezas
-atómicas bajo `components/modules/mostrador/`, **sin cambiar UI ni funcionalidad**,
-dejando `mostrador.tsx` como orquestador (**150 líneas**). La ruta pública
-`app/page.tsx` → `import { Mostrador } from "@/components/modules/mostrador"` se
-preserva (no se creó `index.ts` en la carpeta para no competir con el archivo).
-
-### Diseño de la extracción
-
-- **El orquestador conserva el estado y el fetch.** Los 4 `useApi`
-  (`turnos`, `reservas`, `aforo`, `jornada`), el hook `useDeudasDelDia` y el
-  `refrescar` (`Promise.all` de los 4 `recargar`) siguen en `mostrador.tsx`. Los
-  hijos son presentacionales y reciben props tipadas con `EstadoApi<T>`, así que
-  el fetch, la `clave=fecha` y la recarga post-mutación son exactamente los mismos.
-- **Modales:** `cargar-cliente-modal.tsx` (460) y `agregar-turno-modal.tsx` (212),
-  movidos **verbatim** (verificado con `git diff`).
-- **Vistas:** `tabla-turnos.tsx` (38), `tabla-guarderia.tsx` (64),
-  `widget-aforo.tsx` (47), `avisos-importantes.tsx` (118) y `tablero-jornada.tsx`
-  (50), que compone las tablas y conserva la condición de carga/error del panel.
-- **Auxiliares:** `columna-lista.tsx` (50, ex `TurnoCol`) y `use-deudas-del-dia.ts`
-  (90, incluye `export type DeudasDelDia = ReturnType<typeof useDeudasDelDia>`).
-- **Constantes y helpers** (`ESPECIES`, `CONDUCTAS`, `CONDUCTAS_DE_RIESGO`,
-  `RESERVAS_QUE_OCUPAN`, `hhmm()`) se colocaron junto a su único consumidor; no se
-  creó `constantes.ts`.
-
-### Incidente y corrección
-
-En la primera pasada de `cargar-cliente-modal.tsx` se reescribió JSX y estado en
-vez de copiarlos; se detectó con `git diff --no-index` contra el monolito y se
-restauró el contenido **verbatim** (incluidos los comentarios). Lo mismo se hizo
-para `agregar-turno-modal.tsx`. Los archivos de panel se validaron por diff
-normalizado.
-
-### Bloqueo ajeno resuelto (con confirmación del Dueño)
-
-`app/page.tsx` tenía, en el worktree y **fuera del alcance del refactor**, un
-`<AvisoDemo titulo="Mostrador" />` sin el prop `texto`, lo que rompía
-`npx tsc --noEmit`. Dado que el tablero del Mostrador ya usa datos reales (TANDA 2),
-se confirmó con el Dueño y se **eliminó el aviso obsoleto**.
-
-### Verificación
-
-- `npx tsc --noEmit` → limpio.
-- `.\test-harness.ps1` → **"Todos los controles pasaron"**: TSC limpio, build de
-  Next.js OK, **157 tests de Spring Boot, 0 fallos**.
-- Sin tests de frontend: la equivalencia visual se sostiene por construcción (JSX
-  y clases copiados del original y verificados por diff).
-
-### Archivos (esta fase)
-
-- `components/modules/mostrador.tsx` (reescrito como orquestador, 150 líneas).
-- `components/modules/mostrador/{widget-aforo,avisos-importantes,tablero-jornada,
-  tabla-turnos,tabla-guarderia,columna-lista,cargar-cliente-modal,
-  agregar-turno-modal}.tsx` y `use-deudas-del-dia.ts` (nuevos).
-- `app/page.tsx` (eliminación del `AvisoDemo` de Mostrador sin `texto`).
-- `PROGRESS.md` (este registro).
-
-`AGENTS.md` sin tocar. Backend sin cambios. Sin commit: pendiente de tu confirmación.
-
----
-
-## BALANCE DEL DÍA SOBRE EL CIERRE REAL DE CAJA + `DatePicker` REUTILIZABLE
-
-### Objetivo
-
-Sacar a `components/modules/balance.tsx` de los datos mock del store y conectarlo
-al cierre real de caja, con selección de jornada mediante un calendario
-desplegable. El backend debía exponer el detalle sin filtrar entidades JPA.
-
-### Backend — `GET /api/v1/caja/cierre` ampliado
-
-- `MovimientoCajaDTO` (nuevo, plano): `id`, `fechaHora`, `metodoPago`, `monto`,
-  `concepto`, `nombreTutor`, `nombreMascota`, `estadoComanda`. Los enums viajan
-  como `String`, igual que el resto de los DTOs de cobro.
-- `CierreCajaResponseDTO`: se suman `saldosPendientes` (`BigDecimal`) y
-  `movimientos` (`List<MovimientoCajaDTO>`). Agregar campos a un `record` no rompe
-  los tests existentes que leen `$.totalesPorMetodo.*`.
-- `PagoRepository`:
-  - `sumarTotalDelDia` (`COALESCE(SUM(p.monto), 0)`).
-  - `contarPagosDelDia` (`COUNT(p)`).
-  - `movimientosDelDia`: proyección de interfaz `MovimientoCajaProyeccion`, con
-    `JOIN p.comanda` / `JOIN c.tutor` / `LEFT JOIN c.mascota`, filtrada por rango
-    semiabierto `[desde, hasta)` sobre `fechaHora` (aprovecha el índice nuevo) y
-    ordenada por `fechaHora, id`. El nombre del tutor se arma con `CONCAT` porque
-    `Tutor.nombreCompleto` es un getter derivado, no una columna persistente.
-  - Se eliminó `findByFechaHoraBetweenOrderByFechaHoraAsc`, que traía todas las
-    filas para sumarlas en memoria.
-- `Pago` (entidad): índice `idx_pago_fecha_hora` sobre `fecha_hora`, que es la
-  columna por la que filtran las tres consultas del cierre.
-- `ComandaCobroRepository.sumarSaldoPendienteDelDia`: `SUM(saldoPendiente)` de las
-  comandas `PENDIENTE`/`PARCIAL` emitidas en la jornada.
-- `CajaServiceImpl.cerrarJornada`: ya no usa `.reduce` ni `pagos.size()`; todas las
-  cifras se agregan en MySQL y el extracto se mapea de la proyección al DTO en el
-  servicio (el enum se traduce a `String` ahí, no en JPQL).
-
-### Frontend
-
-- `react-day-picker@10` instalado con **npm** (se actualizó `package-lock.json`).
-- `components/ui/calendar.tsx`: calendario base estilizado con Tailwind y
-  `getDefaultClassNames()` (patrón shadcn/ui), locale `es` y semana iniciando el
-  lunes, sin importar el CSS propio de la librería.
-- `components/ui/date-picker.tsx`: botón-pill con icono de calendario que despliega
-  el calendario y se repliega al elegir un día. Cierra por click afuera y por
-  `Escape` (devolviendo el foco). Atajo "Hoy" con `hoyLocal()`. Recibe y devuelve
-  `YYYY-MM-DD` y acepta `min`/`max`.
-- `components/ui/skeleton.tsx`: bloque de carga reutilizable.
-- `components/modules/balance.tsx`: reescrito sin `useStore`. Arranca en
-  `hoyLocal()`; `useApi(() => apiCaja.cierre(fecha), true, fecha)`. Muestra:
-  - **Total recaudado**, **Saldos pendientes del día** y **Cantidad de movimientos**.
-  - **Desglose por medio de pago** con los 5 métodos (Efectivo, Transferencias,
-    Débito, Crédito y Seña).
-  - **Movimientos de la jornada**: tabla en escritorio y tarjetas apiladas en
-    celular (regla 3.3), con esqueletos mientras carga la fecha nueva.
-- `components/modules/caja.tsx` y `components/modules/agenda.tsx`: se reemplazó el
-  `<input type="date">` nativo por el `DatePicker`. En Caja, cambiar de fecha sigue
-  descartando el tutor elegido.
-- `app/page.tsx`: se eliminó el `AvisoDemo` del Balance (ya lee datos reales) y se
-  actualizó el comentario del shell.
-- `lib/api.ts`: nuevos tipos `MovimientoCaja` y campos `saldosPendientes` /
-  `movimientos` en `CierreCaja`.
-
-### Verificación
-
-- `npx tsc --noEmit` → limpio.
-- `next build --webpack` → OK.
-- `.\test-harness.ps1` → **"Todos los controles pasaron"**: **158 tests de Spring
-  Boot, 0 fallos** (156 previos + `cierreInformaSaldosPendientes` + las aserciones
-  nuevas sobre `movimientos` y `saldosPendientes` en `pagadorNoAfectaElArqueo`).
-- Tests de backend que cubren lo nuevo: el cierre refleja `metodoPago`, `monto`,
-  `concepto`, `estadoComanda` y `nombreMascota` de cada pago, y el saldo que quedó
-  sin cobrar de una comanda parcial.
-
-### Incidente de entorno (post-implementación)
-
-Al abrir la vista en la app, Balance rompía con "la propiedad `datos.movimientos`
-no está definida". La causa no era el código nuevo: el backend que escuchaba en
-`:8080` era el `spring-boot:run` levantado a las 14:40, **anterior** a esta fase,
-así que serializaba el `CierreCajaResponseDTO` viejo sin `saldosPendientes` ni
-`movimientos`. Se detuvo ese proceso y se relanzó el backend con las clases
-recién compiladas; el endpoint ya devuelve ambos campos (verificado por HTTP).
-
-Además, para que una desalineación de versiones (backend viejo, deploy a medio
-actualizar) no vuelva a blanquear la pantalla, `balance.tsx` normaliza la
-respuesta con `?? 0` / `?? []`: ante un campo faltante muestra cero/vacío en vez
-de tumbar el render.
-
-### Archivos (esta fase)
-
-- Backend (nuevos): `dto/MovimientoCajaDTO.java`,
-  `repository/MovimientoCajaProyeccion.java`.
-- Backend (modificados): `dto/CierreCajaResponseDTO.java`, `repository/PagoRepository.java`,
-  `repository/ComandaCobroRepository.java`, `entity/Pago.java`, `service/impl/CajaServiceImpl.java`,
-  `test/.../CajaDelDiaTest.java`.
-- Frontend (nuevos): `components/ui/calendar.tsx`, `components/ui/date-picker.tsx`,
-  `components/ui/skeleton.tsx`.
-- Frontend (modificados): `components/modules/balance.tsx` (reescrito),
-  `components/modules/caja.tsx`, `components/modules/agenda.tsx`, `app/page.tsx`,
-  `lib/api.ts`, `package.json`, `package-lock.json`.
-- `PROGRESS.md` (este registro).
-
-`AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
-
----
-
-## BALANCE: DEUDA ANTERIOR + CALENDARIO TÁCTIL
-
-Dos ajustes pedidos al probar la vista como usuario.
-
-### 1. Distinguir el cobro de una deuda de otro día
-
-Un pago registrado hoy que salda una comanda emitida el miércoles aparecía en el
-corte de hoy sin ninguna marca: se leía igual que un cobro del día.
-
-- `MovimientoCajaProyeccion` + `PagoRepository.movimientosDelDia`: se proyecta
-  `c.fechaEmision AS fechaEmision` (mismo alias que el getter; las otras
-  agregaciones no cambiaron).
-- `MovimientoCajaDTO`: nuevo campo `fechaEmision`.
-- `CajaServiceImpl.aMovimiento`: lo mapea.
-- `lib/api.ts`: `MovimientoCaja.fechaEmision`.
-- `balance.tsx`: deriva `deudaAnterior = fechaEmision < jornada` contra la fecha
-  elegida (no se guarda en el backend, para que siga siendo válido al cambiar de
-  jornada) y muestra el distintivo ámbar "Deuda anterior · dd/mm" en la tarjeta
-  móvil y en la celda de Estado de la tabla de escritorio. Fecha corta local, sin
-  `Date`, igual que `horaDe`.
-- `CajaDelDiaTest.cobroDeComandaViejaInformaSuEmision`: emite una comanda del
-  16/09, la paga hoy y verifica que el extracto informa esa emisión y la de una
-  comanda del día.
-
-### 2. Calendario más grande
-
-Las celdas medían ~38 px porque el tamaño salía del ancho del panel; por debajo
-del mínimo táctil de 44 px de la regla 3.4.
-
-- `components/ui/calendar.tsx`: celdas de día y botón a `size-11` (44×44) fijos;
-  días de semana y etiqueta del mes un escalón más grandes; chevrones y botones de
-  navegación más grandes.
-- `components/ui/date-picker.tsx`: popover a `w-[min(22rem, calc(100vw-1rem))]`,
-  con tope de alto y scroll para no salirse de la pantalla en móvil apaisado.
-
-Como el `Calendar` es compartido, la mejora llega también a Caja y Agenda.
-
-### Verificación
-
-- `npx tsc --noEmit` → limpio.
-- `next build --webpack` → OK.
-- `.\test-harness.ps1` → **159 tests de Spring Boot, 0 fallos** (158 previos +
-  `cobroDeComandaViejaInformaSuEmision`).
-- Backend reiniciado con el código nuevo.
-
-### Archivos
-
-- Backend: `repository/MovimientoCajaProyeccion.java`, `repository/PagoRepository.java`,
-  `dto/MovimientoCajaDTO.java`, `service/impl/CajaServiceImpl.java`,
-  `test/.../CajaDelDiaTest.java`.
-- Frontend: `lib/api.ts`, `components/modules/balance.tsx`,
-  `components/ui/calendar.tsx`, `components/ui/date-picker.tsx`.
-- `PROGRESS.md` (este registro).
-
-`AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
-
----
-
-## MIGRACIÓN DE FECHAS NATIVAS AL `DatePicker` + SELECTOR DE MES/AÑO
-
-Cierre de la deuda de UX que quedó abierta en la fase anterior: el `DatePicker`
-existía pero no se lo usaba en todos lados, y el calendario no permitía saltar de
-mes/año sin ir click a click.
-
-### 1. Los 8 `<input type="date">` operativos → `DatePicker`
-
-Se relevaron todos los `<input type="date">` reales del frontend (el `<input>` de
-la librería nativa aparecía en 10 lugares, pero dos eran `guarderia.tsx` legado y
-los comentarios). Los 8 operativos se migraron al `DatePicker` existente, con su
-calendario táctil de 44 px:
-
-| Módulo | Campo |
-| --- | --- |
-| `egreso.tsx` | Jornada |
-| `ficha.tsx` | Fecha de la atención |
-| `alta-mascota.tsx` | Fecha de nacimiento (`max` + `limpiable`) |
-| `nueva-reserva.tsx` | Fecha de la reserva |
-| `nuevo-turno.tsx` | Fecha del turno |
-| `mostrador.tsx` (tablero) | Día del tablero |
-| `mostrador/agregar-turno-modal.tsx` | Fecha |
-| `mostrador/cargar-cliente-modal.tsx` (fecha de nacimiento, `limpiable` + `max`) |
-
-- `guarderia.tsx` (legacy, no montado, Riesgo 2) **no se tocó**: sigue con su
-  `<input type="date">` a propósito, para no reescribir código muerto.
-- Se adaptaron los `onChange` (antes `e.target.value`, ahora el string directo) y
-  se limpiaron los imports/helpers que quedaron sin uso (`CalendarDays`,
-  `Field`/`TextInput`, el helper `hoy()` de `nueva-reserva.tsx`).
-
-### 2. Selector de Mes/Año en el encabezado del calendario
-
-El `Calendar` es compartido, así que el cambio llega a todos los módulos y al
-`DatePicker`.
-
-- `components/ui/calendar.tsx`:
-  - `CapituloMes` reemplaza al `MonthCaption` por defecto: el encabezado "octubre
-    2026" es ahora un **botón** que abre un panel sobre la grilla con dos
-    columnas, **Mes** y **Año**, y flechas `▲`/`▼` que desplazan el scroll de a
-    un ítem (44 px). No hay `<select>` nativos.
-  - Se navega con `goToMonth()` de `react-day-picker` (única vía soportada).
-  - El rango de años se deriva de `startMonth`/`endMonth`; sin límites cae a
-    `[año actual − 100, año actual + 10]`. La columna arranca centrada en el valor
-    activo.
-  - `month` gana `relative` para anclar el panel (si no, se posicionaría contra el
-    popover del `DatePicker`); la barra de navegación pasa a `pointer-events-none`
-    con los botones prev/next en `pointer-events-auto`, así el click del centro
-    llega al botón de mes/año sin romper los chevrones.
-- `components/ui/date-picker.tsx`: nueva prop `limpiable` (botón "Limpiar" que
-  emite `onChange("")`) y `startMonth`/`endMonth` derivados de `min`/`max`. La
-  usan solo las dos fechas de nacimiento, que son opcionales.
-
-`guarderia.tsx` (legacy, no montado) queda intacto a propósito.
-
-### Verificación
-
-- `npx tsc --noEmit` → limpio.
-- `next build --webpack` → OK.
-- `.\test-harness.ps1` → **159 tests de Spring Boot, 0 fallos** (misma cuenta: la
-  fase es solo frontend). Backend detenido antes (`mvnw clean test` borra
-  `target/`) y reiniciado después con las clases recién compiladas.
-
-### Archivos (esta fase)
-
-- `components/ui/calendar.tsx` (selector Mes/Año: `CapituloMes` + `ColumnaSelector`).
-- `components/ui/date-picker.tsx` (`limpiable`, `startMonth`/`endMonth`).
-- `components/modules/egreso.tsx`, `components/modules/ficha.tsx`,
-  `components/modules/alta-mascota.tsx`, `components/modules/nueva-reserva.tsx`,
-  `components/modules/nuevo-turno.tsx`, `components/modules/mostrador.tsx`,
-  `components/modules/mostrador/agregar-turno-modal.tsx`,
-  `components/modules/mostrador/cargar-cliente-modal.tsx`.
-- `PROGRESS.md` (este registro).
-
-Backend sin cambios, `AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
-
----
-
-## ABM DEL PADRÓN (editar y eliminar tutores y mascotas)
-
-Cierre del hueco funcional del padrón: hasta acá se podía **crear** tutores y
-mascotas y **vincularlos**, pero no corregir un dato mal cargado ni dar de baja a
-nadie. La UI del padrón sólo tenía alta; el backend ya exponía
-`PUT`/`DELETE` para ambos, así que la fase fue conectar la UI y endurecer el
-borrado, que hasta entonces habría respondido con un **500 opaco** al chocar con
-una clave foránea.
-
-### Regla de negocio nueva (inviolable)
-
-**Una mascota no puede quedar sin ningún tutor.** Al eliminar un tutor, las
-mascotas que sólo estaban vinculadas a él quedan huérfanas y **se eliminan con
-él**. Si una de esas mascotas tiene historial (turnos, reservas, consultas o
-comandas), no se puede borrar y, como tampoco puede quedar sin tutor, **se aborta
-el borrado completo del tutor** con `409` en una única transacción: nunca queda
-el padrón a medias.
-
-### Backend
-
-- `service/HistorialMascota.java` (nuevo `@Component`): responde si una mascota
-  tiene turnos, reservas, consultas o comandas. Centraliza la lista de
-  dependencias para que el servicio de mascotas y el de tutores no tengan cada uno
-  su copia.
-- `MascotaServiceImpl.eliminar`: rechaza con `BusinessConflictException` (409) si
-  la mascota tiene historial; si no, borra y el `CascadeType.ALL` limpia el N:M.
-- `TutorServiceImpl.eliminar`:
-  1. 409 si el tutor tiene comandas a su nombre o pagos como pagador (los
-     movimientos contables no pueden quedar sin titular).
-  2. Calcula las mascotas huérfanas (las que sólo tienen a este tutor) y, si
-     alguna tiene historial, 409.
-  3. Corta los vínculos explícitamente (la tupla tiene dos propietarios: dejarla
-     al `cascade` produciría colisiones), vacía la colección del otro lado,
-     `flush()`, borra las huérfanas y recién ahí el tutor.
-- Repositorios: `existsByMascotaId` en `TurnoClinicoRepository`,
-  `ReservaGuarderiaRepository`, `ConsultaMedicaRepository` y
-  `ComandaCobroRepository`; `existsByTutorId` en `ComandaCobroRepository`;
-  `existsByTutorPagadorId` en `PagoRepository`.
-- `GlobalExceptionHandler`: nuevo handler de `DataIntegrityViolationException`
-  → 409 como red de seguridad (si algún servicio no cubre una FK, no explota en
-  un 500).
-
-### Frontend (`components/modules/padron.tsx`)
-
-- Cada fila de tutor y de mascota gana botones de **editar** y **eliminar**
-  (iconos, 44×44 px, `aria-label`). Se reestructuró la fila del tutor para no
-  anidar botones.
-- `ModalEditarTutor`: edita nombre, apellido, DNI, teléfono, email y dirección.
-  Los opcionales se mandan como `undefined` (nunca `""`, que el `@Pattern` del
-  DTO rechaza).
-- `ModalEditarMascota`: edita los datos propios de la mascota. Reenvía
-  `tutores` con la lista actual porque el backend sincroniza el N:M completo:
-  omitirla los desvincularía a todos. Un aviso explica que el vínculo se gestiona
-  desde el modal del tutor.
-- `ModalEliminar` (genérico): confirmación antes de borrar y, si el backend
-  responde 409, muestra el motivo (huérfana con historial, movimientos
-  contables, etc.) sin cerrar el diálogo.
-- `alta-mascota.tsx`: `ESPECIES` y `CONDUCTAS` se exportan para reusarlas en el
-  modal de edición y no duplicarlas.
-
-### Tests (`PadronAbmTest.java`, 6 casos)
-
-Borrar un tutor con mascota compartida la mantiene viva; borrar al único tutor de
-una mascota sin historial la elimina; una huérfana con historial bloquea el
-borrado del tutor con 409 y no borra nada (atomicidad); mascota sin historial se
-elimina; mascota con turno no se elimina (409); tutor con comandas no se elimina
-(409). `TutorControllerTest` se ajustó: al borrar el último tutor la mascota se
-auto-elimina, así que el `DELETE /mascotas` posterior ahora espera 404.
-
-### Verificación
-
-- `npx tsc --noEmit` → limpio.
-- `npx next build --webpack` → OK.
-- `.\test-harness.ps1` → **165 tests de Spring Boot, 0 fallos** (159 previos + 6
-  nuevos). Backend detenido antes (`mvnw clean test` borra `target/`) y reiniciado
-  después con las clases recién compiladas.
-
-### Archivos (esta fase)
-
-- Backend: `service/HistorialMascota.java` (nuevo),
-  `service/impl/TutorServiceImpl.java`, `service/impl/MascotaServiceImpl.java`,
-  `controller/GlobalExceptionHandler.java`, `repository/TurnoClinicoRepository.java`,
-  `repository/ReservaGuarderiaRepository.java`, `repository/ConsultaMedicaRepository.java`,
-  `repository/ComandaCobroRepository.java`, `repository/PagoRepository.java`,
-  `test/.../PadronAbmTest.java` (nuevo), `test/.../TutorControllerTest.java`.
-- Frontend: `components/modules/padron.tsx`, `components/modules/alta-mascota.tsx`.
-- `PROGRESS.md` (este registro).
-
-`AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
-
----
-
-## ALTA DE TUTOR UNIFICADA (email y dirección en Mostrador y Padrón)
-
-### Objetivo
-
-Los dos caminos de alta de tutor debían pedir **los mismos datos**. El padrón
-pedía nombre, apellido, DNI y teléfono; faltaban **email** y **dirección**, que
-el backend ya admitía (`TutorRequestDTO`) y que el modal de edición del padrón ya
-usaba. Se agregaron también al alta del Mostrador ("Cargar cliente") para que
-ambos formularios queden idénticos.
-
-### Cambios (solo frontend)
-
-- `components/modules/padron.tsx` → `ModalAltaTutorNuevo`: se suman los estados y
-  campos **Email** (`inputMode="email"`) y **Dirección**, y se envían en
-  `apiTutores.crear`. Los seis campos quedan en una grilla de dos columnas
-  (`sm:grid-cols-2`).
-- `components/modules/mostrador/cargar-cliente-modal.tsx`: el estado `tutor` y el
-  `limpiar()` incorporan `email`/`direccion`; `guardar()` los manda a
-  `apiTutores.crear`; la grilla "Datos del tutor" pasa de 4 a 6 campos.
-
-Los opcionales viajan como `undefined` (nunca `""`, que el `@Pattern` del DTO
-rechaza), igual que ya se hacía con el teléfono. Backend sin cambios; `AGENTS.md`
-sin tocar.
-
-### Verificación
-
-- `npx tsc --noEmit` → limpio.
-- `npx next build --webpack` → OK.
-- `.\test-harness.ps1` → **165 tests de Spring Boot, 0 fallos** (fase solo
-  frontend). Backend detenido antes (`mvnw clean test` borra `target/`) y
-  reiniciado después.
-
-### Archivos (esta fase)
-
-- `components/modules/padron.tsx`.
-- `components/modules/mostrador/cargar-cliente-modal.tsx`.
-- `PROGRESS.md` (este registro).
-
-Sin commit: pendiente de tu confirmación.
-
----
-
-## REESTILO VISUAL AZUL/NEGRO + BÚSQUEDA CENTRADA EN EL TOPBAR
-
-Encargo del dueño: cambiar la identidad cromática del sistema a **azul y negro**,
-refinar botones y demás controles para que la experiencia sea más agradable, y
-**centrar la barra de búsqueda** (que se ve en el Mostrador, porque el `TopBar` es
-global). Todo sobre las reglas de negocio inviolables de `AGENTS.md`: ningún
-cambio toca lógica de negocio, endpoints ni reglas de aforo/turnos/egreso.
-
-### Paleta y tema (tokens, no componentes)
-
-El frontend ya centralizaba todo el theming en variables shadcn de
-`app/globals.css`, así que la paleta nueva se resuelve casi enteramente ahí:
-
-- **Oscuro por defecto.** `app/layout.tsx` pone `<html lang="en" className="dark">`
-  y se **eliminó el bloque `@media (prefers-color-scheme: dark)`**: antes el tema
-  dependía del sistema operativo, ahora el oscuro es la identidad elegida. El
-  tema claro sigue disponible como opt-in futuro con la clase `.light` en la raíz
-  (los tokens de `:root` quedan completos, también con el azul nuevo).
-- **Azul vivo `#2563EB`** (`oklch(0.546 0.245 262.881)`) como `--primary` en ambos
-  temas; `--ring` y `--sidebar-primary` en azul; `--chart-1..5` en escala de azules.
-- **Fondo negro azulado** (`oklch(0.15 0.012 265)`), `--card`/`--popover`/`--sidebar`
-  un escalón más claros, bordes blancos al 10%.
-- `viewport` de `layout.tsx`: `colorScheme: 'dark'` y `themeColor: '#131320'`.
-
-### Componentes del design system
-
-- `components/ui/button.tsx`: `rounded-lg` → **`rounded-xl`** (consistente con la
-  skill `.opencode/tailwind-shadcn`); la variante `default` gana
-  `shadow-sm hover:shadow-md` y hover un punto más suave (`/85`).
-- `components/ui/field.tsx`: inputs, select, textarea y el contenedor `Panel` a
-  `rounded-xl`.
-- `components/ui/modal.tsx`: diálogo a `rounded-xl` con botón de cerrar acorde.
-- `lib/vista.tsx`: los `Semforo` (verde/ámbar/rojo) y el `ErrorBox` pasan a variantes
-  semitransparentes con `dark:` — se leen igual de bien en oscuro y en claro.
-
-### Navegación
-
-- `components/sidebar.tsx`: la píldora de pestaña activa pasa de blanco/negro a
-  **`bg-primary text-primary-foreground`** (azul con sombra sutil); en la barra
-  inferior de móvil el ícono/label activo se pinta de azul; el logo gana borde e
-  ícono `border-primary/40` / `text-primary`.
-
-### Búsqueda centrada (TopBar)
-
-- `components/top-bar.tsx`: en **`md+`** el header pasa a grilla de 3 columnas
-  `[1fr, buscador 56rem, 1fr]` con `col-start` explícitos, de modo que el input
-  queda **visualmente centrado** y el selector de rol alineado a la derecha. En
-  móvil (`< md`) se conserva el layout flex con el buscador a todo lo ancho
-  (mobile-first, AGENTS.md 3.1). Input, select y botón "Fichas" a `rounded-xl`
-  con focus ring azul.
-- **Agrandada a pedido del dueño:** el input pasa a `min-h-[52px]` y `text-base`
-  (icono `h-5 w-5`, padding `pl-12 pr-4`), y la columna del buscador en desktop
-  sube de `28rem` a `56rem` (con `max-w-2xl` en móvil). El desplegable de
-  resultados pasa a anclarse con `top-[calc(100%+0.5rem)]` para seguir pegado al
-  input sin importar su alto.
-
-### Refinamiento del Mostrador y alertas theme-aware
-
-- `mostrador/widget-aforo.tsx`: la barra de ocupación ahora es **azul**
-  (`bg-primary`) y solo se pinta de rojo con `completo` (la regla de aforo de 10
-  sigue resolviéndose en backend, sin tocarla).
-- `mostrador/columna-lista.tsx`: contenedor a `rounded-lg`.
-- Barrido de avisos y chips con colores claros fijos que quedarían como cajas
-  blancas sobre el fondo negro — todos ganaron variantes `dark:` **sin tocar
-  lógica**: `caja.tsx` (DEUDA SIN VERIFICAR y TUTOR MOROSO), `egreso.tsx`
-  (chip de conducta, deuda y alerta), `balance.tsx` (Deuda anterior y estados de
-  comanda), `fichas.tsx`, `ficha.tsx`, `padron.tsx` (chip de conducta y mensajes
-  de éxito), `alta-mascota.tsx`, `agenda.tsx` (aforo completo),
-  `mostrador/avisos-importantes.tsx` y los dos modales del mostrador.
-
-### Verificación (quality gate AGENTS.md §5)
-
-- `npx tsc --noEmit` → limpio.
-- `npx next build --webpack` → OK.
-- `.\test-harness.ps1` → **"Todos los controles pasaron exitosamente"**:
-  tsc limpio, build OK y **165 tests de Spring Boot, 0 fallos** (fase solo
-  frontend, sin cambios de backend).
-
-### Archivos (esta fase)
-
-- Frontend: `app/globals.css`, `app/layout.tsx`, `components/ui/button.tsx`,
-  `components/ui/field.tsx`, `components/ui/modal.tsx`, `components/sidebar.tsx`,
-  `components/top-bar.tsx`, `lib/vista.tsx`,
-  `components/modules/{mostrador.tsx, widget-aforo, columna-lista,
-  avisos-importantes, agregar-turno-modal, cargar-cliente-modal}` y
-  `components/modules/{caja, egreso, balance, fichas, ficha, padron,
-  alta-mascota, agenda}.tsx`.
-- `PROGRESS.md` (este registro).
-
-Backend sin cambios, `AGENTS.md` sin tocar. Sin commit: pendiente de tu confirmación.
+1. **[RESUELTO] Módulos legacy** — `consultas/cobros/guarderia.tsx` eliminados;
+   el Riesgo 2 histórico ("guardería legado sin montar") quedó cerrado.
+2. **`vinculado_desde` en `TutorMascota`** sigue sin consumirse en el frontend.
+3. **Sin migraciones versionadas** (Flyway/Liquibase): la base depende de
+   `hibernate.ddl-auto=update`.
+4. **Colisión VS Code/Maven:** el Language Server genera clases rotas en
+   `backend/target/classes`; si aparecen `BeanCreationException` anómalos,
+   compilar siempre con `mvnw clean`.
+5. **Regla del huérfano (nueva, inviolable):** al borrar un tutor, una mascota
+   sin otros tutores se elimina con él; si tiene historial clínico/contable, el
+   borrado completo aborta con 409 (única transacción).
+
+## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
+
+- **Endpoints vivos que el frontend consume** (todos bajo `/api/v1`): tutores,
+  mascotas, profesionales, turnos, guarderia, egreso (`/egreso/validar`,
+  `/egreso/pacientes-hoy`), caja (`/comandas/dia`, `/caja/pagos/{id}`,
+  `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
+  consultas.
+- **Tests backend:** 165 en verde. Cobertura clave: aforo concurrente (lock
+  real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
+  DNI sin vínculo, huérfano con historial → 409, aislamiento en
+  `veterinaria_test` (no pisa `veterinaria_db`).
+- **Frontend sin test runner:** la calidad se sostiene con `tsc --noEmit` +
+  `next build --webpack` (el harness 1/3 y 2/3).
+- **Refactor de referencia:** `components/modules/mostrador/` es el patrón a
+  seguir (orquestador con estado/fetch + hijos presentacionales tipados con
+  `EstadoApi<T>`).

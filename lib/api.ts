@@ -653,35 +653,6 @@ function query(params: Record<string, string | number | undefined | null>) {
   return partes.length > 0 ? partes.join("&") : ""
 }
 
-/** Un numero del backend es `number | null`; la UI no deberia ver nulls. */
-export function aTexto(valor: number | null | undefined, porDefecto = "—") {
-  return valor === null || valor === undefined ? porDefecto : String(valor)
-}
-
-/**
- * Convierte los `LocalDateTime` del backend a `YYYY-MM-DD` local.
- *
- * `new Date("2026-03-10T10:00:00")` se interpreta como hora local, pero
- * `toISOString()` convierte a UTC y en una zona como UTC-3 devuelve el dia
- * anterior. Para una agenda eso significa un turno del dia 10 mostrado el dia 9.
- */
-export function aFechaLocal(iso: string | null | undefined) {
-  if (!iso) return null
-  const [fecha] = iso.split("T")
-  return fecha
-}
-
-/** Hora local en HH:mm, sin el corrimiento de huso de `toISOString()`. */
-export function aHoraLocal(iso: string | null | undefined) {
-  if (!iso) return "—"
-  const [, hora] = iso.split("T")
-  return hora ? hora.slice(0, 5) : "—"
-}
-
-export function esFechaHoy(fecha: string | null | undefined) {
-  return fecha === hoyLocal()
-}
-
 /**
  * Fecha de hoy en `YYYY-MM-DD` **local**.
  *
