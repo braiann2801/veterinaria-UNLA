@@ -1,0 +1,11 @@
+# Artefactos de build y entorno que no entran al contexto Docker
+target
+.git
+.idea
+*.iml
+*.log
+
+# Wrapper local (la imagen usa el Maven oficial, no el wrapper)
+.mvn
+mvnw
+mvnw.cmd

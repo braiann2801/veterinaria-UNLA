@@ -1,0 +1,26 @@
+# Dependencias y builds (se regeneran dentro de la imagen)
+node_modules
+.next
+
+# El backend no forma parte del contexto del frontend
+backend
+
+# Secretos y entorno local: jamás dentro de la imagen
+.env
+.env*.local
+*.log
+
+# Git, cachés y editor
+.git
+.gitignore
+tsconfig.tsbuildinfo
+.vscode
+.idea
+
+# Artefactos v0 / vercel (no aportan al build)
+.snowflake
+.v0-trash
+.vercel
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts

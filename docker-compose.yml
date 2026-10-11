@@ -1,0 +1,92 @@
+# ============================================================================
+# veterinaria-UNLA — Stack completo: MySQL 8 + Spring Boot 3/4 + Next.js
+#
+# Uso:
+#   docker compose up --build      -> levanta db, backend y frontend
+#   docker compose down            -> baja todo (los datos persisten en mysql_data)
+#   docker compose down -v         -> baja y borra el volumen de datos
+#
+# Requisitos: copiar .env.example a .env y completar MYSQL_ROOT_PASSWORD.
+# docker-compose falla con un error claro si esa variable no está definida.
+#
+# Ojo con el puerto 3306: si XAMPP/MySQL local está corriendo, subir DB_PORT=3307
+# en .env para mapear el contenedor a otro puerto host (la red Docker interna
+# del backend hacia `db` siempre usa 3306, no se ve afectada).
+# ============================================================================
+name: veterinaria-unla
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: veterinaria-db
+    restart: unless-stopped
+    command:
+      # utf8mb4 garantiza que las ñ/acentos del dominio (conducta, diagnósticos)
+      # se guarden intactos en el contenedor, igual que en el XAMPP local.
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: veterinaria_db
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Definir MYSQL_ROOT_PASSWORD en .env}"
+      TZ: UTC
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # Se escapa $$ para que compose no interpole la contraseña y la evalúe
+      # el shell del contenedor. Mantener la password alfanumérica en .env.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - veterinaria-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: veterinaria-backend
+    restart: unless-stopped
+    environment:
+      # El backend resuelve la base por el nombre de servicio de la red Docker.
+      # application.properties lee estas variables con defaults locales
+      # (localhost/3306/root/vacío), así el mismo jar corre con XAMPP sin tocar nada.
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Definir MYSQL_ROOT_PASSWORD en .env}"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - veterinaria-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Se inlina en build-time (prerrequisito NEXT_PUBLIC_* de Next.js).
+        # El browser consume la API en localhost:8080 (puerto mapeado del host),
+        # por eso el default apunta ahí y no al nombre de servicio `backend`.
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}"
+    container_name: veterinaria-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - veterinaria-net
+
+volumes:
+  mysql_data:
+
+networks:
+  veterinaria-net:
+    driver: bridge

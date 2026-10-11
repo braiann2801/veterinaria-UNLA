@@ -6,10 +6,9 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** Ninguna en ejecución. Último trabajo aplicado: optimización
-  de código (poda de código muerto legacy) + reestilo visual azul/negro.
-- **Base Git:** `c264145` (FASE 1 + FASE 2 + FASE 3 commiteadas). Cambios
-  posteriores al commit: **sin commitear**, pendientes de confirmación del Dueño.
+- **Fase en curso:** Dockerización (compose + Dockerfiles + `output: standalone`).
+  Cambios **sin commitear**, pendientes de confirmación del Dueño.
+- **Base Git:** `931d2fb` (reestilo azul/negro + optimización, commiteadas).
 - **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
   165 tests de Spring Boot, 0 fallos).
 
@@ -43,6 +42,13 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       (`consultas.tsx`, `cobros.tsx`, `guarderia.tsx`) y el store quedó solo con
       estado de sesión (rol + búsqueda); helpers sin uso de `lib/api.ts`
       (`aTexto`, `aFechaLocal`, `aHoraLocal`, `esFechaHoy`) eliminados.
+- [x] **Dockerización** — `docker-compose.yml` (db/backend/frontend, red
+      `veterinaria-net`, volumen `mysql_data`); Dockerfiles multi-stage
+      (Maven→JRE y pnpm→standalone); `next.config.mjs` con `output: 'standalone'`;
+      DB parametrizada por env (`DB_HOST/DB_PORT/DB_USERNAME/DB_PASSWORD`) con
+      defaults locales; secretos en `.env` (gitignored) + `.env.example`
+      versionado; `package-lock.json` eliminado (pnpm único lockfile
+      autoritativo).
 
 ## Decisiones Críticas de Arquitectura
 
@@ -62,6 +68,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 7. **Store global:** `lib/store.tsx` es SOLO estado de sesión (rol + query del
    TopBar). Todo dato operativo sale de `lib/api.ts` + `lib/use-api.ts`
    (triplete `{datos, cargando, error, recargar}`).
+8. **Config por entorno:** `application.properties` lee `DB_HOST/DB_PORT/
+   DB_USERNAME/DB_PASSWORD` con defaults que preservan el dev local (XAMPP:
+   localhost/3306/root/vacío); docker-compose los sobreescribe y el secreto
+   vive en `.env` (nunca versionado).
 
 ## Riesgos y Pendientes Abiertos
 
@@ -76,6 +86,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 5. **Regla del huérfano (nueva, inviolable):** al borrar un tutor, una mascota
    sin otros tutores se elimina con él; si tiene historial clínico/contable, el
    borrado completo aborta con 409 (única transacción).
+6. **Docker sin verificar en este equipo:** no hay Docker instalado localmente;
+   el YAML quedó validado estáticamente pero `docker compose build`/`up` debe
+   correrse en una máquina con Docker. Antes del `up`: detener MySQL de XAMPP o
+   subir `DB_PORT=3307` en `.env` (colisión del puerto 3306).
 
 ## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
 
@@ -93,3 +107,7 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 - **Refactor de referencia:** `components/modules/mostrador/` es el patrón a
   seguir (orquestador con estado/fetch + hijos presentacionales tipados con
   `EstadoApi<T>`).
+- **Docker:** `docker compose up --build` levanta db(3306)/backend(8080)/
+  frontend(3000). El browser pega a la API vía `NEXT_PUBLIC_API_URL` (build-time,
+  default `http://localhost:8080/api/v1`); el backend resuelve `db` por red
+  Docker y el compose falla si `.env` no define `MYSQL_ROOT_PASSWORD`.

@@ -1,4 +1,8 @@
-# v0 sandbox internal files
+# ============================================================================
+# veterinaria-UNLA — .gitignore raíz
+# ============================================================================
+
+# ---------- v0 sandbox internal files ----------
 __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
@@ -6,16 +10,32 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
+# ---------- Environment variables ----------
+# .env contiene secretos (Docker Compose, MYSQL_ROOT_PASSWORD): NO versionar.
+# .env.example SÍ se versiona como plantilla (no cae en estos patrones).
+.env
 .env*.local
 
-# Cache de tipos que genera `tsc --noEmit` (primer paso del test-harness)
-tsconfig.tsbuildinfo
-
-# Common ignores
-node_modules
+# ---------- Node / Next.js ----------
+node_modules/
 .next/
-.DS_Store
+*.tsbuildinfo
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.eslintcache
 
-.env
+# ---------- Java / Maven (backend) ----------
+# backend/.gitignore ya cubre target/ y wrappers; refuerzo a nivel repo.
+backend/target/
+
+# ---------- IDEs / editores ----------
 .vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# ---------- Sistema operativo ----------
+.DS_Store
+Thumbs.db
