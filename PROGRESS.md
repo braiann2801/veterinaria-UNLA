@@ -6,8 +6,8 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** Dockerización (compose + Dockerfiles + `output: standalone`).
-  Cambios **sin commitear**, pendientes de confirmación del Dueño.
+- **Fase en curso:** Dockerización + health check raíz (GET /). Cambios
+  **sin commitear**, pendientes de confirmación del Dueño.
 - **Base Git:** `931d2fb` (reestilo azul/negro + optimización, commiteadas).
 - **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
   165 tests de Spring Boot, 0 fallos).
@@ -49,6 +49,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       defaults locales; secretos en `.env` (gitignored) + `.env.example`
       versionado; `package-lock.json` eliminado (pnpm único lockfile
       autoritativo).
+- [x] **Health check raíz + trazabilidad de errores** — `HomeController` responde
+      `GET /` (`{status: "UP", ...}`) sin tocar la DB. Decisión revisada: NO se
+      agrega `ex.printStackTrace()` porque `log.error(..., ex)` ya vuelca la
+      traza completa al log (duplicar iría a stderr).
 
 ## Decisiones Críticas de Arquitectura
 
@@ -111,3 +115,5 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   frontend(3000). El browser pega a la API vía `NEXT_PUBLIC_API_URL` (build-time,
   default `http://localhost:8080/api/v1`); el backend resuelve `db` por red
   Docker y el compose falla si `.env` no define `MYSQL_ROOT_PASSWORD`.
+- **Health check:** `GET http://localhost:8080/` responde `{"status":"UP",...}`
+  sin conexión a DB; útil para sondear el backend (p. ej. en Docker).
