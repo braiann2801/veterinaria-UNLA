@@ -94,6 +94,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
    el YAML quedó validado estáticamente pero `docker compose build`/`up` debe
    correrse en una máquina con Docker. Antes del `up`: detener MySQL de XAMPP o
    subir `DB_PORT=3307` en `.env` (colisión del puerto 3306).
+7. **MySQL de XAMPP es frágil:** si el harness falla con ~160 errores de
+   `ApplicationContext` (Caused by: `Communications link failure` /
+   `Connection refused` en 3306), no es el código: MySQL se cayó. Reiniciar
+   `C:\xampp\mysql\bin\mysqld.exe`, esperar el puerto y relanzar el harness.
 
 ## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
 
