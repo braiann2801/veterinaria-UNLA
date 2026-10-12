@@ -6,10 +6,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** Handler 404 para rutas inexistentes
-  (`NoResourceFoundException` → 404 en vez de 500). Cambio en
-  `GlobalExceptionHandler.java` **sin commitear**, pendiente de confirmación
-  del Dueño.
+- **Fase en curso:** Endurecimiento del backend pendiente de commit —
+  (a) handler 404 para rutas inexistentes (`GlobalExceptionHandler.java`),
+  (b) CORS: método `PATCH` habilitado en `CorsConfig.java`. Ambos cambios
+  **sin commitear**, pendientes de confirmación del Dueño.
 - **Base Git:** `548124e` (Docker + health check raíz, commiteadas).
 - **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
   165 tests de Spring Boot, 0 fallos).
@@ -60,6 +60,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       contrato `ApiErrorResponse` que el resto de los errores. Sin este
       handler caía en el catch-all `Exception.class` y devolvía 500.
       Verificado con smoke HTTP real: `GET /api/v1/no-existe` → 404.
+- [x] **CORS: PATCH habilitado** — `CorsConfig` ahora permite también el método
+      `PATCH` sobre `/api/**`. Se mantiene la whitelist de orígenes
+      (localhost:3000, 127.0.0.1:3000, `*.vercel.app`), `allowCredentials`,
+      `exposedHeaders("Location")` y `maxAge(3600)`. Alineado a AGENTS.md §1.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -131,3 +135,7 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 - **Contrato de error uniforme:** todas las respuestas de error usan
   `ApiErrorResponse` (`{timestamp,status,error,mensaje,ruta,detalles}`), con
   `status` **numérico**. Rutas inexistentes → **404** (handler dedicado), no 500.
+- **CORS:** `CorsConfig` (`WebMvcConfigurer`) aplica sobre `/api/**` para
+  localhost:3000, 127.0.0.1:3000 y `*.vercel.app`; métodos
+  GET/POST/PUT/DELETE/OPTIONS/**PATCH**; `allowCredentials=true`. No hay Spring
+  Security: esta es la única capa CORS del backend.
