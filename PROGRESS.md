@@ -6,9 +6,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** Dockerización + health check raíz (GET /). Cambios
-  **sin commitear**, pendientes de confirmación del Dueño.
-- **Base Git:** `931d2fb` (reestilo azul/negro + optimización, commiteadas).
+- **Fase en curso:** Handler 404 para rutas inexistentes
+  (`NoResourceFoundException` → 404 en vez de 500). Cambio en
+  `GlobalExceptionHandler.java` **sin commitear**, pendiente de confirmación
+  del Dueño.
+- **Base Git:** `548124e` (Docker + health check raíz, commiteadas).
 - **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
   165 tests de Spring Boot, 0 fallos).
 
@@ -53,6 +55,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `GET /` (`{status: "UP", ...}`) sin tocar la DB. Decisión revisada: NO se
       agrega `ex.printStackTrace()` porque `log.error(..., ex)` ya vuelca la
       traza completa al log (duplicar iría a stderr).
+- [x] **Handler 404 (rutas inexistentes)** — `NoResourceFoundException` se
+      atrapa en `GlobalExceptionHandler` y responde **404** con el mismo
+      contrato `ApiErrorResponse` que el resto de los errores. Sin este
+      handler caía en el catch-all `Exception.class` y devolvía 500.
+      Verificado con smoke HTTP real: `GET /api/v1/no-existe` → 404.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -121,3 +128,6 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   Docker y el compose falla si `.env` no define `MYSQL_ROOT_PASSWORD`.
 - **Health check:** `GET http://localhost:8080/` responde `{"status":"UP",...}`
   sin conexión a DB; útil para sondear el backend (p. ej. en Docker).
+- **Contrato de error uniforme:** todas las respuestas de error usan
+  `ApiErrorResponse` (`{timestamp,status,error,mensaje,ruta,detalles}`), con
+  `status` **numérico**. Rutas inexistentes → **404** (handler dedicado), no 500.

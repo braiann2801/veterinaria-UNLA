@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.veterinaria.veterinaria_backend.exception.ApiErrorResponse;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
@@ -47,6 +48,22 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 				.body(ApiErrorResponse.of(HttpStatus.NOT_FOUND.value(), "Not Found",
 						ex.getMessage(), request.getRequestURI()));
+	}
+
+	/**
+	 * 404: ruta inexistente (ningun controller ni recurso estatico la atiende).
+	 *
+	 * <p>Sin este handler, la {@link NoResourceFoundException} cae en el catch-all
+	 * {@code Exception.class} y se devuelve 500 en vez de 404. Se respeta el
+	 * contrato {@link ApiErrorResponse}: el mismo JSON que el resto de los
+	 * errores, para que el frontend no tenga que parsear variantes.</p>
+	 */
+	@ExceptionHandler(NoResourceFoundException.class)
+	public ResponseEntity<ApiErrorResponse> handleNoResourceFound(NoResourceFoundException ex,
+			HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(ApiErrorResponse.of(HttpStatus.NOT_FOUND.value(), "Not Found",
+						"Recurso no encontrado: " + ex.getResourcePath(), request.getRequestURI()));
 	}
 
 	/**
