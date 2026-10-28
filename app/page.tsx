@@ -3,13 +3,12 @@
 /**
  * Shell del MVP 1.
  *
- * Todas las pantallas leen la base real. El tablero de movimiento del Mostrador
- * es la ultima excepcion: sigue mostrando turnos, reservas y deudas semilla del
- * store mientras se termina su migracion a la API.
+ * Todas las pantallas leen la base real, incluido el tablero de movimiento del
+ * Mostrador (ya no importa nada de `lib/store.tsx`). El store quedó solo con el
+ * estado de sesión: rol y búsqueda del TopBar.
  *
- * Los dos modales del Mostrador (Cargar cliente y Agregar turno) sí persisten:
- * van contra la API. El Historial y el Balance del día ya no son pantallas de
- * demo: el Balance lee el cierre real en `GET /api/v1/caja/cierre`.
+ * Los dos modales del Mostrador (Cargar cliente y Agregar turno) persisten contra
+ * la API. El Balance lee el cierre real en `GET /api/v1/caja/cierre`.
  */
 
 import { useEffect, useState } from "react"
