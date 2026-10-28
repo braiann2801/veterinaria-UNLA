@@ -73,8 +73,9 @@ export function TopBar({
   }, [query, tutores.datos])
 
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-background px-4 py-3 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,56rem)_minmax(0,1fr)]">
-      <div className="relative flex-1 max-w-2xl md:col-start-2 md:row-start-1 md:mx-auto md:max-w-none">
+    <header className="flex items-center gap-3 border-b border-border bg-background px-4 py-3">
+      {/* El buscador arranca en el margen izquierdo y ocupa todo el ancho libre. */}
+      <div className="relative min-w-0 flex-1">
         <Search
           className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
           aria-hidden
@@ -128,7 +129,7 @@ export function TopBar({
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-2 md:col-start-3 md:row-start-1 md:ml-0 md:justify-self-end">
+      <div className="flex shrink-0 items-center gap-2">
         {usuario && role && (
           <div className="hidden min-w-0 flex-col items-end leading-tight sm:flex">
             <span className="max-w-[12rem] truncate text-sm font-medium">{usuario.nombreCompleto}</span>
