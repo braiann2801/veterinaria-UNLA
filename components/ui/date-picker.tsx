@@ -77,7 +77,9 @@ export function DatePicker({
   const fechaSeleccionada = value ? aFecha(value) : undefined
 
   // Cierre por click afuera y por Escape. Escape devuelve el foco al boton para
-  // que la navegacion por teclado no se pierda al cerrar.
+  // que la navegacion por teclado no se pierda al cerrar. El keydown se escucha
+  // en captura y se marca con preventDefault: dentro de un `Modal`, ese Escape
+  // cierra solo el calendario y no el dialogo entero.
   useEffect(() => {
     if (!abierto) return
 
@@ -88,16 +90,17 @@ export function DatePicker({
     }
     function alPresionarTecla(evento: KeyboardEvent) {
       if (evento.key === "Escape") {
+        evento.preventDefault()
         setAbierto(false)
         disparadorRef.current?.focus()
       }
     }
 
     document.addEventListener("pointerdown", alPresionarFuera)
-    document.addEventListener("keydown", alPresionarTecla)
+    document.addEventListener("keydown", alPresionarTecla, true)
     return () => {
       document.removeEventListener("pointerdown", alPresionarFuera)
-      document.removeEventListener("keydown", alPresionarTecla)
+      document.removeEventListener("keydown", alPresionarTecla, true)
     }
   }, [abierto])
 
