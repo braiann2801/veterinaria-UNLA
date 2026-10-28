@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 // Spring Boot 4 movio el autoconfigure de webmvc a este paquete.
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,6 +29,9 @@ import tools.jackson.databind.ObjectMapper;
  * Verifica codigos de estado, validacion y manejo de 404.
  */
 @SpringBootTest
+// La API exige login: estos tests prueban reglas de negocio, no permisos
+// (ver AutenticacionTest). Duenio tiene acceso a todos los endpoints.
+@WithMockUser(roles = "DUENIO")
 @AutoConfigureMockMvc
 @Transactional
 class TutorControllerTest {

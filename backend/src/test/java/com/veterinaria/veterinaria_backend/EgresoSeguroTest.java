@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 // Spring Boot 4 movio el autoconfigure de webmvc a este paquete.
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -45,6 +46,9 @@ import tools.jackson.databind.ObjectMapper;
  * el sistema seguiria bloqueando, y el caso volveria al mostrador dos veces.</p>
  */
 @SpringBootTest
+// La API exige login: estos tests prueban reglas de negocio, no permisos
+// (ver AutenticacionTest). Duenio tiene acceso a todos los endpoints.
+@WithMockUser(roles = "DUENIO")
 @AutoConfigureMockMvc
 @Transactional
 class EgresoSeguroTest {
