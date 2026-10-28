@@ -42,8 +42,10 @@ public class UsuarioJwtConverter implements Converter<Jwt, AbstractAuthenticatio
 	public AbstractAuthenticationToken convert(Jwt jwt) {
 		Usuario usuario = buscar(jwt);
 		Object version = jwt.getClaim(TokenService.CLAIM_VERSION);
-		if (usuario == null || !usuario.isActivo() || !(version instanceof Number n)
-				|| n.intValue() != usuario.getTokenVersion()) {
+		// Solo enteros exactos: intValue() truncaria 2.5 o 2+2^32 a la version real.
+		boolean versionOk = usuario != null && (version instanceof Integer || version instanceof Long)
+				&& ((Number) version).longValue() == usuario.getTokenVersion();
+		if (usuario == null || !usuario.isActivo() || !versionOk) {
 			throw new InvalidBearerTokenException("La sesión ya no es válida");
 		}
 		String autoridad = usuario.isDebeCambiarPassword()

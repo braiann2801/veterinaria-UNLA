@@ -2,6 +2,7 @@ package com.veterinaria.veterinaria_backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -201,6 +202,40 @@ class AutenticacionTest {
 			mockMvc.perform(get("/api/v1/usuarios").header(HttpHeaders.AUTHORIZATION, auth))
 					.andExpect(status().isForbidden());
 		}
+	}
+
+	@Test
+	@DisplayName("S3: HEAD no saltea la regla de solo-Duenio del cierre de caja")
+	void headNoSalteaElCierre() throws Exception {
+		crearUsuario("recep-head", Usuario.Rol.RECEPCION, true, false);
+		mockMvc.perform(head("/api/v1/caja/cierre").header(HttpHeaders.AUTHORIZATION, bearer(token("recep-head"))))
+				.andExpect(status().isForbidden());
+	}
+
+	private String firmar(JwtClaimsSet claims) {
+		return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
+				.getTokenValue();
+	}
+
+	@Test
+	@DisplayName("S2: un token firmado sin vencimiento da 401")
+	void tokenSinExp401() throws Exception {
+		Usuario u = crearUsuario("sin-exp", Usuario.Rol.RECEPCION, true, false);
+		String t = firmar(JwtClaimsSet.builder().subject(u.getId().toString()).issuedAt(Instant.now())
+				.claim("ver", u.getTokenVersion()).build());
+		mockMvc.perform(get("/api/v1/tutores").header(HttpHeaders.AUTHORIZATION, bearer(t)))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	@DisplayName("S2: un claim ver no entero no se trunca a la version real")
+	void verNoEntero401() throws Exception {
+		Usuario u = crearUsuario("ver-float", Usuario.Rol.RECEPCION, true, false);
+		String t = firmar(JwtClaimsSet.builder().subject(u.getId().toString()).issuedAt(Instant.now())
+				.expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+				.claim("ver", u.getTokenVersion() + 0.5).build());
+		mockMvc.perform(get("/api/v1/tutores").header(HttpHeaders.AUTHORIZATION, bearer(t)))
+				.andExpect(status().isUnauthorized());
 	}
 
 	@Test

@@ -3,6 +3,7 @@ package com.veterinaria.veterinaria_backend.security;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Instant;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -21,7 +22,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
@@ -73,7 +78,9 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/api/v1/auth/cambiar-password").authenticated()
 						// Solo el Duenio.
 						.requestMatchers("/api/v1/usuarios/**").hasRole("DUENIO")
-						.requestMatchers(HttpMethod.GET, "/api/v1/caja/cierre").hasRole("DUENIO")
+						// Sin metodo a proposito: con HttpMethod.GET, un HEAD no matchea esta regla,
+						// cae en la de empleados y Spring MVC igual ejecuta el handler de GET.
+						.requestMatchers("/api/v1/caja/cierre").hasRole("DUENIO")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/comandas/tarifas/**").hasRole("DUENIO")
 						// Cualquier empleado con la clave ya cambiada.
 						.requestMatchers("/api/**").hasAnyRole(EMPLEADOS)
@@ -126,7 +133,13 @@ public class SecurityConfig {
 
 	@Bean
 	JwtDecoder jwtDecoder(SecretKey jwtSecretKey) {
-		return NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(MacAlgorithm.HS256).build();
+		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(MacAlgorithm.HS256).build();
+		// El validador por defecto revisa exp solo si viene: un token sin vencimiento
+		// valdria para siempre. Se exige el claim ademas de chequearlo.
+		decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+				JwtValidators.createDefault(),
+				new JwtClaimValidator<Instant>(JwtClaimNames.EXP, exp -> exp != null)));
+		return decoder;
 	}
 
 	/** 401 con el mismo contrato {@link ApiErrorResponse} que el resto de los errores. */
