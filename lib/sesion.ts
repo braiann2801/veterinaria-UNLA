@@ -35,6 +35,11 @@ const CLAVE = "veterinaria.sesion"
 let actual: Sesion | null | undefined
 const suscriptores = new Set<() => void>()
 
+/** Un `expiraEn` ilegible cuenta como vencido: `NaN > ahora` es falso. */
+function vigente(sesion: Sesion) {
+  return Date.parse(sesion.expiraEn) > Date.now()
+}
+
 function leer(): Sesion | null {
   if (typeof window === "undefined") return null
   try {
@@ -42,7 +47,7 @@ function leer(): Sesion | null {
     if (!crudo) return null
     const sesion = JSON.parse(crudo) as Sesion
     // Una sesion vencida se descarta aca: el backend igual la rechazaria con 401.
-    if (!sesion?.token || Date.parse(sesion.expiraEn) <= Date.now()) return null
+    if (!sesion?.token || !vigente(sesion)) return null
     return sesion
   } catch {
     return null
@@ -51,8 +56,18 @@ function leer(): Sesion | null {
 
 export function obtenerSesion(): Sesion | null {
   if (actual === undefined) actual = leer()
-  else if (actual && Date.parse(actual.expiraEn) <= Date.now()) actual = null
+  else if (actual && !vigente(actual)) actual = null
   return actual
+}
+
+// Un logout o un login en otra pestaña cambia el storage: se relee para no seguir
+// mandando un token que ya no corresponde.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key !== null && e.key !== CLAVE) return
+    actual = leer()
+    suscriptores.forEach((fn) => fn())
+  })
 }
 
 export function guardarSesion(sesion: Sesion) {

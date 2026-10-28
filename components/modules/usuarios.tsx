@@ -67,9 +67,14 @@ export function Usuarios() {
     setError(null)
     try {
       setClave(await apiUsuarios.resetearPassword(u.id))
-      await lista.recargar()
     } catch (e) {
       setError(textoError(e, "No se pudo resetear la contraseña"))
+      setOcupado(null)
+      return
+    }
+    // La clave ya se mostró: si la recarga de la lista falla, no es un error del reset.
+    try {
+      await lista.recargar()
     } finally {
       setOcupado(null)
     }
@@ -128,10 +133,14 @@ export function Usuarios() {
                       <Pencil className="size-3.5" aria-hidden />
                       Editar
                     </button>
-                    <button className={BOTON_FILA} onClick={() => resetear(u)} disabled={ocupado === u.id}>
-                      <KeyRound className="size-3.5" aria-hidden />
-                      Resetear clave
-                    </button>
+                    {/* Resetear la propia cuenta cerraría esta sesión antes de poder leer la
+                        clave temporal: para el Dueño logueado no se ofrece. */}
+                    {!soyYo && (
+                      <button className={BOTON_FILA} onClick={() => resetear(u)} disabled={ocupado === u.id}>
+                        <KeyRound className="size-3.5" aria-hidden />
+                        Resetear clave
+                      </button>
+                    )}
                     {!soyYo && (
                       <button className={BOTON_FILA} onClick={() => alternarActivo(u)} disabled={ocupado === u.id}>
                         <Power className="size-3.5" aria-hidden />
