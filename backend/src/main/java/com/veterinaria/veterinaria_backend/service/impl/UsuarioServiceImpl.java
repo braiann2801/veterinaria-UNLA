@@ -115,6 +115,19 @@ public class UsuarioServiceImpl implements UsuarioService {
 		return new UsuarioConClaveTemporalDTO(mapper.toResponse(usuarioRepository.save(usuario)), temporal);
 	}
 
+	@Override
+	@Transactional
+	public void eliminar(Long id, Long solicitanteId) {
+		Usuario usuario = buscar(id);
+		if (usuario.getId().equals(solicitanteId)) {
+			throw new BusinessConflictException("No se puede eliminar la propia cuenta");
+		}
+		if (usuario.getRol() == Usuario.Rol.DUENIO && usuario.isActivo()) {
+			exigirOtroDuenioActivo("eliminarlo");
+		}
+		usuarioRepository.delete(usuario);
+	}
+
 	private void exigirOtroDuenioActivo(String accion) {
 		if (usuarioRepository.countByRolAndActivoTrue(Usuario.Rol.DUENIO) <= 1) {
 			throw new BusinessConflictException(

@@ -19,4 +19,7 @@ public interface UsuarioService {
 	UsuarioResponseDTO cambiarActivo(Long id, boolean activo, Long solicitanteId);
 
 	UsuarioConClaveTemporalDTO resetearPassword(Long id);
+
+	/** Borra la cuenta. Su sesion abierta cae en el siguiente request (el usuario ya no existe). */
+	void eliminar(Long id, Long solicitanteId);
 }

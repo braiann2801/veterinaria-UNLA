@@ -693,6 +693,7 @@ export const usuarios = {
     put<UsuarioSesion>(`/usuarios/${id}`, datos),
   cambiarActivo: (id: number, activo: boolean) => put<UsuarioSesion>(`/usuarios/${id}/activo`, { activo }),
   resetearPassword: (id: number) => post<UsuarioConClaveTemporal>(`/usuarios/${id}/reset-password`),
+  eliminar: (id: number) => del<void>(`/usuarios/${id}`),
 }
 
 // ----------------------------------------------------------------- helpers

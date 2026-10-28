@@ -7,14 +7,14 @@
  * se muestra <b>una sola vez</b> para dictársela al empleado, y la cuenta queda
  * con cambio obligatorio en el primer ingreso.</p>
  *
- * <p>Cambiar el rol, desactivar o resetear cierra al instante la sesión abierta
- * de ese empleado. El backend rechaza (409) desactivarse a uno mismo y dejar el
- * sistema sin un Dueño activo; la UI esconde esas acciones, pero la regla es la
- * del servidor.</p>
+ * <p>Cambiar el rol, desactivar, resetear o eliminar cierra al instante la sesión
+ * abierta de ese empleado. El backend rechaza (409) desactivarse o eliminarse a
+ * uno mismo y dejar el sistema sin un Dueño activo; la UI esconde esas acciones,
+ * pero la regla es la del servidor.</p>
  */
 
 import { useState } from "react"
-import { KeyRound, Pencil, Power, UserPlus } from "lucide-react"
+import { KeyRound, Pencil, Power, Trash2, UserPlus } from "lucide-react"
 
 import { ApiError, usuarios as apiUsuarios, type UsuarioConClaveTemporal } from "@/lib/api"
 import { useAuth, rolDeUi } from "@/lib/auth"
@@ -75,6 +75,20 @@ export function Usuarios() {
     // La clave ya se mostró: si la recarga de la lista falla, no es un error del reset.
     try {
       await lista.recargar()
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  async function eliminar(u: UsuarioSesion) {
+    if (!window.confirm(`¿Eliminar definitivamente la cuenta de ${u.nombreCompleto} (${u.username})? No se puede deshacer.`)) return
+    setOcupado(u.id)
+    setError(null)
+    try {
+      await apiUsuarios.eliminar(u.id)
+      await lista.recargar()
+    } catch (e) {
+      setError(textoError(e, "No se pudo eliminar la cuenta"))
     } finally {
       setOcupado(null)
     }
@@ -145,6 +159,16 @@ export function Usuarios() {
                       <button className={BOTON_FILA} onClick={() => alternarActivo(u)} disabled={ocupado === u.id}>
                         <Power className="size-3.5" aria-hidden />
                         {u.activo ? "Desactivar" : "Reactivar"}
+                      </button>
+                    )}
+                    {!soyYo && (
+                      <button
+                        className={cn(BOTON_FILA, "border-destructive/40 text-destructive hover:bg-destructive/10")}
+                        onClick={() => eliminar(u)}
+                        disabled={ocupado === u.id}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden />
+                        Eliminar
                       </button>
                     )}
                   </div>

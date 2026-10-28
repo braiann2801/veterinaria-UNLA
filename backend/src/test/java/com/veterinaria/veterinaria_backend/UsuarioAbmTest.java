@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -225,6 +226,54 @@ class UsuarioAbmTest {
 				.andExpect(status().isConflict());
 		assertThat(usuarioRepository.findById(jefa.getId()).orElseThrow().isActivo()).isTrue();
 		assertThat(usuarioRepository.findById(jefa.getId()).orElseThrow().getRol()).isEqualTo(Usuario.Rol.DUENIO);
+	}
+
+	@Test
+	@DisplayName("Eliminar un empleado borra la cuenta, corta su sesion y bloquea el login")
+	void eliminarEmpleado() throws Exception {
+		crear("jefa", Usuario.Rol.DUENIO);
+		Usuario emp = crear("emp", Usuario.Rol.GUARDERIA);
+		String auth = bearer("jefa");
+		String sesionEmp = bearer("emp");
+
+		mockMvc.perform(delete("/api/v1/usuarios/" + emp.getId()).header(HttpHeaders.AUTHORIZATION, auth))
+				.andExpect(status().isNoContent());
+
+		assertThat(usuarioRepository.findById(emp.getId())).isEmpty();
+		mockMvc.perform(get("/api/v1/tutores").header(HttpHeaders.AUTHORIZATION, sesionEmp))
+				.andExpect(status().isUnauthorized());
+		assertThat(login("emp", CLAVE).getResponse().getStatus()).isEqualTo(401);
+		mockMvc.perform(get("/api/v1/usuarios").header(HttpHeaders.AUTHORIZATION, auth))
+				.andExpect(jsonPath("$[?(@.username == 'emp')]").isEmpty());
+	}
+
+	@Test
+	@DisplayName("No se puede eliminar la propia cuenta ni al ultimo Duenio activo")
+	void eliminarConGuardas() throws Exception {
+		Usuario jefa = crear("jefa", Usuario.Rol.DUENIO);
+		unicoDuenio(jefa);
+		String auth = bearer("jefa");
+
+		mockMvc.perform(delete("/api/v1/usuarios/" + jefa.getId()).header(HttpHeaders.AUTHORIZATION, auth))
+				.andExpect(status().isConflict());
+		assertThat(usuarioRepository.findById(jefa.getId())).isPresent();
+
+		// Con otro Duenio activo se lo puede eliminar a el, pero sigue sin poder eliminarse a si misma.
+		Usuario socio = crear("socio", Usuario.Rol.DUENIO);
+		mockMvc.perform(delete("/api/v1/usuarios/" + socio.getId()).header(HttpHeaders.AUTHORIZATION, auth))
+				.andExpect(status().isNoContent());
+		mockMvc.perform(delete("/api/v1/usuarios/999999").header(HttpHeaders.AUTHORIZATION, auth))
+				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("Un empleado no puede eliminar cuentas (403)")
+	void eliminarSinSerDuenio() throws Exception {
+		Usuario victima = crear("victima", Usuario.Rol.RECEPCION);
+		crear("recep", Usuario.Rol.RECEPCION);
+		mockMvc.perform(delete("/api/v1/usuarios/" + victima.getId()).header(HttpHeaders.AUTHORIZATION, bearer("recep")))
+				.andExpect(status().isForbidden());
+		assertThat(usuarioRepository.findById(victima.getId())).isPresent();
 	}
 
 	@Test
