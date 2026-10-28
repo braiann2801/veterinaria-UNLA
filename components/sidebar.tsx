@@ -24,6 +24,7 @@ import {
   LogOut,
   Menu,
   Stethoscope,
+  UserCog,
   Users,
   Wallet,
   X,
@@ -42,6 +43,10 @@ export type TabId =
   | "balance"
   | "egreso"
   | "fichas"
+  | "usuarios"
+
+/** Guardería ve lo mismo que Recepción (S3 de `odd/tasks/autenticacion.md`). */
+const EMPLEADOS: Role[] = ["recepcion", "veterinario", "duenio", "guarderia"]
 
 type TabDef = {
   id: TabId
@@ -69,22 +74,24 @@ type TabDef = {
  * los dos veían la misma lista en distinto orden (Agenda antes que Padrón).</p>
  */
 export const TABS: TabDef[] = [
-  { id: "mostrador", label: "Mostrador", icon: LayoutDashboard, roles: ["recepcion", "veterinario", "duenio"] },
-  { id: "padron", label: "Padrón", icon: Users, roles: ["recepcion", "veterinario", "duenio"] },
+  { id: "mostrador", label: "Mostrador", icon: LayoutDashboard, roles: EMPLEADOS },
+  { id: "padron", label: "Padrón", icon: Users, roles: EMPLEADOS },
   // El veterinario entra al Padron para consultar de quien es cada paciente antes
   // de firmar una ficha clinica. Sin este rol la pestana le era invisible y se
   // quedaba sin forma de resolver el DNI de una emergencia.
-  { id: "agenda", label: "Agenda", icon: CalendarDays, roles: ["recepcion", "veterinario", "duenio"] },
-  { id: "consultas", label: "Ficha médica", icon: Stethoscope, roles: ["recepcion", "veterinario", "duenio"] },
+  { id: "agenda", label: "Agenda", icon: CalendarDays, roles: EMPLEADOS },
+  { id: "consultas", label: "Ficha médica", icon: Stethoscope, roles: EMPLEADOS },
   // El veterinario entra a Caja: cobra, ve quien debe y genera la comanda. Lo que
   // no debe ver es el balance, y ese no esta en esta pestana (ver `balance`).
-  { id: "cobros", label: "Caja", icon: Wallet, roles: ["recepcion", "veterinario", "duenio"] },
+  { id: "cobros", label: "Caja", icon: Wallet, roles: EMPLEADOS },
   // Recepcion entra al Historial: es quien recibe al paciente de vuelta y necesita
   // leerle al dueno como venia el animal antes de devolverlo.
-  { id: "fichas", label: "Historial", icon: FileText, roles: ["recepcion", "veterinario", "duenio"] },
+  { id: "fichas", label: "Historial", icon: FileText, roles: EMPLEADOS },
   // Unico modulo que no ven ni Recepcion ni Veterinario.
   { id: "balance", label: "Balance", icon: ClipboardList, roles: ["duenio"] },
-  { id: "egreso", label: "Egreso", icon: LogOut, roles: ["recepcion", "veterinario", "duenio"] },
+  // ABM de cuentas: solo el Dueño (el backend responde 403 al resto).
+  { id: "usuarios", label: "Usuarios", icon: UserCog, roles: ["duenio"] },
+  { id: "egreso", label: "Egreso", icon: LogOut, roles: EMPLEADOS },
 ]
 
 /** Módulos visibles en la barra inferior del móvil. */

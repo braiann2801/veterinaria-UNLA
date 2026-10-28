@@ -1,12 +1,14 @@
 "use client"
 
 /**
- * Estado de sesión global (rol + búsqueda del TopBar).
+ * Estado de UI compartido entre pantallas (búsqueda del TopBar).
  *
  * <p>Este store nació como un mock en memoria con perros, tutores, turnos,
  * reservas y pagos de juguete. Ese mundo de datos ya no existe: todo el dato
- * operativo se lee y escribe contra la API Spring Boot (`lib/api.ts`), y acá
- * solo queda el estado de UI compartido entre pantallas.</p>
+ * operativo se lee y escribe contra la API Spring Boot (`lib/api.ts`).</p>
+ *
+ * <p>El rol tampoco vive acá: antes se elegía con un selector y cualquiera podía
+ * ponerse "Dueño". Ahora sale del usuario logueado (`lib/auth.tsx`).</p>
  */
 
 import {
@@ -17,17 +19,16 @@ import {
   type ReactNode,
 } from "react"
 
-export type Role = "recepcion" | "veterinario" | "duenio"
+export type Role = "recepcion" | "veterinario" | "duenio" | "guarderia"
 
 export const roleLabels: Record<Role, string> = {
   recepcion: "Recepción",
   veterinario: "Veterinario",
   duenio: "Dueño",
+  guarderia: "Guardería",
 }
 
 type Store = {
-  role: Role
-  setRole: (role: Role) => void
   query: string
   setQuery: (query: string) => void
 }
@@ -35,13 +36,9 @@ type Store = {
 const StoreContext = createContext<Store | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>("recepcion")
   const [query, setQuery] = useState("")
 
-  const value = useMemo<Store>(
-    () => ({ role, setRole, query, setQuery }),
-    [role, query],
-  )
+  const value = useMemo<Store>(() => ({ query, setQuery }), [query])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

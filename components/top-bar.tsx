@@ -1,7 +1,11 @@
 "use client"
 
 /**
- * Barra superior: busqueda global y selector de rol.
+ * Barra superior: busqueda global y usuario logueado.
+ *
+ * <p>Antes tenia un selector "Usuario" para elegir el rol, que dejaba a
+ * cualquiera ver el Balance. Ahora muestra quien esta logueado y permite cerrar
+ * la sesion; el rol sale del login (`lib/auth.tsx`).</p>
  *
  * <p>La busqueda leia del store en memoria y por eso solo encontraba los datos
  * semilla. Con el alta unificada del mostrador, un cliente recien cargado no
@@ -17,19 +21,28 @@
  */
 
 import { useMemo } from "react"
-import { FileText, Loader2, Search } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { FileText, Loader2, LogOut, Search } from "lucide-react"
 
 import { tutores as apiTutores } from "@/lib/api"
 import type { MascotaVinculada, Tutor } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
-import { useStore, roleLabels, type Role } from "@/lib/store"
+import { useAuth } from "@/lib/auth"
+import { useStore, roleLabels } from "@/lib/store"
 
 export function TopBar({
   onVerFichas,
 }: {
   onVerFichas: (mascotaId: number) => void
 }) {
-  const { query, setQuery, role, setRole } = useStore()
+  const { query, setQuery } = useStore()
+  const { usuario, role, logout } = useAuth()
+  const router = useRouter()
+
+  const salir = () => {
+    logout()
+    router.replace("/login")
+  }
 
   // El texto sigue siendo del store para no duplicar el filtro del Historial.
   const tutores = useApi<Tutor[]>(() => apiTutores.listar())
@@ -113,21 +126,22 @@ export function TopBar({
       </div>
 
       <div className="ml-auto flex items-center gap-2 md:col-start-3 md:row-start-1 md:ml-0 md:justify-self-end">
-        <label htmlFor="selector-rol" className="hidden text-xs text-muted-foreground sm:inline">
-          Usuario
-        </label>
-        <select
-          id="selector-rol"
-          value={role}
-          onChange={(e) => setRole(e.target.value as Role)}
-          className="min-h-[44px] rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
+        {usuario && role && (
+          <div className="hidden min-w-0 flex-col items-end leading-tight sm:flex">
+            <span className="max-w-[12rem] truncate text-sm font-medium">{usuario.nombreCompleto}</span>
+            <span className="text-xs text-muted-foreground">{roleLabels[role]}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={salir}
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-xl border border-input bg-background px-3 text-sm transition-colors hover:bg-muted"
         >
-          {(Object.keys(roleLabels) as Role[]).map((r) => (
-            <option key={r} value={r}>
-              {roleLabels[r]}
-            </option>
-          ))}
-        </select>
+          <LogOut className="h-4 w-4" aria-hidden />
+          <span className="hidden md:inline">Salir</span>
+        </button>
       </div>
     </header>
   )

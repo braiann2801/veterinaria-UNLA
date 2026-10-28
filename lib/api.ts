@@ -10,6 +10,8 @@
  * lugar de fallar en runtime con `undefined`.
  */
 
+import { borrarSesion, obtenerSesion, type RolApi, type Sesion, type UsuarioSesion } from "@/lib/sesion"
+
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1"
 
@@ -55,6 +57,16 @@ export class ApiError extends Error {
   get esServidor(): boolean {
     return this.status >= 500 || this.status === 0
   }
+
+  /** 401: no hay sesion valida (o, en el login, usuario o clave incorrectos). */
+  get esNoAutenticado(): boolean {
+    return this.status === 401
+  }
+
+  /** 403: el rol del usuario no tiene permiso para esa accion. */
+  get esProhibido(): boolean {
+    return this.status === 403
+  }
 }
 
 /**
@@ -81,8 +93,23 @@ interface ApiErrorBody {
   ruta?: string
 }
 
+/**
+ * Un 401 en cualquier endpoint que no sea el login significa que la sesion ya no
+ * vale (vencio, la desactivaron o le cambiaron el rol): se limpia y se manda al
+ * login. El login en si devuelve 401 por clave incorrecta, y ese error lo tiene
+ * que mostrar el formulario, no redirigir.
+ */
+function sesionCaducada(path: string) {
+  if (path === "/auth/login") return
+  borrarSesion()
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.assign("/login?motivo=sesion")
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`
+  const token = obtenerSesion()?.token
 
   let respuesta: Response
   try {
@@ -91,6 +118,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
       // El backend es el estado de verdad: la cache del navegador solo sirve
@@ -102,6 +130,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!respuesta.ok) {
+    if (respuesta.status === 401) sesionCaducada(path)
     let cuerpo: ApiErrorBody = {}
     try {
       cuerpo = (await respuesta.json()) as ApiErrorBody
@@ -636,6 +665,34 @@ export const egreso = {
    */
   pacientesDelDia: (fecha?: string) =>
     get<MascotaDelDia[]>(`/egreso/pacientes-hoy?${query({ fecha })}`),
+}
+
+// -------------------------------------------------------------------- auth
+
+export const auth = {
+  login: (username: string, password: string) => post<Sesion>("/auth/login", { username, password }),
+  me: () => get<UsuarioSesion>("/auth/me"),
+  /** Devuelve una sesion nueva: el cambio de clave invalida el token anterior. */
+  cambiarPassword: (actual: string, nueva: string) => post<Sesion>("/auth/cambiar-password", { actual, nueva }),
+}
+
+// ---------------------------------------------------------------- usuarios
+
+/** Alta y reset: la clave temporal viaja una sola vez y no se puede volver a pedir. */
+export interface UsuarioConClaveTemporal {
+  usuario: UsuarioSesion
+  passwordTemporal: string
+}
+
+/** ABM de cuentas. Solo el Dueño: el backend responde 403 al resto. */
+export const usuarios = {
+  listar: () => get<UsuarioSesion[]>("/usuarios"),
+  crear: (datos: { username: string; nombreCompleto: string; rol: RolApi }) =>
+    post<UsuarioConClaveTemporal>("/usuarios", datos),
+  actualizar: (id: number, datos: { nombreCompleto: string; rol: RolApi }) =>
+    put<UsuarioSesion>(`/usuarios/${id}`, datos),
+  cambiarActivo: (id: number, activo: boolean) => put<UsuarioSesion>(`/usuarios/${id}/activo`, { activo }),
+  resetearPassword: (id: number) => post<UsuarioConClaveTemporal>(`/usuarios/${id}/reset-password`),
 }
 
 // ----------------------------------------------------------------- helpers

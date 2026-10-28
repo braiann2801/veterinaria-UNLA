@@ -1,19 +1,23 @@
 "use client"
 
 /**
- * Shell del MVP 1.
+ * Shell del sistema interno (`/app`). La landing pública vive en `/`.
  *
  * Todas las pantallas leen la base real, incluido el tablero de movimiento del
- * Mostrador (ya no importa nada de `lib/store.tsx`). El store quedó solo con el
- * estado de sesión: rol y búsqueda del TopBar.
+ * Mostrador (ya no importa nada de `lib/store.tsx`). El rol sale del usuario
+ * logueado (`lib/auth.tsx`); el store solo guarda la búsqueda del TopBar.
  *
  * Los dos modales del Mostrador (Cargar cliente y Agregar turno) persisten contra
  * la API. El Balance lee el cierre real en `GET /api/v1/caja/cierre`.
  */
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
-import { StoreProvider, useStore } from "@/lib/store"
+import { useAuth } from "@/lib/auth"
+import { StoreProvider, type Role } from "@/lib/store"
+import { Cargando } from "@/lib/vista"
+import { CambiarPassword } from "@/components/cambiar-password"
 import { Sidebar, TABS, type TabId } from "@/components/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Agenda } from "@/components/modules/agenda"
@@ -25,9 +29,9 @@ import { Fichas } from "@/components/modules/fichas"
 import { Mostrador } from "@/components/modules/mostrador"
 import { Padron } from "@/components/modules/padron"
 import { Profesionales } from "@/components/modules/profesionales"
+import { Usuarios } from "@/components/modules/usuarios"
 
-function Shell() {
-  const { role } = useStore()
+function Shell({ role }: { role: Role }) {
   const [active, setActive] = useState<TabId>("mostrador")
   const [fichaMascotaId, setFichaMascotaId] = useState<number | null>(null)
 
@@ -79,6 +83,7 @@ function Shell() {
                 en Caja: un veterinario que cobra no esta mirando el balance del
                 dia, solo las comandas que tiene delante. */}
             {active === "balance" && esDuenio && <Balance />}
+            {active === "usuarios" && esDuenio && <Usuarios />}
           </div>
         </main>
       </div>
@@ -86,10 +91,36 @@ function Shell() {
   )
 }
 
+/**
+ * Puerta de entrada al sistema.
+ *
+ * Sin sesion se va al login; con el cambio de clave pendiente solo se muestra el
+ * formulario de cambio (el backend igual responde 403 a todo lo demas). La
+ * guarda es comodidad de UI: la proteccion real es que la API exige token.
+ */
 export default function Page() {
+  const { listo, sesion, role } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (listo && !sesion) router.replace("/login")
+  }, [listo, sesion, router])
+
+  if (!listo || !sesion || !role) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <Cargando texto="Verificando sesión" />
+      </div>
+    )
+  }
+
+  if (sesion.usuario.debeCambiarPassword) {
+    return <CambiarPassword />
+  }
+
   return (
     <StoreProvider>
-      <Shell />
+      <Shell role={role} />
     </StoreProvider>
   )
 }
