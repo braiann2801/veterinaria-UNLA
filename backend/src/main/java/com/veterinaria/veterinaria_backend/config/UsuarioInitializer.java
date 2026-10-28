@@ -21,10 +21,10 @@ import com.veterinaria.veterinaria_backend.service.impl.AuthServiceImpl;
  * cambiarla, el resto de la API responde 403 hasta entonces.</p>
  *
  * <p>Idempotente, como {@link DataInitializer}: con un Duenio activo no hace
- * nada. Si el usuario configurado ya existe (desactivado), se reactiva como
- * Duenio con la clave por defecto en vez de chocar contra el UNIQUE del
- * username. El ABM impide desactivar al ultimo Duenio, asi que esto solo pasa
- * si alguien lo toco a mano en la base.</p>
+ * nada. Si el usuario configurado ya existe como Duenio desactivado, se
+ * reactiva con la clave por defecto en vez de chocar contra el UNIQUE del
+ * username; si es la cuenta de otro rol, no se toca. El ABM impide desactivar
+ * al ultimo Duenio, asi que esto solo pasa si alguien toco la base a mano.</p>
  */
 @Component
 public class UsuarioInitializer implements CommandLineRunner {
@@ -61,6 +61,13 @@ public class UsuarioInitializer implements CommandLineRunner {
 			return 0;
 		}
 		Usuario duenio = usuarioRepository.findByUsername(username).orElseGet(Usuario::new);
+		// Una cuenta de empleado que casualmente se llama igual no se promueve a
+		// Duenio con la clave por defecto: eso le daria el control a quien la use.
+		if (duenio.getId() != null && duenio.getRol() != Usuario.Rol.DUENIO) {
+			log.error("No hay Duenio activo y el usuario '{}' pertenece a una cuenta {}: no se siembra. "
+					+ "Definir OWNER_USERNAME con un usuario libre y reiniciar.", username, duenio.getRol());
+			return 0;
+		}
 		duenio.setUsername(username);
 		if (duenio.getNombreCompleto() == null) {
 			duenio.setNombreCompleto("Dueño");

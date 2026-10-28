@@ -1,5 +1,6 @@
 package com.veterinaria.veterinaria_backend.service.impl;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -72,6 +73,11 @@ public class AuthServiceImpl implements AuthService {
 		}
 		if (request.actual().equals(request.nueva())) {
 			throw new BadRequestException("La contraseña nueva tiene que ser distinta de la actual");
+		}
+		// @Size cuenta caracteres; BCrypt corta en 72 bytes. Con acentos o ñ una
+		// clave de menos de 72 caracteres puede pasar ese limite y perder el final.
+		if (request.nueva().getBytes(StandardCharsets.UTF_8).length > 72) {
+			throw new BadRequestException("La contraseña nueva es demasiado larga");
 		}
 		usuario.setPasswordHash(passwordEncoder.encode(request.nueva()));
 		usuario.setDebeCambiarPassword(false);
