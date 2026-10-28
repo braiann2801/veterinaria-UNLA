@@ -6,11 +6,14 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** Endurecimiento del backend pendiente de commit —
-  (a) handler 404 para rutas inexistentes (`GlobalExceptionHandler.java`),
-  (b) CORS: método `PATCH` habilitado en `CorsConfig.java`. Ambos cambios
-  **sin commitear**, pendientes de confirmación del Dueño.
-- **Base Git:** `548124e` (Docker + health check raíz, commiteadas).
+- **Fase en curso:** Mantenimiento — tablero Kaban (`.kaban/`) con los
+  pendientes priorizados.
+- **Base Git:** `29b5a5e` (handler 404 en `e9d837a` y CORS con `PATCH` en
+  `29b5a5e`, ambos commiteados) + `CLAUDE.md`.
+- **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
+  reescriba `AGENTS.md`.
+- **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
+  `./mvnw` corre en macOS/Linux sin `chmod`.
 - **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
   165 tests de Spring Boot, 0 fallos).
 
@@ -101,10 +104,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 5. **Regla del huérfano (nueva, inviolable):** al borrar un tutor, una mascota
    sin otros tutores se elimina con él; si tiene historial clínico/contable, el
    borrado completo aborta con 409 (única transacción).
-6. **Docker sin verificar en este equipo:** no hay Docker instalado localmente;
-   el YAML quedó validado estáticamente pero `docker compose build`/`up` debe
-   correrse en una máquina con Docker. Antes del `up`: detener MySQL de XAMPP o
-   subir `DB_PORT=3307` en `.env` (colisión del puerto 3306).
+6. **`docker compose up` sin verificar end-to-end:** el YAML quedó validado
+   estáticamente. En macOS ya se probó un MySQL 8 en contenedor (puerto 3307)
+   con backend y frontend locales, pero falta el `compose up --build`
+   completo. Antes del `up`: detener el MySQL local o subir `DB_PORT=3307` en
+   `.env` (colisión del puerto 3306).
 7. **MySQL de XAMPP es frágil:** si el harness falla con ~160 errores de
    `ApplicationContext` (Caused by: `Communications link failure` /
    `Connection refused` en 3306), no es el código: MySQL se cayó. Reiniciar
