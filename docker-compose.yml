@@ -58,6 +58,15 @@ services:
       DB_PORT: 3306
       DB_USERNAME: root
       DB_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Definir MYSQL_ROOT_PASSWORD en .env}"
+      # Firma de los tokens de sesion (HS256, minimo 32 caracteres). Obligatoria:
+      # sin ella el backend usaria una clave aleatoria y cada reinicio cerraria
+      # todas las sesiones. Generar con: openssl rand -base64 48
+      JWT_SECRET: "${JWT_SECRET:?Definir JWT_SECRET en .env (minimo 32 caracteres)}"
+      # Cuenta inicial del Dueno: se crea solo si no hay ningun Dueno activo y
+      # nace con cambio de contrasena obligatorio. Obligatoria para no exponer
+      # en la red la clave por defecto del codigo.
+      OWNER_USERNAME: "${OWNER_USERNAME:-duenio}"
+      OWNER_PASSWORD: "${OWNER_PASSWORD:?Definir OWNER_PASSWORD en .env (clave inicial del Dueno)}"
     ports:
       - "8080:8080"
     depends_on:
