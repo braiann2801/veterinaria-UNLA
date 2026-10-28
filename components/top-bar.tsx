@@ -20,9 +20,11 @@
  * request por tecla.</p>
  */
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Loader2, LogOut, Search } from "lucide-react"
+import { FileText, KeyRound, Loader2, LogOut, Search } from "lucide-react"
+
+import { ModalCambiarPassword } from "@/components/cambiar-password"
 
 import { tutores as apiTutores } from "@/lib/api"
 import type { MascotaVinculada, Tutor } from "@/lib/api"
@@ -38,6 +40,7 @@ export function TopBar({
   const { query, setQuery } = useStore()
   const { usuario, role, logout } = useAuth()
   const router = useRouter()
+  const [cambiandoClave, setCambiandoClave] = useState(false)
 
   const salir = () => {
     logout()
@@ -132,6 +135,16 @@ export function TopBar({
             <span className="text-xs text-muted-foreground">{roleLabels[role]}</span>
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => setCambiandoClave(true)}
+          aria-label="Cambiar contraseña"
+          title="Cambiar contraseña"
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-input bg-background px-3 text-sm transition-colors hover:bg-muted"
+        >
+          <KeyRound className="h-4 w-4" aria-hidden />
+        </button>
+        <ModalCambiarPassword open={cambiandoClave} onClose={() => setCambiandoClave(false)} />
         <button
           type="button"
           onClick={salir}
