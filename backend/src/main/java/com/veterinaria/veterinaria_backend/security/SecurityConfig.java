@@ -2,10 +2,13 @@ package com.veterinaria.veterinaria_backend.security;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,6 +52,8 @@ import tools.jackson.databind.ObjectMapper;
 @Configuration
 public class SecurityConfig {
 
+	private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
 	private static final String[] EMPLEADOS = { "DUENIO", "VETERINARIO", "RECEPCION", "GUARDERIA" };
 
 	@Bean
@@ -88,8 +93,23 @@ public class SecurityConfig {
 		return new BCryptPasswordEncoder();
 	}
 
+	/**
+	 * Clave HS256 de firma.
+	 *
+	 * <p>Nunca hay un valor por defecto en el codigo: un secreto publicado en el
+	 * repositorio dejaria a cualquiera fabricar un token de Duenio. Sin
+	 * {@code JWT_SECRET} se genera una clave aleatoria en cada arranque: sirve
+	 * para desarrollo, pero cada reinicio cierra todas las sesiones, por eso en
+	 * produccion se define por entorno.</p>
+	 */
 	@Bean
-	SecretKey jwtSecretKey(@Value("${veterinaria.auth.jwt-secret:dev-solo-local-cambiar-en-produccion-0123456789}") String secreto) {
+	public SecretKey jwtSecretKey(@Value("${veterinaria.auth.jwt-secret:}") String secreto) {
+		if (secreto == null || secreto.isBlank()) {
+			byte[] aleatoria = new byte[32];
+			new SecureRandom().nextBytes(aleatoria);
+			log.warn("JWT_SECRET no esta definida: se usa una clave aleatoria y las sesiones se pierden al reiniciar.");
+			return new SecretKeySpec(aleatoria, "HmacSHA256");
+		}
 		byte[] bytes = secreto.getBytes(StandardCharsets.UTF_8);
 		// HS256 exige una clave de al menos 256 bits. Se corta el arranque en vez
 		// de emitir tokens con una clave adivinable.
