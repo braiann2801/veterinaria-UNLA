@@ -583,6 +583,9 @@ export interface ProfesionalInput {
 export const profesionales = {
   listar: () => get<Profesional[]>("/profesionales"),
   crear: (body: ProfesionalInput) => post<Profesional>("/profesionales", body),
+  actualizar: (id: number, body: ProfesionalInput) => put<Profesional>(`/profesionales/${id}`, body),
+  /** 409 si el profesional tiene turnos o consultas registrados. */
+  eliminar: (id: number) => del<void>(`/profesionales/${id}`),
 }
 
 // ----------------------------------------------------------------- turnos
