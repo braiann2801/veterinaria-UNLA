@@ -23,6 +23,7 @@ import { useApi } from "@/lib/use-api"
 import { Panel, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { Paginado } from "@/components/ui/paginado"
 
 export function Profesionales() {
   const lista = useApi<Profesional[]>(() => apiProfesionales.listar())
@@ -48,8 +49,10 @@ export function Profesionales() {
         onReintentar={lista.recargar}
       >
         {(datos) => (
+          <Paginado items={datos} clave="profesionales">
+          {(pagina) => (
           <ul className="flex flex-col divide-y divide-border">
-            {datos.map((p) => (
+            {pagina.map((p) => (
               <li key={p.id} className="flex flex-col gap-1 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm font-medium">{p.nombreCompleto}</p>
@@ -71,6 +74,8 @@ export function Profesionales() {
               </li>
             ))}
           </ul>
+          )}
+          </Paginado>
         )}
       </Recurso>
 

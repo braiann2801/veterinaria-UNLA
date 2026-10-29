@@ -26,6 +26,7 @@ import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { Paginado } from "@/components/ui/paginado"
 import { AltaMascota, CONDUCTAS, ESPECIES } from "@/components/modules/alta-mascota"
 
 /** Botón de acción de fila (editar/eliminar): cuadrado táctil de 44 px (regla 3.4). */
@@ -88,8 +89,10 @@ export function Padron() {
           textoVacio="Todavía no hay tutores cargados"
         >
           {(lista) => (
+            <Paginado items={lista} clave="padron-tutores">
+            {(pagina) => (
             <ul className="flex flex-col divide-y divide-border">
-              {lista.map((t) => (
+              {pagina.map((t) => (
                 <li key={t.id} className="flex items-center gap-2 py-2">
                   <button
                     onClick={() => setSeleccion(t)}
@@ -123,6 +126,8 @@ export function Padron() {
                 </li>
               ))}
             </ul>
+            )}
+            </Paginado>
           )}
         </Recurso>
       </Panel>
@@ -134,8 +139,10 @@ export function Padron() {
           textoVacio="Todavía no hay mascotas cargadas"
         >
           {(lista) => (
+            <Paginado items={lista} clave="padron-mascotas">
+            {(pagina) => (
             <ul className="flex flex-col divide-y divide-border">
-              {lista.map((m) => (
+              {pagina.map((m) => (
                 <li key={m.id} className="flex flex-col gap-2 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -189,6 +196,8 @@ export function Padron() {
                 </li>
               ))}
             </ul>
+            )}
+            </Paginado>
           )}
         </Recurso>
       </Panel>

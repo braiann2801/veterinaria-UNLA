@@ -28,6 +28,7 @@ import { useApi } from "@/lib/use-api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
+import { Paginado } from "@/components/ui/paginado"
 
 const CONDUCTAS: { valor: ConductaObservada; etiqueta: string }[] = [
   { valor: "TRANQUILO", etiqueta: "Tranquilo" },
@@ -352,8 +353,10 @@ export function FichaMedica() {
             textoVacio="Esta mascota todavía no tiene fichas"
           >
             {(lista) => (
+              <Paginado items={lista} clave="ficha-historial" reiniciarCon={mascotaId}>
+              {(pagina) => (
               <ul className="flex flex-col divide-y divide-border">
-                {lista.map((f) => (
+                {pagina.map((f) => (
                   <li key={f.id} className="flex flex-col gap-1 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">
@@ -378,6 +381,8 @@ export function FichaMedica() {
                   </li>
                 ))}
               </ul>
+              )}
+              </Paginado>
             )}
           </Recurso>
         </Panel>

@@ -24,6 +24,7 @@ import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Field, Panel, Select, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { Paginado } from "@/components/ui/paginado"
 import { cn } from "@/lib/utils"
 
 const ROLES: RolApi[] = ["DUENIO", "VETERINARIO", "RECEPCION", "GUARDERIA"]
@@ -119,8 +120,10 @@ export function Usuarios() {
         onReintentar={lista.recargar}
       >
         {(datos) => (
+          <Paginado items={datos} clave="usuarios">
+          {(pagina) => (
           <ul className="flex flex-col divide-y divide-border">
-            {datos.map((u) => {
+            {pagina.map((u) => {
               const soyYo = u.id === yo?.id
               return (
                 <li key={u.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -176,6 +179,8 @@ export function Usuarios() {
               )
             })}
           </ul>
+          )}
+          </Paginado>
         )}
       </Recurso>
 
