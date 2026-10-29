@@ -97,6 +97,8 @@ export function CargarClienteModal({
   const [autorizado, setAutorizado] = useState(true)
   const [cotutorId, setCotutorId] = useState<string>("")
   const [padron, setPadron] = useState<Tutor[]>([])
+  // La lista vacía sola no distingue "todavía no hay tutores" de "falló el GET".
+  const [estadoPadron, setEstadoPadron] = useState<"cargando" | "listo" | "error">("cargando")
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -114,15 +116,20 @@ export function CargarClienteModal({
     let vigente = true
     setError(null)
     setExito(null)
+    setEstadoPadron("cargando")
     apiTutores
       .listar()
       .then((lista) => {
-        if (vigente) setPadron(lista)
+        if (!vigente) return
+        setPadron(lista)
+        setEstadoPadron("listo")
       })
       .catch(() => {
         // El cotutor es opcional: si el padrón no carga, el alta igual tiene que
         // poder hacerse con el tutor principal. Se avisa abajo.
-        if (vigente) setPadron([])
+        if (!vigente) return
+        setPadron([])
+        setEstadoPadron("error")
       })
     return () => {
       vigente = false
@@ -232,6 +239,9 @@ export function CargarClienteModal({
       setGuardando(false)
     }
   }
+
+  // El tutor que se está cargando no puede ser su propio cotutor.
+  const candidatosCotutor = padron.filter((t) => t.dni.trim() !== tutor.dni.trim())
 
   const listo =
     tutor.nombre.trim().length > 0 &&
@@ -432,18 +442,20 @@ export function CargarClienteModal({
               aria-label="Cotutor a vincular"
             >
               <option value="">Sin cotutor</option>
-              {padron
-                .filter((t) => t.dni.trim() !== tutor.dni.trim())
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombreCompleto} · DNI {t.dni}
-                  </option>
-                ))}
+              {candidatosCotutor.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombreCompleto} · DNI {t.dni}
+                </option>
+              ))}
             </Select>
             <span className="text-xs text-muted-foreground">
-              {padron.length === 0
-                ? "No se pudo leer el padrón, se puede guardar igual sin cotutor."
-                : "El cotutor se vincula sin autorización de retiro."}
+              {estadoPadron === "cargando"
+                ? "Cargando el padrón…"
+                : estadoPadron === "error"
+                  ? "No se pudo leer el padrón, se puede guardar igual sin cotutor."
+                  : candidatosCotutor.length === 0
+                    ? "Todavía no hay otros tutores en el padrón."
+                    : "El cotutor se vincula sin autorización de retiro."}
             </span>
           </label>
         </div>
