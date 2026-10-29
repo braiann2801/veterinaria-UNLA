@@ -90,6 +90,8 @@ El frontend todavía no tiene test runner.
 
 - **Guardería:** hay un máximo de 10 perros por día. Las reservas por rango se validan día por día.
 - **Turnos clínicos:** cada turno dura 45 minutos de atención y le siguen 15 minutos de desinfección.
+  - La Agenda muestra el mes como calendario, con los turnos de cada día. Al elegir un día, sus turnos aparecen al costado (debajo en celular).
+  - Para un cliente que llega por primera vez, el modal "Agendar turno" tiene un botón "Cliente o mascota nuevos": permite cargar el cliente y su mascota en el mismo paso. Todo se guarda junto: si el horario choca con otro turno, no queda nada creado a medias.
 - **Ficha clínica sin dinero:**
   - La consulta registra anamnesis, diagnóstico, tratamiento y conducta.
   - El cobro se genera como comanda para el mostrador.
