@@ -47,7 +47,7 @@ export function RangoEstadiaPicker({
 }) {
   return (
     <DateRangePicker
-      className="w-full"
+      className="rango-estadia flex w-full flex-col gap-1.5"
       granularity="minute"
       hourCycle={24}
       hideTimeZone
@@ -58,20 +58,20 @@ export function RangoEstadiaPicker({
     >
       {({ state }) => (
         <>
-          <Label>Entrada y salida</Label>
-          <DateField.Group>
-            <DateField.InputContainer>
+          <Label className="text-xs font-medium text-muted-foreground">Entrada y salida</Label>
+          <DateField.Group className="h-auto min-h-[44px] rounded-xl border border-input bg-background px-3 py-1 text-sm transition-colors focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
+            <DateField.InputContainer className="flex-wrap gap-y-1">
               <DateField.Input slot="start">{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
               <DateRangePicker.RangeSeparator />
               <DateField.Input slot="end">{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
             </DateField.InputContainer>
             <DateField.Suffix>
-              <DateRangePicker.Trigger aria-label="Elegir entrada y salida">
+              <DateRangePicker.Trigger aria-label="Elegir entrada y salida" className="min-h-[36px] min-w-[36px] text-muted-foreground hover:text-foreground">
                 <DateRangePicker.TriggerIndicator />
               </DateRangePicker.Trigger>
             </DateField.Suffix>
           </DateField.Group>
-          <DateRangePicker.Popover className="flex w-full max-w-72 flex-col gap-3">
+          <DateRangePicker.Popover className="rango-estadia flex w-full max-w-80 flex-col gap-3 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg">
             <RangeCalendar aria-label="Días de la estadía" className="w-full">
               <RangeCalendar.Header>
                 <RangeCalendar.YearPickerTrigger>
@@ -95,7 +95,7 @@ export function RangoEstadiaPicker({
             </RangeCalendar>
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <Label>Hora de entrada</Label>
+                <Label className="text-sm text-muted-foreground">Hora de entrada</Label>
                 <TimeField
                   aria-label="Hora de entrada"
                   granularity="minute"
@@ -107,13 +107,13 @@ export function RangoEstadiaPicker({
                     state.setTimeRange({ end: state.timeRange?.end as TimeValue, start: v as TimeValue })
                   }
                 >
-                  <TimeField.Group variant="secondary">
+                  <TimeField.Group variant="secondary" className="min-h-[40px] rounded-lg border border-input bg-background px-3">
                     <TimeField.Input>{(segment) => <TimeField.Segment segment={segment} />}</TimeField.Input>
                   </TimeField.Group>
                 </TimeField>
               </div>
               <div className="flex items-center justify-between">
-                <Label>Hora de salida</Label>
+                <Label className="text-sm text-muted-foreground">Hora de salida</Label>
                 <TimeField
                   aria-label="Hora de salida"
                   granularity="minute"
@@ -125,7 +125,7 @@ export function RangoEstadiaPicker({
                     state.setTimeRange({ end: v as TimeValue, start: state.timeRange?.start as TimeValue })
                   }
                 >
-                  <TimeField.Group variant="secondary">
+                  <TimeField.Group variant="secondary" className="min-h-[40px] rounded-lg border border-input bg-background px-3">
                     <TimeField.Input>{(segment) => <TimeField.Segment segment={segment} />}</TimeField.Input>
                   </TimeField.Group>
                 </TimeField>
@@ -137,6 +137,11 @@ export function RangoEstadiaPicker({
                 : "Elegí los días en el calendario"}
             </span>
           </DateRangePicker.Popover>
+          <p className="text-xs text-muted-foreground">
+            {state.value?.start && state.value?.end
+              ? `Entra ${FORMATO.format(state.value.start.toDate("UTC"))} · sale ${FORMATO.format(state.value.end.toDate("UTC"))}`
+              : "Tocá el calendario para elegir los días"}
+          </p>
         </>
       )}
     </DateRangePicker>
