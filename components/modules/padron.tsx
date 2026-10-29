@@ -798,7 +798,7 @@ function ModalAltaTutor({
     setGuardando(true)
     setError(null)
     try {
-      await apiTutores.vincular(tutor.id, mascotaId, !actual)
+      await apiTutores.actualizarAutorizacion(tutor.id, mascotaId, !actual)
       await onCambio()
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cambiar la autorización")

@@ -42,6 +42,13 @@ public interface TutorService {
 	 */
 	MascotaResponseDTO vincularMascota(Long tutorId, Long mascotaId, boolean autorizadoRetiro);
 
+	/**
+	 * Cambia la autorizacion de retiro de un vinculo existente.
+	 *
+	 * @throws com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException si el vinculo no existe
+	 */
+	MascotaResponseDTO actualizarAutorizacion(Long tutorId, Long mascotaId, boolean autorizadoRetiro);
+
 	/** Desvincula una mascota de un tutor. Lanza 404 si el vinculo no existe. */
 	void desvincularMascota(Long tutorId, Long mascotaId);
 }

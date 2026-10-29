@@ -485,6 +485,9 @@ export const tutores = {
    */
   vincular: (tutorId: number, mascotaId: number, autorizadoRetiro: boolean) =>
     post<Mascota>(`/tutores/${tutorId}/mascotas/${mascotaId}?autorizadoRetiro=${autorizadoRetiro}`),
+  /** Cambia la autorización de un vínculo que ya existe (`vincular` rechaza duplicados con 400). */
+  actualizarAutorizacion: (tutorId: number, mascotaId: number, autorizadoRetiro: boolean) =>
+    put<Mascota>(`/tutores/${tutorId}/mascotas/${mascotaId}?autorizadoRetiro=${autorizadoRetiro}`),
   desvincular: (tutorId: number, mascotaId: number) =>
     del<void>(`/tutores/${tutorId}/mascotas/${mascotaId}`),
   deuda: (tutorId: number) => get<DeudaTutor>(`/tutores/${tutorId}/deuda`),
