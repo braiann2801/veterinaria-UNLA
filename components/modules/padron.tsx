@@ -42,6 +42,7 @@ export function Padron() {
   const [eliminandoTutor, setEliminandoTutor] = useState<Tutor | null>(null)
   const [editandoMascota, setEditandoMascota] = useState<Mascota | null>(null)
   const [eliminandoMascota, setEliminandoMascota] = useState<Mascota | null>(null)
+  const [agregandoCotutor, setAgregandoCotutor] = useState<Mascota | null>(null)
   const refAltaMascota = useRef<HTMLDivElement | null>(null)
 
   /**
@@ -192,6 +193,17 @@ export function Padron() {
                     {m.tutores.length === 0 && (
                       <li className="text-xs text-muted-foreground">Sin tutores vinculados</li>
                     )}
+                    <li>
+                      {/* Sumar un tutor desde la mascota, sin ir a buscar la ficha del tutor. */}
+                      <button
+                        onClick={() => setAgregandoCotutor(m)}
+                        aria-label={`Agregar cotutor a ${m.nombre}`}
+                        className={`inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${TOQUE_MINIMO}`}
+                      >
+                        <Link2 className="size-3" aria-hidden />
+                        Agregar cotutor
+                      </button>
+                    </li>
                   </ul>
                 </li>
               ))}
@@ -269,6 +281,18 @@ export function Padron() {
           onCerrar={() => setEditandoMascota(null)}
           onGuardado={async () => {
             setEditandoMascota(null)
+            await refrescar()
+          }}
+        />
+      )}
+
+      {agregandoCotutor && (
+        <ModalAgregarCotutor
+          mascota={agregandoCotutor}
+          tutores={tutores.datos ?? []}
+          onCerrar={() => setAgregandoCotutor(null)}
+          onVinculado={async () => {
+            setAgregandoCotutor(null)
             await refrescar()
           }}
         />
@@ -891,6 +915,116 @@ function ModalAltaTutor({
             {guardando ? "Vinculando…" : "Vincular mascota"}
           </button>
         </section>
+      </div>
+    </Modal>
+  )
+}
+
+/**
+ * Vincula un tutor más a una mascota ya registrada, desde la tarjeta de la
+ * mascota. Es el mismo vínculo que "Vincular otra mascota" en la ficha del
+ * tutor (`POST /tutores/{id}/mascotas/{mascotaId}`): solo cambia el punto de
+ * entrada. Por defecto queda como cotutor, sin autorización de retiro.
+ */
+function ModalAgregarCotutor({
+  mascota,
+  tutores,
+  onCerrar,
+  onVinculado,
+}: {
+  mascota: Mascota
+  tutores: Tutor[]
+  onCerrar: () => void
+  onVinculado: () => void | Promise<void>
+}) {
+  const [tutorId, setTutorId] = useState<number | null>(null)
+  const [autorizado, setAutorizado] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  const disponibles = tutores.filter((t) => !mascota.tutores.some((v) => v.id === t.id))
+
+  async function vincular() {
+    if (!tutorId) {
+      setError("Elegí un tutor para vincular.")
+      return
+    }
+    setGuardando(true)
+    setError(null)
+    try {
+      await apiTutores.vincular(tutorId, mascota.id, autorizado)
+      await onVinculado()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo vincular")
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onCerrar} title={`Agregar cotutor a ${mascota.nombre}`}>
+      <div className="flex flex-col gap-3">
+        {disponibles.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Todos los tutores del padrón ya están vinculados a {mascota.nombre}. Para sumar a alguien
+            nuevo, primero cargalo con &quot;Nuevo tutor&quot;.
+          </p>
+        ) : (
+          <>
+            <Select
+              value={tutorId ?? ""}
+              onChange={(e) => setTutorId(e.target.value ? Number(e.target.value) : null)}
+              className={TOQUE_MINIMO}
+              aria-label="Tutor a vincular"
+            >
+              <option value="">Elegí un tutor…</option>
+              {disponibles.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre} {t.apellido} · DNI {t.dni}
+                </option>
+              ))}
+            </Select>
+
+            <label className="flex min-h-[44px] items-center gap-3 rounded-md border border-border px-3">
+              <input
+                type="checkbox"
+                checked={autorizado}
+                onChange={(e) => setAutorizado(e.target.checked)}
+                className="size-4"
+              />
+              <span className="text-sm">
+                Autorizado a retirar
+                <span className="block text-xs text-muted-foreground">
+                  Si está apagado, queda como cotutor: puede consultar y pagar, pero no llevarse a la mascota.
+                </span>
+              </span>
+            </label>
+          </>
+        )}
+
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            onClick={onCerrar}
+            className={`rounded-md border border-border px-4 text-sm hover:bg-muted ${TOQUE_MINIMO}`}
+          >
+            Cancelar
+          </button>
+          {disponibles.length > 0 && (
+            <button
+              onClick={vincular}
+              disabled={guardando || !tutorId}
+              className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60 ${TOQUE_MINIMO}`}
+            >
+              <Link2 className="size-4" aria-hidden />
+              {guardando ? "Vinculando…" : "Vincular tutor"}
+            </button>
+          )}
+        </div>
       </div>
     </Modal>
   )
