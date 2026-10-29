@@ -18,6 +18,7 @@
 
 import { useState } from "react"
 import {
+  CheckCircle2,
   Clock,
   Home,
   LogOut,
@@ -27,7 +28,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 
-import { egreso as apiEgreso, hoyLocal } from "@/lib/api"
+import { ApiError, egreso as apiEgreso, hoyLocal } from "@/lib/api"
 import type { EgresoValidacion, MascotaDelDia } from "@/lib/api"
 import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Panel, Select, TextInput } from "@/components/ui/field"
@@ -110,13 +111,21 @@ export function Egreso() {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setValidando(m)}
-                  className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-                >
-                  <LogOut className="size-3.5" aria-hidden />
-                  Validar egreso
-                </button>
+                {m.fechaHoraEntrega ? (
+                  // Ya se registró la entrega: no se ofrece validar de nuevo.
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="size-3.5" aria-hidden />
+                    Entregado {m.fechaHoraEntrega.slice(11, 16)} a {m.entregadoA}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setValidando(m)}
+                    className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+                  >
+                    <LogOut className="size-3.5" aria-hidden />
+                    Validar egreso
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -126,6 +135,7 @@ export function Egreso() {
       {validando && (
         <ModalValidar
           mascota={validando}
+          fecha={fecha}
           abierto
           onCerrar={() => setValidando(null)}
           onValidado={async () => {
@@ -151,11 +161,14 @@ export function Egreso() {
  */
 function ModalValidar({
   mascota,
+  fecha,
   abierto,
   onCerrar,
   onValidado,
 }: {
   mascota: MascotaDelDia
+  /** Jornada del checkout: la entrega se registra en esa fecha. */
+  fecha: string
   abierto: boolean
   onCerrar: () => void
   onValidado: () => void | Promise<void>
@@ -179,6 +192,23 @@ function ModalValidar({
   )
 
   const veredicto = validacion.datos
+  const [registrando, setRegistrando] = useState(false)
+  const [errorRegistro, setErrorRegistro] = useState<string | null>(null)
+
+  // El backend vuelve a validar al registrar: si entre el veredicto y el clic
+  // cambió algo (otra comanda, la autorización), responde 409 con el motivo.
+  async function registrarEntrega() {
+    if (!veredicto?.tutorId) return
+    setRegistrando(true)
+    setErrorRegistro(null)
+    try {
+      await apiEgreso.registrar(mascota.mascotaId, veredicto.tutorId, fecha)
+      await onValidado()
+    } catch (e) {
+      setErrorRegistro(e instanceof ApiError ? mensajeDeError(e) : "No se pudo registrar la entrega")
+      setRegistrando(false)
+    }
+  }
   const tutorElegido = mascota.tutores.find((t) => String(t.tutorId) === tutorId)
 
   return (
@@ -248,12 +278,19 @@ function ModalValidar({
 
         {veredicto && <Veredicto veredicto={veredicto} />}
 
+        {errorRegistro && (
+          <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            {errorRegistro}
+          </p>
+        )}
+
         {veredicto && (
           <button
-            onClick={() => void onValidado()}
-            className={`w-full rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+            onClick={() => (veredicto.puedeRetirar ? void registrarEntrega() : onCerrar())}
+            disabled={registrando}
+            className={`w-full rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60 ${TOQUE_MINIMO}`}
           >
-            {veredicto.puedeRetirar ? "Registrar entrega y cerrar" : "Cerrar"}
+            {veredicto.puedeRetirar ? (registrando ? "Registrando…" : "Registrar entrega y cerrar") : "Cerrar"}
           </button>
         )}
       </div>

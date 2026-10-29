@@ -55,6 +55,10 @@ public interface ReservaGuarderiaRepository extends JpaRepository<ReservaGuarder
 	boolean existsByMascotaIdAndFechaAndEstadoIn(Long mascotaId, LocalDate fecha,
 			List<ReservaGuarderia.EstadoReserva> estados);
 
+	/** Estadia vigente de una mascota en la fecha (la que se finaliza al entregarla). */
+	java.util.Optional<ReservaGuarderia> findFirstByMascotaIdAndFechaAndEstadoIn(Long mascotaId, LocalDate fecha,
+			List<ReservaGuarderia.EstadoReserva> estados);
+
 	/** ¿La mascota tiene alguna reserva de guarderia? Bloquea su borrado. */
 	boolean existsByMascotaId(Long mascotaId);
 }

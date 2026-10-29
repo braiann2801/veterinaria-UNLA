@@ -73,6 +73,7 @@ class RollbackTransaccionalTest {
 		// dejara alguna reserva viva, el DELETE de mascota reventaria por FK.
 		// Pagos y comandas van antes que las reservas: la comanda de guarderia
 		// referencia a la reserva que la emitio (reserva_guarderia_id).
+		jdbc.update("DELETE FROM egreso_mascota");
 		jdbc.update("DELETE FROM pago");
 		jdbc.update("DELETE FROM comanda_cobro");
 		jdbc.update("DELETE FROM reserva_guarderia");

@@ -5,15 +5,21 @@ import java.util.List;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.veterinaria.veterinaria_backend.dto.EgresoRegistradoResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.EgresoRegistroRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaDelDiaResponseDTO;
 import com.veterinaria.veterinaria_backend.service.EgresoService;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 /**
@@ -73,6 +79,18 @@ public class EgresoController {
 	 * y el flag de retiro de cada vinculo. No es el semaforo: es la lista de
 	 * candidatos sobre la que después se corre {@code /validar}.</p>
 	 */
+	/**
+	 * POST /api/v1/egreso/registrar -> 201
+	 *
+	 * <p>"Registrar entrega y cerrar". Revalida el retiro en el servidor: 409 si
+	 * no esta autorizado, tiene deuda o ya se entrego en la jornada.</p>
+	 */
+	@PostMapping("/registrar")
+	public ResponseEntity<EgresoRegistradoResponseDTO> registrarEntrega(
+			@Valid @RequestBody EgresoRegistroRequestDTO request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(egresoService.registrarEntrega(request));
+	}
+
 	@GetMapping("/pacientes-hoy")
 	public ResponseEntity<List<MascotaDelDiaResponseDTO>> pacientesDelDia(
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {

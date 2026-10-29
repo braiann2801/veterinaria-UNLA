@@ -454,6 +454,21 @@ export interface MascotaDelDia {
   horaIngreso: string | null
   horaSalida: string | null
   tutores: TutorVinculado[]
+  /** Entrega registrada en la jornada ("Registrar entrega y cerrar"); `null` si todavía no se entregó. */
+  fechaHoraEntrega: string | null
+  entregadoA: string | null
+}
+
+/** Respuesta de `POST /egreso/registrar`. */
+export interface EgresoRegistrado {
+  id: number
+  mascotaId: number
+  nombreMascota: string
+  tutorId: number
+  nombreTutor: string
+  fecha: string
+  fechaHora: string
+  reservaGuarderiaId: number | null
 }
 
 /** Tutor con actividad en una jornada, con las mascotas por las que vino. */
@@ -672,6 +687,12 @@ export const egreso = {
    */
   pacientesDelDia: (fecha?: string) =>
     get<MascotaDelDia[]>(`/egreso/pacientes-hoy?${query({ fecha })}`),
+  /**
+   * Registra la entrega. El backend vuelve a validar: si el retiro ya no está
+   * permitido (o ya se entregó en la jornada) responde 409 con el motivo.
+   */
+  registrar: (mascotaId: number, tutorId: number, fecha: string) =>
+    post<EgresoRegistrado>("/egreso/registrar", { mascotaId, tutorId, fecha }),
 }
 
 // -------------------------------------------------------------------- auth

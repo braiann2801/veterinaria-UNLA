@@ -108,7 +108,9 @@ public class JornadaDelDiaServiceImpl implements JornadaDelDiaService {
 					acumulado.estadoGuarderia != null ? acumulado.estadoGuarderia.name() : null,
 					acumulado.horaIngreso,
 					acumulado.horaSalida,
-					tutoresDe(mascota.getId())));
+					tutoresDe(mascota.getId()),
+					null,
+					null));
 		}
 
 		return List.copyOf(resultado);
@@ -202,7 +204,8 @@ public class JornadaDelDiaServiceImpl implements JornadaDelDiaService {
 	 * {@code IN} en MySQL no esta garantizado, y una lista que se reordena entre dos
 	 * recargas hace que el operador elija el renglon equivocado.</p>
 	 */
-	private List<TutorVinculadoResponseDTO> tutoresDe(Long mascotaId) {
+	@Override
+	public List<TutorVinculadoResponseDTO> tutoresDe(Long mascotaId) {
 		return vinculoRepository.findByMascotaId(mascotaId).stream()
 				.sorted(Comparator.comparing(vinculo -> vinculo.getTutor().getId()))
 				.map(vinculo -> {
