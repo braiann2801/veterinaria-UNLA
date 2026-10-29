@@ -283,13 +283,22 @@ export function Caja() {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm">
-                      <span className="font-medium">{money(c.saldoPendiente)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {" "}
-                        pendientes de {money(c.montoTotal)}
-                      </span>
-                    </p>
+                    {/* Una comanda cancelada conserva su saldo en el backend, pero ya no
+                        se cobra ni cuenta como deuda: mostrarlo como "pendiente" confunde. */}
+                    {c.estado === "CANCELADA" ? (
+                      <p className="text-sm text-muted-foreground">
+                        Anulada · no se cobra{" "}
+                        <span className="text-xs">({money(c.montoTotal)})</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm">
+                        <span className="font-medium">{money(c.saldoPendiente)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {" "}
+                          pendientes de {money(c.montoTotal)}
+                        </span>
+                      </p>
+                    )}
                     {c.estado !== "PAGADA" && c.estado !== "CANCELADA" && (
                       <button
                         onClick={() => setACobrar(c)}
