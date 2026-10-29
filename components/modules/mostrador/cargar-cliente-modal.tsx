@@ -8,17 +8,8 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { mascotas as apiMascotas, tutores as apiTutores, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
-import { TOQUE_MINIMO, formatearDni, limpiarDni, soloDecimal, soloDni, soloTelefono } from "@/lib/vista"
+import { ESPECIES, TOQUE_MINIMO, formatearDni, limpiarDni, soloDecimal, soloDni, soloTelefono } from "@/lib/vista"
 
-/** Especies del enum `Mascota.Especie` del backend, con la etiqueta que ve el operador. */
-const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
-  { valor: "CANINO", etiqueta: "Canino" },
-  { valor: "FELINO", etiqueta: "Felino" },
-  { valor: "AVE", etiqueta: "Ave" },
-  { valor: "ROEDOR", etiqueta: "Roedor" },
-  { valor: "REPTIL", etiqueta: "Reptil" },
-  { valor: "OTRO", etiqueta: "Otro" },
-]
 
 /**
  * Conductas de la **mascota** (`MascotaRequestDTO.conducta`).

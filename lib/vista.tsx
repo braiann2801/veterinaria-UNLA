@@ -11,9 +11,19 @@
 import type { ReactNode } from "react"
 import { AlertCircle, Loader2, RefreshCw, Inbox } from "lucide-react"
 
-import { ApiError } from "@/lib/api"
+import { ApiError, type EspecieMascota } from "@/lib/api"
 import { mensajeDeError, type EstadoApi } from "@/lib/use-api"
 import { cn } from "@/lib/utils"
+
+/** Especies del enum `Mascota.Especie` del backend, con la etiqueta que ve el operador. */
+export const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
+  { valor: "CANINO", etiqueta: "Canino" },
+  { valor: "FELINO", etiqueta: "Felino" },
+  { valor: "AVE", etiqueta: "Ave" },
+  { valor: "ROEDOR", etiqueta: "Roedor" },
+  { valor: "REPTIL", etiqueta: "Reptil" },
+  { valor: "OTRO", etiqueta: "Otro" },
+]
 
 /** Ancho de la zona de toque tactil (regla 3.4 de AGENTS.md). */
 export const TOQUE_MINIMO = "min-h-[44px]"

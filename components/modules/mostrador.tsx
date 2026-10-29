@@ -59,7 +59,7 @@ import type {
 import { useApi } from "@/lib/use-api"
 import { TOQUE_MINIMO } from "@/lib/vista"
 
-import { AgregarTurnoModal } from "./mostrador/agregar-turno-modal"
+import { AgendarTurnoModal } from "./agendar-turno-modal"
 import { AvisosImportantes } from "./mostrador/avisos-importantes"
 import { CargarClienteModal } from "./mostrador/cargar-cliente-modal"
 import { TableroJornada } from "./mostrador/tablero-jornada"
@@ -145,7 +145,9 @@ export function Mostrador() {
       <TableroJornada turnos={turnos} reservas={reservas} fecha={fecha} onReintentar={refrescar} />
 
       <CargarClienteModal open={openCliente} onClose={() => setOpenCliente(false)} onGuardado={refrescar} />
-      <AgregarTurnoModal open={openTurno} onClose={() => setOpenTurno(false)} onGuardado={refrescar} />
+      {openTurno && (
+        <AgendarTurnoModal fechaPorDefecto={fecha} onCerrar={() => setOpenTurno(false)} onGuardado={refrescar} />
+      )}
     </div>
   )
 }

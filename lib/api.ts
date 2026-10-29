@@ -593,10 +593,29 @@ export const profesionales = {
 
 // ----------------------------------------------------------------- turnos
 
+/**
+ * Turno con alta de cliente y/o mascota en el mismo paso. El cliente es
+ * `tutorId` o `tutorNuevo`; la mascota, `mascotaId` o `mascotaNueva`. El backend
+ * lo hace todo en una transacción: si el turno choca (409), no queda nada creado.
+ */
+export interface TurnoConAltaInput {
+  tutorId?: number
+  tutorNuevo?: TutorInput
+  mascotaId?: number
+  mascotaNueva?: Omit<MascotaInput, "tutores">
+  fechaHoraInicio: string
+  motivo: string
+  profesionalId: number
+}
+
 export const turnos = {
   listar: (fecha?: string) =>
     get<TurnoClinico[]>(`/turnos${fecha ? `?fecha=${fecha}` : ""}`),
+  /** Turnos de `desde` a `hasta`, ambos inclusive (máximo 62 días): la vista mensual. */
+  listarRango: (desde: string, hasta: string) =>
+    get<TurnoClinico[]>(`/turnos?desde=${desde}&hasta=${hasta}`),
   crear: (body: TurnoClinicoInput) => post<TurnoClinico>("/turnos", body),
+  crearConAlta: (body: TurnoConAltaInput) => post<TurnoClinico>("/turnos/con-alta", body),
 }
 
 // -------------------------------------------------------------- guarderia
