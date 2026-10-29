@@ -45,6 +45,19 @@ public class ReservaGuarderia {
 	@Column(name = "fecha", nullable = false)
 	private LocalDate fecha;
 
+	/**
+	 * Ultimo dia de la estadia, para las de varias noches. Null en las reservas
+	 * de un solo dia (y en todas las anteriores al rango): ahi el fin es
+	 * {@link #fecha}. La estadia ocupa cupo en cada dia de fecha..fechaSalida.
+	 */
+	@Column(name = "fecha_salida")
+	private LocalDate fechaSalida;
+
+	/** Ultimo dia que ocupa cupo: {@link #fechaSalida} o, si no hay, {@link #fecha}. */
+	public LocalDate getFechaFin() {
+		return fechaSalida != null ? fechaSalida : fecha;
+	}
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "tipo_estadia", nullable = false, length = 20)
 	private TipoEstadia tipoEstadia = TipoEstadia.COMPLETA_24H;

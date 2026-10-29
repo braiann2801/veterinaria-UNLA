@@ -16,7 +16,13 @@ public record ReservaGuarderiaRequestDTO(
 		@NotNull(message = "La fecha de la reserva es obligatoria")
 		LocalDate fecha,
 
-		@NotNull(message = "El tipo de estadia es obligatorio")
+		/**
+		 * Ultimo dia de una estadia por rango (con horaEntrada y horaSalida
+		 * obligatorias). Null en la reserva de un solo dia de siempre.
+		 */
+		LocalDate fechaSalida,
+
+		/** Opcional: con rango se deduce de las fechas; sin rango, COMPLETA_24H. */
 		TipoEstadiaRequestDTO tipoEstadia,
 
 		@NotNull(message = "El id de la mascota es obligatorio")

@@ -52,7 +52,7 @@ public interface ComandaCobroService {
 	 * esta autorizado). Devuelve el id, o {@code null} si la mascota no tiene
 	 * tutor: sin titular no hay a quien cobrarle.
 	 */
-	Long emitirParaReserva(ReservaGuarderia reserva);
+	Long emitirParaReserva(ReservaGuarderia reserva, java.util.function.Supplier<java.math.BigDecimal> monto);
 
 	/** Al cancelar una reserva: anula sus comandas sin pagos y deja las que ya tienen pagos. */
 	void anularDeReserva(Long reservaId);

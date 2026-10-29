@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.service.impl;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -21,6 +22,7 @@ import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.ReservaGuarderiaRepository;
 import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.ReservaGuarderiaService;
+import com.veterinaria.veterinaria_backend.service.TarifaGuarderiaService;
 
 /**
  * Implementacion transaccional de {@link ReservaGuarderiaService}.
@@ -46,14 +48,19 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	private final MascotaRepository mascotaRepository;
 	private final ControlAforoService controlAforoService;
 	private final ComandaCobroService comandaService;
+	private final TarifaGuarderiaService tarifaService;
+
+	/** Tope de una estadia por rango: evita bloquear cientos de semaforos por un error de fecha. */
+	static final int MAXIMO_DIAS_ESTADIA = 60;
 
 	public ReservaGuarderiaServiceImpl(ReservaGuarderiaRepository reservaRepository,
 			MascotaRepository mascotaRepository, ControlAforoService controlAforoService,
-			ComandaCobroService comandaService) {
+			ComandaCobroService comandaService, TarifaGuarderiaService tarifaService) {
 		this.reservaRepository = reservaRepository;
 		this.mascotaRepository = mascotaRepository;
 		this.controlAforoService = controlAforoService;
 		this.comandaService = comandaService;
+		this.tarifaService = tarifaService;
 	}
 
 	@Override
@@ -83,51 +90,65 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	public ReservaGuarderiaResponseDTO crear(ReservaGuarderiaRequestDTO request) {
 		Mascota mascota = obtenerMascota(request.mascotaId());
 
-		// A partir de aqui corre bajo SELECT ... FOR UPDATE sobre el semaforo
-		// del dia. Toda la seccion check-then-act queda serializada: la peticion
-		// B espera al commit de A antes de contar, asi que nunca ve un conteo
-		// viejo. Sin este lock, dos peticiones del cupo 10 y 11 pasarian ambas
-		// el filtro y el dia quedaria con 11.
-		ControlAforoDiario semaforo = controlAforoService.bloquearDia(request.fecha());
+		// Se arma y valida la reserva antes de tomar locks: un rango invalido no
+		// tiene por que esperar el semaforo de nadie.
+		ReservaGuarderia reserva = new ReservaGuarderia();
+		reserva.setFecha(request.fecha());
+		reserva.setEstado(ReservaGuarderia.EstadoReserva.RESERVADO);
+		reserva.setMascota(mascota);
+		if (request.fechaSalida() != null) {
+			aplicarRango(reserva, request);
+		} else {
+			reserva.setTipoEstadia(request.tipoEstadia() != null
+					? ReservaGuarderia.TipoEstadia.valueOf(request.tipoEstadia().name())
+					: ReservaGuarderia.TipoEstadia.COMPLETA_24H);
+			aplicarHorario(reserva, request.horaEntrada(), request.horaSalida(), reserva.getTipoEstadia());
+		}
+		reserva.setSena(request.sena());
+		reserva.setObservaciones(request.observaciones());
+
+		// A partir de aqui corre bajo SELECT ... FOR UPDATE sobre el semaforo de
+		// CADA dia de la estadia. Toda la seccion check-then-act queda
+		// serializada: la peticion B espera al commit de A antes de contar, asi
+		// que nunca ve un conteo viejo. Los dias se bloquean en orden ascendente:
+		// dos estadias que se pisan toman los locks en el mismo orden y no se
+		// pueden trabar mutuamente (deadlock).
+		List<LocalDate> dias = reserva.getFecha().datesUntil(reserva.getFechaFin().plusDays(1)).toList();
+		List<ControlAforoDiario> semaforos = dias.stream().map(controlAforoService::bloquearDia).toList();
 
 		// El chequeo de mascota duplicada va dentro del lock a proposito: si
 		// quedara antes, dos peticiones concurrentes de la MISMA mascota
 		// podrian pasar ambas el EXISTS y devolver dos reservas para un perro.
-		if (reservaRepository.existsByMascotaIdAndFechaAndEstadoIn(
-				mascota.getId(), request.fecha(), ESTADOS_QUE_OCUPAN)) {
-			throw new BadRequestException(
-					"La mascota " + mascota.getId() + " ya tiene una reserva activa para el " + request.fecha());
+		if (reservaRepository.existeEstadiaSolapada(mascota.getId(), reserva.getFecha(), reserva.getFechaFin(),
+				ESTADOS_QUE_OCUPAN)) {
+			throw new BadRequestException("La mascota " + mascota.getId()
+					+ " ya tiene una reserva activa " + describirDias(reserva));
 		}
 
-		long ocupados = contarOcupados(request.fecha());
-		if (ocupados >= ReservaGuarderia.AFORO_MAXIMO) {
-			throw BusinessConflictException.aforoLleno(request.fecha(), ocupados,
-					ReservaGuarderia.AFORO_MAXIMO);
+		List<Long> ocupadosPorDia = new java.util.ArrayList<>();
+		for (LocalDate dia : dias) {
+			long ocupados = contarOcupados(dia);
+			if (ocupados >= ReservaGuarderia.AFORO_MAXIMO) {
+				throw BusinessConflictException.aforoLleno(dia, ocupados, ReservaGuarderia.AFORO_MAXIMO);
+			}
+			ocupadosPorDia.add(ocupados);
 		}
-
-		ReservaGuarderia reserva = new ReservaGuarderia();
-		reserva.setFecha(request.fecha());
-		reserva.setTipoEstadia(request.tipoEstadia() != null
-				? ReservaGuarderia.TipoEstadia.valueOf(request.tipoEstadia().name())
-				: ReservaGuarderia.TipoEstadia.COMPLETA_24H);
-		reserva.setEstado(ReservaGuarderia.EstadoReserva.RESERVADO);
-		reserva.setMascota(mascota);
-		aplicarHorario(reserva, request.horaEntrada(), request.horaSalida(), reserva.getTipoEstadia());
-		reserva.setSena(request.sena());
-		reserva.setObservaciones(request.observaciones());
 
 		ReservaGuarderia guardada = reservaRepository.save(reserva);
 
 		// La estadia se cobra desde la reserva: asi se puede pagar o señar por
-		// adelantado y el egreso exige que este saldada. En la misma transaccion
-		// que la reserva: si la comanda falla (p. ej. sin tarifa), no queda una
-		// reserva sin cobro.
-		Long comandaId = comandaService.emitirParaReserva(guardada);
+		// adelantado y el egreso exige que este saldada. El monto sale de la misma
+		// formula que muestra la pantalla (por horas o por noches). En la misma
+		// transaccion que la reserva: si la comanda falla, no queda reserva sin cobro.
+		Long comandaId = comandaService.emitirParaReserva(guardada,
+				() -> tarifaService.cotizar(inicio(guardada), fin(guardada)).total());
 
 		// Instantanea informativa. La fuente de verdad sigue siendo el COUNT.
-		semaforo.setCuposOcupados((int) (ocupados + 1));
+		for (int i = 0; i < semaforos.size(); i++) {
+			semaforos.get(i).setCuposOcupados((int) (ocupadosPorDia.get(i) + 1));
+		}
 
-		return toResponse(guardada, ocupados + 1, comandaId);
+		return toResponse(guardada, ocupadosPorDia.get(0) + 1, comandaId);
 	}
 
 	@Override
@@ -235,6 +256,64 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 		reserva.setHoraSalida(salida);
 	}
 
+	/**
+	 * Estadia por rango: entrada {@code fecha + horaEntrada}, salida
+	 * {@code fechaSalida + horaSalida}. El tipo se deduce: mismo dia es DIURNA,
+	 * con al menos una noche es COMPLETA_24H.
+	 */
+	private void aplicarRango(ReservaGuarderia reserva, ReservaGuarderiaRequestDTO request) {
+		if (request.horaEntrada() == null || request.horaSalida() == null) {
+			throw new BadRequestException("Una estadia por rango necesita hora de entrada y hora de salida");
+		}
+		LocalDateTime entrada = request.fecha().atTime(request.horaEntrada());
+		LocalDateTime salida = request.fechaSalida().atTime(request.horaSalida());
+		if (!salida.isAfter(entrada)) {
+			throw new BadRequestException("La salida (" + salida + ") tiene que ser posterior a la entrada ("
+					+ entrada + ")");
+		}
+		if (request.fechaSalida().isAfter(request.fecha().plusDays(MAXIMO_DIAS_ESTADIA))) {
+			throw new BadRequestException("Una estadia no puede superar los " + MAXIMO_DIAS_ESTADIA + " dias");
+		}
+		boolean mismoDia = request.fechaSalida().isEqual(request.fecha());
+		reserva.setFechaSalida(mismoDia ? null : request.fechaSalida());
+		reserva.setTipoEstadia(mismoDia ? ReservaGuarderia.TipoEstadia.DIURNA : ReservaGuarderia.TipoEstadia.COMPLETA_24H);
+		reserva.setHoraEntrada(request.horaEntrada());
+		reserva.setHoraSalida(request.horaSalida());
+	}
+
+	/**
+	 * Momento de entrada para cotizar. Las reservas de un dia sin horario (las
+	 * de siempre) entran a las 08:00.
+	 */
+	static LocalDateTime inicio(ReservaGuarderia reserva) {
+		LocalTime hora = reserva.getHoraEntrada() != null ? reserva.getHoraEntrada() : LocalTime.of(8, 0);
+		return reserva.getFecha().atTime(hora);
+	}
+
+	/**
+	 * Momento de salida para cotizar. Con rango, {@code fechaSalida + horaSalida}.
+	 * Sin rango vale la regla de siempre: si la hora de salida no es posterior a
+	 * la de entrada, sale al dia siguiente (estadia de 24 h). Sin horario, una
+	 * DIURNA sale a las 18:00 y el resto al dia siguiente a la misma hora.
+	 */
+	static LocalDateTime fin(ReservaGuarderia reserva) {
+		LocalDateTime entrada = inicio(reserva);
+		if (reserva.getHoraSalida() == null) {
+			return reserva.getTipoEstadia() == ReservaGuarderia.TipoEstadia.DIURNA
+					? reserva.getFecha().atTime(18, 0)
+					: entrada.plusDays(1);
+		}
+		LocalDateTime salida = reserva.getFechaFin().atTime(reserva.getHoraSalida());
+		return salida.isAfter(entrada) ? salida : salida.plusDays(1);
+	}
+
+	private static String describirDias(ReservaGuarderia reserva) {
+		// Mismo texto de siempre para un solo dia: "... para el 2026-11-10".
+		return reserva.getFechaSalida() == null
+				? "para el " + reserva.getFecha()
+				: "que se pisa con el rango " + reserva.getFecha() + " a " + reserva.getFechaSalida();
+	}
+
 	private AforoGuarderiaResponseDTO construirAforo(LocalDate fecha, long ocupados) {
 		int maximo = ReservaGuarderia.AFORO_MAXIMO;
 		int disponibles = (int) Math.max(0, maximo - ocupados);
@@ -250,6 +329,7 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 		return new ReservaGuarderiaResponseDTO(
 				reserva.getId(),
 				reserva.getFecha(),
+				reserva.getFechaSalida(),
 				reserva.getTipoEstadia() != null ? reserva.getTipoEstadia().name() : null,
 				reserva.getEstado() != null ? reserva.getEstado().name() : null,
 				mascota != null ? mascota.getId() : null,

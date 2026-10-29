@@ -171,7 +171,7 @@ public class JornadaDelDiaServiceImpl implements JornadaDelDiaService {
 	}
 
 	private void acumularReservas(LocalDate dia, Map<Long, Acumulado> porMascota) {
-		for (ReservaGuarderia reserva : reservaRepository.findByFechaAndEstadoIn(dia, RESERVAS_QUE_OCCUPAN)) {
+		for (ReservaGuarderia reserva : reservaRepository.findVigentesEnDia(dia, RESERVAS_QUE_OCCUPAN)) {
 			Mascota mascota = reserva.getMascota();
 			Acumulado acumulado = porMascota.computeIfAbsent(
 					mascota.getId(), id -> new Acumulado(id, mascota));

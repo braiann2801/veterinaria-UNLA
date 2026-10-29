@@ -13,6 +13,8 @@ import java.time.LocalTime;
 public record ReservaGuarderiaResponseDTO(
 		Long id,
 		LocalDate fecha,
+		/** Ultimo dia de la estadia; null en las de un solo dia. */
+		LocalDate fechaSalida,
 		String tipoEstadia,
 		String estado,
 		Long mascotaId,

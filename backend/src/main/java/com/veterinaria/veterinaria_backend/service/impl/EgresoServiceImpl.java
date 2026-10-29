@@ -145,9 +145,9 @@ public class EgresoServiceImpl implements EgresoService {
 		Mascota mascota = obtenerMascota(request.mascotaId());
 		Tutor tutor = tutorRepository.findById(request.tutorId())
 				.orElseThrow(() -> ResourceNotFoundException.tutor(request.tutorId()));
-		ReservaGuarderia estadia = reservaRepository.findFirstByMascotaIdAndFechaAndEstadoIn(mascota.getId(), dia,
+		ReservaGuarderia estadia = reservaRepository.findVigentesDeMascotaEnDia(mascota.getId(), dia,
 				List.of(ReservaGuarderia.EstadoReserva.RESERVADO, ReservaGuarderia.EstadoReserva.INGRESADO))
-				.orElse(null);
+				.stream().findFirst().orElse(null);
 		if (estadia != null) {
 			estadia.setEstado(ReservaGuarderia.EstadoReserva.FINALIZADO);
 		}

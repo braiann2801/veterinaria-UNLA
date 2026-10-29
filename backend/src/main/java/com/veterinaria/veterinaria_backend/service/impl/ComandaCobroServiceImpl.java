@@ -235,7 +235,7 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 	 */
 	@Override
 	@Transactional
-	public Long emitirParaReserva(ReservaGuarderia reserva) {
+	public Long emitirParaReserva(ReservaGuarderia reserva, java.util.function.Supplier<BigDecimal> montoEstadia) {
 		Mascota mascota = reserva.getMascota();
 		Tutor titular = mascota.getVinculos() == null ? null : mascota.getVinculos().stream()
 				.filter(v -> v.getTutor() != null)
@@ -251,7 +251,9 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 			return null;
 		}
 
-		BigDecimal monto = precioDelConcepto(ComandaCobro.Concepto.GUARDERIA.name());
+		// El monto se pide solo si hay a quien cobrarle: una mascota sin tutor no
+		// necesita tarifas cargadas para poder reservar.
+		BigDecimal monto = montoEstadia.get().setScale(2, RoundingMode.HALF_UP);
 		ComandaCobro comanda = new ComandaCobro();
 		comanda.setConcepto(ComandaCobro.Concepto.GUARDERIA);
 		comanda.setMontoTotal(monto);

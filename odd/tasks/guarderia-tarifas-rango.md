@@ -16,7 +16,7 @@ Rama: `feat/autenticacion` (continúa sobre el PR #1) · Tests: `./mvnw test` (M
 | ID | Specs | Ruta | Estado | Commit |
 |---|---|---|---|---|
 | T1 | S1, S2 | inline | hecho (215 tests verdes; RED observado) | ver git log |
-| T2 | S1, S4, S5 | inline | pendiente | |
+| T2 | S1, S4, S5 | inline | hecho (222 tests verdes; RED 6/7 observado) | ver git log |
 | T3 | S3, S4 | inline | pendiente | |
 | T4 | — | inline | pendiente | |
 
