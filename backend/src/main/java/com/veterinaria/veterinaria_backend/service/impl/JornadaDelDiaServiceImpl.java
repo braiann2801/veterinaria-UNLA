@@ -108,7 +108,9 @@ public class JornadaDelDiaServiceImpl implements JornadaDelDiaService {
 					acumulado.estadoGuarderia != null ? acumulado.estadoGuarderia.name() : null,
 					acumulado.horaIngreso,
 					acumulado.horaSalida,
-					tutoresDe(mascota.getId())));
+					tutoresDe(mascota.getId()),
+					null,
+					null));
 		}
 
 		return List.copyOf(resultado);
@@ -169,7 +171,7 @@ public class JornadaDelDiaServiceImpl implements JornadaDelDiaService {
 	}
 
 	private void acumularReservas(LocalDate dia, Map<Long, Acumulado> porMascota) {
-		for (ReservaGuarderia reserva : reservaRepository.findByFechaAndEstadoIn(dia, RESERVAS_QUE_OCCUPAN)) {
+		for (ReservaGuarderia reserva : reservaRepository.findVigentesEnDia(dia, RESERVAS_QUE_OCCUPAN)) {
 			Mascota mascota = reserva.getMascota();
 			Acumulado acumulado = porMascota.computeIfAbsent(
 					mascota.getId(), id -> new Acumulado(id, mascota));
@@ -202,7 +204,8 @@ public class JornadaDelDiaServiceImpl implements JornadaDelDiaService {
 	 * {@code IN} en MySQL no esta garantizado, y una lista que se reordena entre dos
 	 * recargas hace que el operador elija el renglon equivocado.</p>
 	 */
-	private List<TutorVinculadoResponseDTO> tutoresDe(Long mascotaId) {
+	@Override
+	public List<TutorVinculadoResponseDTO> tutoresDe(Long mascotaId) {
 		return vinculoRepository.findByMascotaId(mascotaId).stream()
 				.sorted(Comparator.comparing(vinculo -> vinculo.getTutor().getId()))
 				.map(vinculo -> {

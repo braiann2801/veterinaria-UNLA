@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+/* HeroUI v3 (DateRangePicker de la reserva de guardería). Va antes de los tokens
+   del proyecto: comparte nombres de variables (--background, --muted, --accent,
+   --radius...) y los :root/.dark de abajo tienen que ganar. */
+@import '@heroui/styles';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
@@ -140,4 +144,43 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+/*
+ * Selector de rango de la guardería (HeroUI). HeroUI y el tema shadcn usan los
+ * mismos nombres con significados distintos: en HeroUI `muted` es texto atenuado
+ * y `accent` es el color de marca; en el tema son colores de fondo. Sin esto, las
+ * barras de la fecha, el separador y el ícono quedan invisibles y los días
+ * elegidos, grises. Se reasignan solo dentro del selector y de su popover.
+ */
+.rango-estadia {
+  /* El tema usa @theme inline: las utilidades leen --muted/--accent directo,
+     no --color-*. Se reasignan las dos capas. */
+  --muted: var(--muted-foreground);
+  --accent: var(--primary);
+  --accent-foreground: var(--primary-foreground);
+  --accent-hover: color-mix(in oklch, var(--primary) 88%, white);
+  --accent-soft: color-mix(in oklch, var(--primary) 22%, transparent);
+  --accent-soft-hover: color-mix(in oklch, var(--primary) 32%, transparent);
+  --accent-soft-foreground: var(--foreground);
+  --default: var(--background);
+  --default-foreground: var(--foreground);
+  --field: var(--background);
+  --field-hover: var(--background);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted-foreground);
+  --overlay: var(--popover);
+  --color-muted: var(--muted-foreground);
+  --color-accent: var(--primary);
+  --color-accent-foreground: var(--primary-foreground);
+  --color-accent-hover: color-mix(in oklch, var(--primary) 88%, white);
+  --color-accent-soft: color-mix(in oklch, var(--primary) 22%, transparent);
+  --color-accent-soft-hover: color-mix(in oklch, var(--primary) 32%, transparent);
+  --color-accent-soft-foreground: var(--foreground);
+  --color-default: var(--background);
+  --color-default-foreground: var(--foreground);
+  --color-field: var(--background);
+  --color-field-hover: var(--background);
+  --color-field-foreground: var(--foreground);
+  --color-field-placeholder: var(--muted-foreground);
+  --color-overlay: var(--popover);
 }

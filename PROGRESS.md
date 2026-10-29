@@ -6,16 +6,17 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** Mantenimiento — tablero Kaban (`.kaban/`) con los
-  pendientes priorizados.
-- **Base Git:** `29b5a5e` (handler 404 en `e9d837a` y CORS con `PATCH` en
-  `29b5a5e`, ambos commiteados) + `CLAUDE.md`.
+- **Fase en curso:** Autenticación (rama `feat/autenticacion`, detalle en
+  `odd/tasks/autenticacion.md`): landing pública, login JWT con roles, ABM de
+  usuarios por el Dueño. Implementada y verificada; pendiente de merge.
+- **Base Git:** `main` en `a80a808` (modal y tablero Kaban); la rama suma
+  backend auth, ABM, frontend y docs.
 - **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
 - **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
-  165 tests de Spring Boot, 0 fallos).
+  222 tests de Spring Boot, 0 fallos).
 
 ## Hitos completados
 
@@ -67,6 +68,17 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `PATCH` sobre `/api/**`. Se mantiene la whitelist de orígenes
       (localhost:3000, 127.0.0.1:3000, `*.vercel.app`), `allowCredentials`,
       `exposedHeaders("Location")` y `maxAge(3600)`. Alineado a AGENTS.md §1.
+- [x] **Guardería por rango y tarifas** — estadía con entrada/salida (fecha y
+      hora) en el DateRangePicker de HeroUI; aforo validado cada día del rango;
+      monto por horas o por noches con precios del Dueño (pestaña Tarifas); la
+      comanda GUARDERIA se emite al reservar; el egreso registra la entrega y
+      finaliza la estadía. Detalle: `odd/tasks/guarderia-tarifas-rango.md`.
+- [x] **Autenticación y landing** — `/` landing pública (`lib/negocio.ts`),
+      `/login`, `/app` protegido. Spring Security + JWT HS256; roles
+      DUENIO/VETERINARIO/RECEPCION/GUARDERIA (Guardería = Recepción); Balance,
+      Usuarios, cierre y tarifas solo Dueño (403). Dueño sembrado con clave
+      default y cambio obligatorio; ABM de usuarios con clave temporal y
+      revocación inmediata de sesiones. 187 tests backend.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -83,9 +95,14 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 6. **Arquitectura en capas estricta:** Controller → Service → Repository,
    DTOs planos (sin entidades serializadas), errores HTTP semánticos
    (400/404/409/500) vía `GlobalExceptionHandler`.
-7. **Store global:** `lib/store.tsx` es SOLO estado de sesión (rol + query del
-   TopBar). Todo dato operativo sale de `lib/api.ts` + `lib/use-api.ts`
-   (triplete `{datos, cargando, error, recargar}`).
+7. **Store global:** `lib/store.tsx` es SOLO la query del TopBar. El rol sale
+   del login (`lib/auth.tsx`), nunca de un selector. Todo dato operativo sale
+   de `lib/api.ts` + `lib/use-api.ts` (triplete `{datos, cargando, error, recargar}`).
+9. **Permisos en el backend:** la matriz vive en `security/SecurityConfig.java`;
+   esconder pestañas es solo UI. El rol y el estado de la cuenta se leen de la
+   base en cada request (`UsuarioJwtConverter`). Nunca versionar un
+   `JWT_SECRET` por defecto; en Docker `JWT_SECRET` y `OWNER_PASSWORD` son
+   obligatorios.
 8. **Config por entorno:** `application.properties` lee `DB_HOST/DB_PORT/
    DB_USERNAME/DB_PASSWORD` con defaults que preservan el dev local (XAMPP:
    localhost/3306/root/vacío); docker-compose los sobreescribe y el secreto

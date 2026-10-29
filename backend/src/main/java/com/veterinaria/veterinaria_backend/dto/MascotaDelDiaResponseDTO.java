@@ -38,7 +38,21 @@ public record MascotaDelDiaResponseDTO(
 		LocalTime horaIngreso,
 		LocalTime horaSalida,
 
-		List<TutorVinculadoResponseDTO> tutores) {
+		List<TutorVinculadoResponseDTO> tutores,
+
+		/**
+		 * Entrega registrada en la jornada ("Registrar entrega y cerrar"). Null si
+		 * todavia no se entrego. Los completa el checkout de egreso; la jornada
+		 * compartida con la caja los deja en null.
+		 */
+		java.time.LocalDateTime fechaHoraEntrega,
+		String entregadoA) {
+
+	/** Copia con la entrega registrada. */
+	public MascotaDelDiaResponseDTO conEntrega(java.time.LocalDateTime fechaHora, String tutor) {
+		return new MascotaDelDiaResponseDTO(mascotaId, nombreMascota, especie, conducta, motivos, cantidadTurnos,
+				estadoGuarderia, horaIngreso, horaSalida, tutores, fechaHora, tutor);
+	}
 
 	/**
 	 * Motivos de presencia, en el vocabulario de la API.

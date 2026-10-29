@@ -19,6 +19,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.veterinaria.veterinaria_backend.exception.ApiErrorResponse;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
+import com.veterinaria.veterinaria_backend.exception.CredencialesInvalidasException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,6 +39,15 @@ public class GlobalExceptionHandler {
 			HttpServletRequest request) {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 				.body(ApiErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Bad Request",
+						ex.getMessage(), request.getRequestURI()));
+	}
+
+	/** 401: login rechazado. Mismo mensaje para cualquier causa (ver la excepcion). */
+	@ExceptionHandler(CredencialesInvalidasException.class)
+	public ResponseEntity<ApiErrorResponse> handleCredencialesInvalidas(CredencialesInvalidasException ex,
+			HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+				.body(ApiErrorResponse.of(HttpStatus.UNAUTHORIZED.value(), "Unauthorized",
 						ex.getMessage(), request.getRequestURI()));
 	}
 

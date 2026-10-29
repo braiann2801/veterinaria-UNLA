@@ -241,7 +241,7 @@ class AforoConcurrenteTest {
 	}
 
 	private ReservaGuarderiaRequestDTO pedir(long mascotaId, LocalDate fecha) {
-		return new ReservaGuarderiaRequestDTO(fecha,
+		return new ReservaGuarderiaRequestDTO(fecha, null,
 				ReservaGuarderiaRequestDTO.TipoEstadiaRequestDTO.COMPLETA_24H,
 				mascotaId, null, null, null, null);
 	}

@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 // Spring Boot 4 movio el autoconfigure de webmvc a este paquete.
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,6 +45,9 @@ import tools.jackson.databind.ObjectMapper;
  * parcial registrado (la caja cierra descuadrada).</p>
  */
 @SpringBootTest
+// La API exige login: estos tests prueban reglas de negocio, no permisos
+// (ver AutenticacionTest). Duenio tiene acceso a todos los endpoints.
+@WithMockUser(roles = "DUENIO")
 @AutoConfigureMockMvc
 class RollbackTransaccionalTest {
 
@@ -67,9 +71,12 @@ class RollbackTransaccionalTest {
 		// Las reservas se borran primero porque AforoConcurrenteTest tambien
 		// deja mascotas commiteadas: si el orden de ejecucion de las clases
 		// dejara alguna reserva viva, el DELETE de mascota reventaria por FK.
-		jdbc.update("DELETE FROM reserva_guarderia");
+		// Pagos y comandas van antes que las reservas: la comanda de guarderia
+		// referencia a la reserva que la emitio (reserva_guarderia_id).
+		jdbc.update("DELETE FROM egreso_mascota");
 		jdbc.update("DELETE FROM pago");
 		jdbc.update("DELETE FROM comanda_cobro");
+		jdbc.update("DELETE FROM reserva_guarderia");
 		jdbc.update("DELETE FROM consulta_medica");
 		jdbc.update("DELETE FROM turno_clinico");
 		jdbc.update("DELETE FROM tutor_mascota");

@@ -38,4 +38,7 @@ public interface JornadaDelDiaService {
 	 * @param fecha jornada a consultar
 	 */
 	List<TutorDelDiaResponseDTO> tutoresDelDia(LocalDate fecha);
+
+	/** Tutores vinculados a una mascota, con su flag de retiro (mismo orden que la jornada). */
+	List<MascotaDelDiaResponseDTO.TutorVinculadoResponseDTO> tutoresDe(Long mascotaId);
 }

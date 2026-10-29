@@ -27,14 +27,23 @@ public interface ReservaGuarderiaRepository extends JpaRepository<ReservaGuarder
 	 */
 	@Query("""
 			SELECT r FROM ReservaGuarderia r
-			WHERE r.fecha = :fecha
+			WHERE r.fecha <= :fecha AND COALESCE(r.fechaSalida, r.fecha) >= :fecha
 			ORDER BY CASE WHEN r.horaEntrada IS NULL THEN 1 ELSE 0 END,
 			         r.horaEntrada, r.horaSalida, r.id
 			""")
 	List<ReservaGuarderia> findByFechaOrdenadasPorHorario(@Param("fecha") LocalDate fecha);
 
-	List<ReservaGuarderia> findByFechaAndEstadoIn(LocalDate fecha,
-			List<ReservaGuarderia.EstadoReserva> estados);
+	/**
+	 * Estadias en esos estados que cubren el dia: las de un solo dia de esa fecha
+	 * y las de varias noches cuyo rango lo incluye.
+	 */
+	@Query("""
+			SELECT r FROM ReservaGuarderia r
+			WHERE r.fecha <= :dia AND COALESCE(r.fechaSalida, r.fecha) >= :dia
+			  AND r.estado IN :estados
+			""")
+	List<ReservaGuarderia> findVigentesEnDia(@Param("dia") LocalDate dia,
+			@Param("estados") List<ReservaGuarderia.EstadoReserva> estados);
 
 	/**
 	 * Aforo ocupado de una fecha: cuenta solo reservas RESERVADO o INGRESADO.
@@ -45,15 +54,32 @@ public interface ReservaGuarderiaRepository extends JpaRepository<ReservaGuarder
 	 */
 	@Query("""
 			SELECT COUNT(r) FROM ReservaGuarderia r
-			WHERE r.fecha = :fecha
+			WHERE r.fecha <= :fecha AND COALESCE(r.fechaSalida, r.fecha) >= :fecha
 			  AND r.estado IN (com.veterinaria.veterinaria_backend.entity.ReservaGuarderia$EstadoReserva.RESERVADO,
 			                   com.veterinaria.veterinaria_backend.entity.ReservaGuarderia$EstadoReserva.INGRESADO)
 			""")
 	long contarCuposOcupados(@Param("fecha") LocalDate fecha);
 
-	/** ¿La mascota ya tiene reserva activa para esa fecha? */
-	boolean existsByMascotaIdAndFechaAndEstadoIn(Long mascotaId, LocalDate fecha,
-			List<ReservaGuarderia.EstadoReserva> estados);
+	/** ¿La mascota ya tiene una estadia activa que se pise con [desde, hasta]? */
+	@Query("""
+			SELECT COUNT(r) > 0 FROM ReservaGuarderia r
+			WHERE r.mascota.id = :mascotaId
+			  AND r.fecha <= :hasta AND COALESCE(r.fechaSalida, r.fecha) >= :desde
+			  AND r.estado IN :estados
+			""")
+	boolean existeEstadiaSolapada(@Param("mascotaId") Long mascotaId, @Param("desde") LocalDate desde,
+			@Param("hasta") LocalDate hasta, @Param("estados") List<ReservaGuarderia.EstadoReserva> estados);
+
+	/** Estadia vigente de una mascota que cubre el dia (la que se finaliza al entregarla). */
+	@Query("""
+			SELECT r FROM ReservaGuarderia r
+			WHERE r.mascota.id = :mascotaId
+			  AND r.fecha <= :dia AND COALESCE(r.fechaSalida, r.fecha) >= :dia
+			  AND r.estado IN :estados
+			ORDER BY r.fecha, r.id
+			""")
+	List<ReservaGuarderia> findVigentesDeMascotaEnDia(@Param("mascotaId") Long mascotaId,
+			@Param("dia") LocalDate dia, @Param("estados") List<ReservaGuarderia.EstadoReserva> estados);
 
 	/** ¿La mascota tiene alguna reserva de guarderia? Bloquea su borrado. */
 	boolean existsByMascotaId(Long mascotaId);

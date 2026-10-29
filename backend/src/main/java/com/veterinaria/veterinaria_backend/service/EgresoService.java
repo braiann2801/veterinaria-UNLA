@@ -3,6 +3,8 @@ package com.veterinaria.veterinaria_backend.service;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.veterinaria.veterinaria_backend.dto.EgresoRegistradoResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.EgresoRegistroRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaDelDiaResponseDTO;
 
@@ -47,4 +49,11 @@ public interface EgresoService {
 	 * @param fecha jornada a listar; null o vacio significa hoy
 	 */
 	List<MascotaDelDiaResponseDTO> listarPacientesDelDia(LocalDate fecha);
+
+	/**
+	 * Registra la entrega de una mascota. Vuelve a validar el retiro con
+	 * {@link #validarPorTutorId}: si no esta permitido responde 409 con el mismo
+	 * mensaje del veredicto. Finaliza la estadia de guarderia de la fecha, si hay.
+	 */
+	EgresoRegistradoResponseDTO registrarEntrega(EgresoRegistroRequestDTO request);
 }

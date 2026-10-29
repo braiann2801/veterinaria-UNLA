@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,9 @@ import tools.jackson.databind.node.ArrayNode;
  * mas probable de esta fase.</p>
  */
 @SpringBootTest
+// La API exige login: estos tests prueban reglas de negocio, no permisos
+// (ver AutenticacionTest). Duenio tiene acceso a todos los endpoints.
+@WithMockUser(roles = "DUENIO")
 @AutoConfigureMockMvc
 @Transactional
 class CajaDelDiaTest {
@@ -386,6 +390,29 @@ class CajaDelDiaTest {
 	}
 
 	@Test
+	@DisplayName("El extracto del cierre distingue al titular de la comanda de quien pago")
+	void cierreInformaQuienPago() throws Exception {
+		long titularId = crearTutor("Ana", "Titular");
+		long cotutorId = crearTutor("Carlos", "Pagador");
+		long mascotaId = crearMascotaConDuenio("Pagada", titularId);
+		vincular(cotutorId, mascotaId, false);
+		long comandaId = emitirComandaParaMascota(titularId, mascotaId);
+
+		mockMvc.perform(post("/api/v1/caja/pagos/{id}", comandaId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"pagos":[{"metodoPago":"EFECTIVO","monto":5000}],"tutorId":%d}
+								""".formatted(cotutorId)))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(get("/api/v1/caja/cierre"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.movimientos", Matchers.hasSize(1)))
+				.andExpect(jsonPath("$.movimientos[0].nombreTutor").value("Ana Titular"))
+				.andExpect(jsonPath("$.movimientos[0].nombrePagador").value("Carlos Pagador"));
+	}
+
+	@Test
 	@DisplayName("El cierre informa el saldo que quedo sin cobrar de la jornada")
 	void cierreInformaSaldosPendientes() throws Exception {
 		long tutorId = crearTutor();
@@ -537,11 +564,15 @@ class CajaDelDiaTest {
 	}
 
 	private long crearTutor() throws Exception {
+		return crearTutor("Tutor", "Caja");
+	}
+
+	private long crearTutor(String nombre, String apellido) throws Exception {
 		String json = mockMvc.perform(post("/api/v1/tutores")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"nombre":"Tutor","apellido":"Caja","dni":"%s"}
-								""".formatted(dni())))
+								{"nombre":"%s","apellido":"%s","dni":"%s"}
+								""".formatted(nombre, apellido, dni())))
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		return objectMapper.readTree(json).get("id").asLong();

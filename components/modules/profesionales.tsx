@@ -15,7 +15,7 @@
  */
 
 import { useState } from "react"
-import { Stethoscope, UserPlus } from "lucide-react"
+import { Pencil, Stethoscope, Trash2, UserPlus } from "lucide-react"
 
 import { profesionales as apiProfesionales } from "@/lib/api"
 import type { Profesional } from "@/lib/api"
@@ -23,10 +23,17 @@ import { useApi } from "@/lib/use-api"
 import { Panel, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { Paginado } from "@/components/ui/paginado"
+
+/** Botón de acción de fila (editar/eliminar): cuadrado táctil de 44 px, igual que en el Padrón. */
+const BOTON_ACCION =
+  "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border transition-colors"
 
 export function Profesionales() {
   const lista = useApi<Profesional[]>(() => apiProfesionales.listar())
   const [abierto, setAbierto] = useState(false)
+  const [editando, setEditando] = useState<Profesional | null>(null)
+  const [eliminando, setEliminando] = useState<Profesional | null>(null)
 
   return (
     <Panel
@@ -48,16 +55,36 @@ export function Profesionales() {
         onReintentar={lista.recargar}
       >
         {(datos) => (
+          <Paginado items={datos} clave="profesionales">
+          {(pagina) => (
           <ul className="flex flex-col divide-y divide-border">
-            {datos.map((p) => (
+            {pagina.map((p) => (
               <li key={p.id} className="flex flex-col gap-1 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm font-medium">{p.nombreCompleto}</p>
-                  {!p.activo && (
-                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      Inactivo
-                    </span>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {!p.activo && (
+                      <span className="mr-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        Inactivo
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setEditando(p)}
+                      aria-label={`Editar ${p.nombreCompleto}`}
+                      title="Editar profesional"
+                      className={`${BOTON_ACCION} border-border text-muted-foreground hover:bg-muted hover:text-foreground`}
+                    >
+                      <Pencil className="size-4" aria-hidden />
+                    </button>
+                    <button
+                      onClick={() => setEliminando(p)}
+                      aria-label={`Eliminar ${p.nombreCompleto}`}
+                      title="Eliminar profesional"
+                      className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {[
@@ -71,6 +98,8 @@ export function Profesionales() {
               </li>
             ))}
           </ul>
+          )}
+          </Paginado>
         )}
       </Recurso>
 
@@ -80,6 +109,25 @@ export function Profesionales() {
           onCerrar={() => setAbierto(false)}
           titulo="Cargar veterinario"
           onCreado={lista.recargar}
+        />
+      )}
+      {editando && (
+        <ModalCargarProfesional
+          abierto
+          profesional={editando}
+          onCerrar={() => setEditando(null)}
+          titulo={`Editar ${editando.nombreCompleto}`}
+          onCreado={lista.recargar}
+        />
+      )}
+      {eliminando && (
+        <ModalEliminarProfesional
+          profesional={eliminando}
+          onCerrar={() => setEliminando(null)}
+          onEliminado={async () => {
+            setEliminando(null)
+            await lista.recargar()
+          }}
         />
       )}
     </Panel>
@@ -94,22 +142,25 @@ export function Profesionales() {
  * dejaria escrito el DNI rechazado y el operador tendria que limpiarlo a mano
  * para reintentar.</p>
  */
+/** Alta o, si recibe `profesional`, edición: mismos campos y mismas reglas del backend. */
 function ModalCargarProfesional({
   abierto,
   onCerrar,
   titulo,
   onCreado,
+  profesional,
 }: {
   abierto: boolean
   onCerrar: () => void
   titulo: string
   onCreado: () => void | Promise<void>
+  profesional?: Profesional
 }) {
-  const [nombre, setNombre] = useState("")
-  const [apellido, setApellido] = useState("")
-  const [dni, setDni] = useState("")
-  const [matricula, setMatricula] = useState("")
-  const [telefono, setTelefono] = useState("")
+  const [nombre, setNombre] = useState(profesional?.nombre ?? "")
+  const [apellido, setApellido] = useState(profesional?.apellido ?? "")
+  const [dni, setDni] = useState(profesional?.dni ?? "")
+  const [matricula, setMatricula] = useState(profesional?.matricula ?? "")
+  const [telefono, setTelefono] = useState(profesional?.telefono ?? "")
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
@@ -117,13 +168,15 @@ function ModalCargarProfesional({
     setGuardando(true)
     setError(null)
     try {
-      await apiProfesionales.crear({
+      const datos = {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         dni: dni.trim() || undefined,
         matricula: matricula.trim() || undefined,
         telefono: telefono.trim() || undefined,
-      })
+      }
+      if (profesional) await apiProfesionales.actualizar(profesional.id, datos)
+      else await apiProfesionales.crear(datos)
       setNombre("")
       setApellido("")
       setDni("")
@@ -215,5 +268,67 @@ function Campo({
         className={TOQUE_MINIMO}
       />
     </label>
+  )
+}
+
+function ModalEliminarProfesional({
+  profesional,
+  onCerrar,
+  onEliminado,
+}: {
+  profesional: Profesional
+  onCerrar: () => void
+  onEliminado: () => void | Promise<void>
+}) {
+  const [error, setError] = useState<string | null>(null)
+  const [borrando, setBorrando] = useState(false)
+
+  async function eliminar() {
+    setBorrando(true)
+    setError(null)
+    try {
+      await apiProfesionales.eliminar(profesional.id)
+      await onEliminado()
+    } catch (e) {
+      // 409: tiene turnos o consultas. El motivo viene del backend.
+      setError(e instanceof Error ? e.message : "No se pudo eliminar el profesional")
+      setBorrando(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={borrando ? () => {} : onCerrar} title={`Eliminar a ${profesional.nombreCompleto}`}>
+      <div className="flex flex-col gap-3 p-4 text-sm">
+        <p>
+          ¿Seguro que querés eliminar a <strong>{profesional.nombreCompleto}</strong>?
+        </p>
+        <p className="text-muted-foreground">
+          Si ya tiene turnos o consultas registrados, el sistema no va a permitir eliminarlo. Esta acción no se
+          puede deshacer.
+        </p>
+        {error && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCerrar}
+            disabled={borrando}
+            className={`rounded-md border border-border px-3 text-sm transition-colors hover:bg-muted disabled:opacity-60 ${TOQUE_MINIMO}`}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={eliminar}
+            disabled={borrando}
+            className={`inline-flex items-center justify-center gap-2 rounded-md bg-destructive px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60 ${TOQUE_MINIMO}`}
+          >
+            <Trash2 className="size-4" aria-hidden />
+            {borrando ? "Eliminando…" : "Eliminar"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }

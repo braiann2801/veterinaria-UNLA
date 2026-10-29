@@ -10,6 +10,8 @@
  * lugar de fallar en runtime con `undefined`.
  */
 
+import { borrarSesion, obtenerSesion, type RolApi, type Sesion, type UsuarioSesion } from "@/lib/sesion"
+
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1"
 
@@ -55,6 +57,16 @@ export class ApiError extends Error {
   get esServidor(): boolean {
     return this.status >= 500 || this.status === 0
   }
+
+  /** 401: no hay sesion valida (o, en el login, usuario o clave incorrectos). */
+  get esNoAutenticado(): boolean {
+    return this.status === 401
+  }
+
+  /** 403: el rol del usuario no tiene permiso para esa accion. */
+  get esProhibido(): boolean {
+    return this.status === 403
+  }
 }
 
 /**
@@ -81,8 +93,23 @@ interface ApiErrorBody {
   ruta?: string
 }
 
+/**
+ * Un 401 en cualquier endpoint que no sea el login significa que la sesion ya no
+ * vale (vencio, la desactivaron o le cambiaron el rol): se limpia y se manda al
+ * login. El login en si devuelve 401 por clave incorrecta, y ese error lo tiene
+ * que mostrar el formulario, no redirigir.
+ */
+function sesionCaducada(path: string) {
+  if (path === "/auth/login") return
+  borrarSesion()
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.assign("/login?motivo=sesion")
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`
+  const token = obtenerSesion()?.token
 
   let respuesta: Response
   try {
@@ -91,6 +118,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
       // El backend es el estado de verdad: la cache del navegador solo sirve
@@ -102,6 +130,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!respuesta.ok) {
+    if (respuesta.status === 401) sesionCaducada(path)
     let cuerpo: ApiErrorBody = {}
     try {
       cuerpo = (await respuesta.json()) as ApiErrorBody
@@ -231,6 +260,8 @@ export interface AforoGuarderia {
 export interface ReservaGuarderia {
   id: number
   fecha: string
+  /** Último día de la estadía; `null` en las de un solo día. */
+  fechaSalida: string | null
   tipoEstadia: TipoEstadiaGuarderia
   estado: string
   mascotaId: number
@@ -242,11 +273,19 @@ export interface ReservaGuarderia {
   observaciones: string | null
   cuposOcupados: number
   aforoMaximo: number
+  /** Comanda de guardería emitida al reservar; `null` si la mascota no tiene tutor. */
+  comandaId: number | null
 }
 
 export interface ReservaGuarderiaInput {
   fecha: string
-  tipoEstadia: TipoEstadiaGuarderia
+  /**
+   * Último día de una estadía por rango (requiere `horaEntrada` y `horaSalida`).
+   * Sin él, la reserva es de un solo día, como siempre.
+   */
+  fechaSalida?: string
+  /** Opcional: con rango el backend lo deduce de las fechas. */
+  tipoEstadia?: TipoEstadiaGuarderia
   mascotaId: number
   /**
    * Horarios en `HH:mm`. Se mandan juntos o ninguno: el backend rechaza media
@@ -350,6 +389,8 @@ export interface MovimientoCaja {
   concepto: ConceptoCobro
   /** Deudor de la comanda, no necesariamente quien pagó. */
   nombreTutor: string
+  /** Quién pagó (un cotutor puede saldar la comanda del titular). `null` si no se registró. */
+  nombrePagador: string | null
   /** `null` en las comandas de guardería sin mascota. */
   nombreMascota: string | null
   estadoComanda: EstadoComanda
@@ -421,6 +462,21 @@ export interface MascotaDelDia {
   horaIngreso: string | null
   horaSalida: string | null
   tutores: TutorVinculado[]
+  /** Entrega registrada en la jornada ("Registrar entrega y cerrar"); `null` si todavía no se entregó. */
+  fechaHoraEntrega: string | null
+  entregadoA: string | null
+}
+
+/** Respuesta de `POST /egreso/registrar`. */
+export interface EgresoRegistrado {
+  id: number
+  mascotaId: number
+  nombreMascota: string
+  tutorId: number
+  nombreTutor: string
+  fecha: string
+  fechaHora: string
+  reservaGuarderiaId: number | null
 }
 
 /** Tutor con actividad en una jornada, con las mascotas por las que vino. */
@@ -456,6 +512,9 @@ export const tutores = {
    */
   vincular: (tutorId: number, mascotaId: number, autorizadoRetiro: boolean) =>
     post<Mascota>(`/tutores/${tutorId}/mascotas/${mascotaId}?autorizadoRetiro=${autorizadoRetiro}`),
+  /** Cambia la autorización de un vínculo que ya existe (`vincular` rechaza duplicados con 400). */
+  actualizarAutorizacion: (tutorId: number, mascotaId: number, autorizadoRetiro: boolean) =>
+    put<Mascota>(`/tutores/${tutorId}/mascotas/${mascotaId}?autorizadoRetiro=${autorizadoRetiro}`),
   desvincular: (tutorId: number, mascotaId: number) =>
     del<void>(`/tutores/${tutorId}/mascotas/${mascotaId}`),
   deuda: (tutorId: number) => get<DeudaTutor>(`/tutores/${tutorId}/deuda`),
@@ -524,6 +583,9 @@ export interface ProfesionalInput {
 export const profesionales = {
   listar: () => get<Profesional[]>("/profesionales"),
   crear: (body: ProfesionalInput) => post<Profesional>("/profesionales", body),
+  actualizar: (id: number, body: ProfesionalInput) => put<Profesional>(`/profesionales/${id}`, body),
+  /** 409 si el profesional tiene turnos o consultas registrados. */
+  eliminar: (id: number) => del<void>(`/profesionales/${id}`),
 }
 
 // ----------------------------------------------------------------- turnos
@@ -584,6 +646,9 @@ export const comandas = {
     post<ComandaCobro>("/comandas", body),
   cancelar: (id: number) => put<ComandaCobro>(`/comandas/${id}/cancelar`),
   tarifas: () => get<Record<string, number>>("/comandas/tarifas"),
+  /** Solo el Dueño (403 al resto). */
+  actualizarTarifa: (concepto: ConceptoCobro, monto: number) =>
+    put<{ concepto: string; monto: number }>(`/comandas/tarifas/${concepto}`, { monto }),
 }
 
 // -------------------------------------------------------------------- caja
@@ -636,6 +701,65 @@ export const egreso = {
    */
   pacientesDelDia: (fecha?: string) =>
     get<MascotaDelDia[]>(`/egreso/pacientes-hoy?${query({ fecha })}`),
+  /**
+   * Registra la entrega. El backend vuelve a validar: si el retiro ya no está
+   * permitido (o ya se entregó en la jornada) responde 409 con el motivo.
+   */
+  registrar: (mascotaId: number, tutorId: number, fecha: string) =>
+    post<EgresoRegistrado>("/egreso/registrar", { mascotaId, tutorId, fecha }),
+}
+
+// -------------------------------------------------------------------- auth
+
+export const auth = {
+  login: (username: string, password: string) => post<Sesion>("/auth/login", { username, password }),
+  me: () => get<UsuarioSesion>("/auth/me"),
+  /** Devuelve una sesion nueva: el cambio de clave invalida el token anterior. */
+  cambiarPassword: (actual: string, nueva: string) => post<Sesion>("/auth/cambiar-password", { actual, nueva }),
+}
+
+// ---------------------------------------------------------------- usuarios
+
+/** Alta y reset: la clave temporal viaja una sola vez y no se puede volver a pedir. */
+export interface UsuarioConClaveTemporal {
+  usuario: UsuarioSesion
+  passwordTemporal: string
+}
+
+/** ABM de cuentas. Solo el Dueño: el backend responde 403 al resto. */
+export const usuarios = {
+  listar: () => get<UsuarioSesion[]>("/usuarios"),
+  crear: (datos: { username: string; nombreCompleto: string; rol: RolApi }) =>
+    post<UsuarioConClaveTemporal>("/usuarios", datos),
+  actualizar: (id: number, datos: { nombreCompleto: string; rol: RolApi }) =>
+    put<UsuarioSesion>(`/usuarios/${id}`, datos),
+  cambiarActivo: (id: number, activo: boolean) => put<UsuarioSesion>(`/usuarios/${id}/activo`, { activo }),
+  resetearPassword: (id: number) => post<UsuarioConClaveTemporal>(`/usuarios/${id}/reset-password`),
+  eliminar: (id: number) => del<void>(`/usuarios/${id}`),
+}
+
+// ------------------------------------------------------- tarifas guardería
+
+export interface TarifaGuarderia {
+  precioHora: number
+  precioNoche: number
+}
+
+/** Monto de una estadía: por horas si entra y sale el mismo día, por noches si pasa al menos una. */
+export interface CotizacionGuarderia {
+  modalidad: "HORAS" | "NOCHES"
+  cantidad: number
+  precioUnitario: number
+  total: number
+}
+
+export const tarifasGuarderia = {
+  obtener: () => get<TarifaGuarderia>("/guarderia/tarifas"),
+  /** Solo el Dueño (403 al resto). */
+  actualizar: (tarifas: TarifaGuarderia) => put<TarifaGuarderia>("/guarderia/tarifas", tarifas),
+  /** `desde`/`hasta` en ISO local sin zona: `2031-06-02T09:00:00`. */
+  cotizar: (desde: string, hasta: string) =>
+    get<CotizacionGuarderia>(`/guarderia/cotizar?${query({ desde, hasta })}`),
 }
 
 // ----------------------------------------------------------------- helpers

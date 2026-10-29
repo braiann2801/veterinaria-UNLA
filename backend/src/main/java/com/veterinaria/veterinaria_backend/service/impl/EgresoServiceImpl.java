@@ -3,7 +3,10 @@ package com.veterinaria.veterinaria_backend.service.impl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -11,18 +14,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.EgresoRegistradoResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.EgresoRegistroRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO.MotivoBloqueo;
 import com.veterinaria.veterinaria_backend.dto.MascotaDelDiaResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ConsultaMedica;
+import com.veterinaria.veterinaria_backend.entity.EgresoMascota;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
+import com.veterinaria.veterinaria_backend.entity.ReservaGuarderia;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
+import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
 import com.veterinaria.veterinaria_backend.repository.ConsultaMedicaRepository;
+import com.veterinaria.veterinaria_backend.repository.EgresoMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
+import com.veterinaria.veterinaria_backend.repository.ReservaGuarderiaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
 import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
@@ -55,13 +65,19 @@ public class EgresoServiceImpl implements EgresoService {
 	private final ConsultaMedicaRepository consultaRepository;
 	private final ComandaCobroService comandaService;
 	private final JornadaDelDiaService jornadaDelDiaService;
+	private final EgresoMascotaRepository egresoRepository;
+	private final ReservaGuarderiaRepository reservaRepository;
 
 	public EgresoServiceImpl(MascotaRepository mascotaRepository,
 			TutorRepository tutorRepository,
 			TutorMascotaRepository vinculoRepository,
 			ConsultaMedicaRepository consultaRepository,
 			ComandaCobroService comandaService,
-			JornadaDelDiaService jornadaDelDiaService) {
+			JornadaDelDiaService jornadaDelDiaService,
+			EgresoMascotaRepository egresoRepository,
+			ReservaGuarderiaRepository reservaRepository) {
+		this.egresoRepository = egresoRepository;
+		this.reservaRepository = reservaRepository;
 		this.mascotaRepository = mascotaRepository;
 		this.tutorRepository = tutorRepository;
 		this.vinculoRepository = vinculoRepository;
@@ -73,8 +89,80 @@ public class EgresoServiceImpl implements EgresoService {
 	@Override
 	public List<MascotaDelDiaResponseDTO> listarPacientesDelDia(LocalDate fecha) {
 		// Sin reglas propias: la definicion de "estuvo hoy" es una sola y la
-		// comparte con la caja del dia.
-		return jornadaDelDiaService.mascotasDelDia(fecha);
+		// comparte con la caja del dia. Solo se le suma la entrega registrada.
+		LocalDate dia = fecha != null ? fecha : LocalDate.now();
+		Map<Long, EgresoMascota> entregas = egresoRepository.findByFecha(dia).stream()
+				.collect(Collectors.toMap(e -> e.getMascota().getId(), e -> e, (a, b) -> a));
+		List<MascotaDelDiaResponseDTO> resultado = new java.util.ArrayList<>(jornadaDelDiaService.mascotasDelDia(dia)
+				.stream()
+				.map(m -> {
+					EgresoMascota entrega = entregas.remove(m.mascotaId());
+					return entrega == null ? m
+							: m.conEntrega(entrega.getFechaHora(), entrega.getTutor().getNombreCompleto());
+				})
+				.toList());
+		// La jornada deja afuera la estadia FINALIZADA (no ocupa cupo), pero el
+		// checkout tiene que seguir mostrando a quien ya se entrego ese dia.
+		entregas.values().forEach(entrega -> resultado.add(filaEntregada(entrega)));
+		return List.copyOf(resultado);
+	}
+
+	private MascotaDelDiaResponseDTO filaEntregada(EgresoMascota entrega) {
+		Mascota mascota = entrega.getMascota();
+		ReservaGuarderia estadia = entrega.getReservaGuarderia();
+		return new MascotaDelDiaResponseDTO(
+				mascota.getId(),
+				mascota.getNombre(),
+				mascota.getEspecie() != null ? mascota.getEspecie().name() : null,
+				EntityMapper.conductaToApi(mascota.getConducta()),
+				estadia != null ? List.of(MascotaDelDiaResponseDTO.MOTIVO_GUARDERIA) : List.of(),
+				0,
+				estadia != null ? estadia.getEstado().name() : null,
+				estadia != null ? estadia.getHoraEntrada() : null,
+				estadia != null ? estadia.getHoraSalida() : null,
+				jornadaDelDiaService.tutoresDe(mascota.getId()),
+				entrega.getFechaHora(),
+				entrega.getTutor().getNombreCompleto());
+	}
+
+	@Override
+	@Transactional
+	public EgresoRegistradoResponseDTO registrarEntrega(EgresoRegistroRequestDTO request) {
+		LocalDate dia = request.fecha() != null ? request.fecha() : LocalDate.now();
+		if (egresoRepository.existsByMascotaIdAndFecha(request.mascotaId(), dia)) {
+			throw new BusinessConflictException("La mascota " + request.mascotaId()
+					+ " ya fue entregada en la jornada del " + dia + ".");
+		}
+
+		// Se vuelve a validar aca: el veredicto que vio la pantalla puede estar
+		// viejo (alguien cambio la autorizacion o se emitio otra comanda) o haber
+		// sido salteado llamando a la API directo.
+		EgresoValidacionResponseDTO veredicto = validarPorTutorId(request.mascotaId(), request.tutorId());
+		if (!veredicto.puedeRetirar()) {
+			throw new BusinessConflictException(veredicto.mensaje());
+		}
+
+		Mascota mascota = obtenerMascota(request.mascotaId());
+		Tutor tutor = tutorRepository.findById(request.tutorId())
+				.orElseThrow(() -> ResourceNotFoundException.tutor(request.tutorId()));
+		ReservaGuarderia estadia = reservaRepository.findVigentesDeMascotaEnDia(mascota.getId(), dia,
+				List.of(ReservaGuarderia.EstadoReserva.RESERVADO, ReservaGuarderia.EstadoReserva.INGRESADO))
+				.stream().findFirst().orElse(null);
+		if (estadia != null) {
+			estadia.setEstado(ReservaGuarderia.EstadoReserva.FINALIZADO);
+		}
+
+		EgresoMascota egreso = new EgresoMascota();
+		egreso.setMascota(mascota);
+		egreso.setTutor(tutor);
+		egreso.setFecha(dia);
+		egreso.setFechaHora(LocalDateTime.now());
+		egreso.setReservaGuarderia(estadia);
+		EgresoMascota guardado = egresoRepository.save(egreso);
+
+		return new EgresoRegistradoResponseDTO(guardado.getId(), mascota.getId(), mascota.getNombre(),
+				tutor.getId(), tutor.getNombreCompleto(), dia, guardado.getFechaHora(),
+				estadia != null ? estadia.getId() : null);
 	}
 
 	@Override

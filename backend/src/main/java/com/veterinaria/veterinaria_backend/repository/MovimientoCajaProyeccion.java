@@ -32,6 +32,9 @@ public interface MovimientoCajaProyeccion {
 
 	String getNombreTutor();
 
+	/** Quien pago; {@code null} en pagos cargados antes de registrar al pagador. */
+	String getNombrePagador();
+
 	String getNombreMascota();
 
 	ComandaCobro.EstadoComanda getEstadoComanda();

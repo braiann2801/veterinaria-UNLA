@@ -202,15 +202,18 @@ public class TutorServiceImpl implements TutorService {
 
 	@Override
 	@Transactional
+	public MascotaResponseDTO actualizarAutorizacion(Long tutorId, Long mascotaId, boolean autorizadoRetiro) {
+		TutorMascota vinculo = obtenerVinculo(obtenerEntidad(tutorId), mascotaId);
+		vinculo.setAutorizadoRetiro(autorizadoRetiro);
+		return mapper.toResponse(vinculo.getMascota());
+	}
+
+	@Override
+	@Transactional
 	public void desvincularMascota(Long tutorId, Long mascotaId) {
 		Tutor tutor = obtenerEntidad(tutorId);
 
-		TutorMascota vinculo = tutor.getVinculos().stream()
-				.filter(Objects::nonNull)
-				.filter(v -> Objects.equals(v.getMascota().getId(), mascotaId))
-				.findFirst()
-				.orElseThrow(() -> new ResourceNotFoundException(
-						"La mascota " + mascotaId + " no esta vinculada al tutor " + tutorId));
+		TutorMascota vinculo = obtenerVinculo(tutor, mascotaId);
 
 		Mascota mascota = vinculo.getMascota();
 		tutor.getVinculos().remove(vinculo);
@@ -222,6 +225,15 @@ public class TutorServiceImpl implements TutorService {
 	}
 
 	// ------------------------------------------------------------- internos
+
+	private TutorMascota obtenerVinculo(Tutor tutor, Long mascotaId) {
+		return tutor.getVinculos().stream()
+				.filter(Objects::nonNull)
+				.filter(v -> Objects.equals(v.getMascota().getId(), mascotaId))
+				.findFirst()
+				.orElseThrow(() -> new ResourceNotFoundException(
+						"La mascota " + mascotaId + " no esta vinculada al tutor " + tutor.getId()));
+	}
 
 	private Tutor obtenerEntidad(Long id) {
 		if (id == null) {

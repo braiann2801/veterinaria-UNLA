@@ -143,3 +143,15 @@ export function money(n: number | null | undefined) {
   const miles = entero.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
   return `${valor < 0 ? "-" : ""}$${miles}${Math.round(valor) !== entero ? ",00" : ""}`
 }
+/**
+ * Fecha legible `dd/mm/aaaa` a partir de un ISO del backend (`2026-10-28` o
+ * `2026-10-28T00:00:00`).
+ *
+ * Se toma el texto tal cual y no se pasa por `Date`: `new Date("2026-10-28")` es
+ * medianoche UTC, y en UTC-3 se mostraría el día anterior.
+ */
+export function fechaCorta(iso: string | null | undefined) {
+  if (!iso) return ""
+  const [anio, mes, dia] = iso.slice(0, 10).split("-")
+  return anio && mes && dia ? `${dia}/${mes}/${anio}` : iso
+}

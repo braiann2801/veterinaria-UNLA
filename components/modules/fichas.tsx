@@ -30,7 +30,8 @@ import { consultas as apiConsultas, mascotas as apiMascotas } from "@/lib/api"
 import type { ConsultaMedica, ConductaMascota, ConductaObservada, Mascota } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Panel, TextInput } from "@/components/ui/field"
-import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { Recurso, TOQUE_MINIMO, fechaCorta } from "@/lib/vista"
+import { Paginado } from "@/components/ui/paginado"
 import { cn } from "@/lib/utils"
 
 /**
@@ -132,8 +133,10 @@ export function Fichas({ initialMascotaId }: { initialMascotaId?: number | null 
             {(lista) => {
               const filtradas = filtrar(lista)
               return (
+                <Paginado items={filtradas} clave="historial-pacientes" reiniciarCon={q}>
+                {(pagina) => (
                 <ul className="flex max-h-[420px] flex-col gap-1 overflow-y-auto">
-                  {filtradas.map((m) => {
+                  {pagina.map((m) => {
                     const activo = m.id === seleccionId
                     return (
                       <li key={m.id}>
@@ -171,6 +174,8 @@ export function Fichas({ initialMascotaId }: { initialMascotaId?: number | null 
                     </li>
                   )}
                 </ul>
+                )}
+                </Paginado>
               )
             }}
           </Recurso>
@@ -227,12 +232,14 @@ export function Fichas({ initialMascotaId }: { initialMascotaId?: number | null 
                 textoVacio="Sin consultas registradas todavía."
               >
                 {(consultas) => (
+                  <Paginado items={consultas} clave="historial-consultas" reiniciarCon={seleccionId}>
+                  {(pagina) => (
                   <ul className="flex flex-col gap-3">
-                    {consultas.map((c) => (
+                    {pagina.map((c) => (
                       <li key={c.id} className="rounded-md border border-border p-3">
                         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <FileText className="size-3.5" aria-hidden />
-                          {c.fechaAtencion}
+                          {fechaCorta(c.fechaAtencion)}
                           <span>· {c.profesional.nombreCompleto}</span>
                           {c.alertaConducta && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900 dark:bg-amber-500/15 dark:text-amber-300">
@@ -254,6 +261,8 @@ export function Fichas({ initialMascotaId }: { initialMascotaId?: number | null 
                       </li>
                     ))}
                   </ul>
+                  )}
+                  </Paginado>
                 )}
               </Recurso>
             </Panel>

@@ -13,10 +13,12 @@ import com.veterinaria.veterinaria_backend.dto.TutorRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResumenDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorMascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.UsuarioResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.Profesional;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
+import com.veterinaria.veterinaria_backend.entity.Usuario;
 
 /**
  * Traduccion entre entidades JPA y DTOs de la API.
@@ -230,6 +232,29 @@ public class EntityMapper {
 			return List.of();
 		}
 		return profesionales.stream().filter(Objects::nonNull).map(this::toResponse).toList();
+	}
+
+	// ------------------------------------------------------------ Usuario
+
+	/** Nunca expone el hash ni la version de token. */
+	public UsuarioResponseDTO toResponse(Usuario usuario) {
+		if (usuario == null) {
+			return null;
+		}
+		return new UsuarioResponseDTO(
+				usuario.getId(),
+				usuario.getUsername(),
+				usuario.getNombreCompleto(),
+				usuario.getRol(),
+				usuario.isActivo(),
+				usuario.isDebeCambiarPassword());
+	}
+
+	public List<UsuarioResponseDTO> toUsuarioResponseList(List<Usuario> usuarios) {
+		if (usuarios == null) {
+			return List.of();
+		}
+		return usuarios.stream().filter(Objects::nonNull).map(this::toResponse).toList();
 	}
 
 	// -------------------------------------------------------- TutorMascota

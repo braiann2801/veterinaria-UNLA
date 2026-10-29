@@ -52,6 +52,11 @@ export function Modal({
         return
       }
       if (evento.key !== "Tab" || !panelRef.current) return
+      // Los popovers de react-aria/HeroUI (p. ej. el calendario del rango de la
+      // guardería) se abren en un portal fuera del panel, como otro role=dialog:
+      // el Tab dentro de ellos lo maneja su propia trampa de foco, no esta.
+      const otroDialogo = (document.activeElement as HTMLElement | null)?.closest('[role="dialog"]')
+      if (otroDialogo && otroDialogo !== panelRef.current) return
 
       // El `Button` de Base UI deja `tabindex` en botones deshabilitados: sin
       // este filtro el ultimo "focusable" podia ser un Guardar inactivo y el

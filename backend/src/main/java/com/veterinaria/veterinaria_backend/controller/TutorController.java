@@ -101,6 +101,23 @@ public class TutorController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(vinculada);
 	}
 
+	/**
+	 * PUT /api/v1/tutores/{tutorId}/mascotas/{mascotaId}
+	 *
+	 * <p>Cambia la autorizacion de retiro de un vinculo que ya existe. El POST
+	 * de arriba rechaza un vinculo repetido (400), asi que no sirve para esto.
+	 * Mismo contrato del flag: query param o body, y 400 si no llega.</p>
+	 */
+	@PutMapping("/{tutorId}/mascotas/{mascotaId}")
+	public ResponseEntity<MascotaResponseDTO> actualizarAutorizacion(@PathVariable Long tutorId,
+			@PathVariable Long mascotaId,
+			@RequestParam(required = false) Boolean autorizadoRetiro,
+			@RequestBody(required = false) VinculoRequestDTO body) {
+
+		Boolean flag = resolverFlag(autorizadoRetiro, body);
+		return ResponseEntity.ok(tutorService.actualizarAutorizacion(tutorId, mascotaId, flag));
+	}
+
 	/** DELETE /api/v1/tutores/{tutorId}/mascotas/{mascotaId} -> 204 */
 	@DeleteMapping("/{tutorId}/mascotas/{mascotaId}")
 	public ResponseEntity<Void> desvincular(@PathVariable Long tutorId, @PathVariable Long mascotaId) {

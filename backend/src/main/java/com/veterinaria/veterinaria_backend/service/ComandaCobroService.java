@@ -8,6 +8,7 @@ import java.util.Map;
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
+import com.veterinaria.veterinaria_backend.entity.ReservaGuarderia;
 
 /**
  * Casos de uso de las comandas de cobro.
@@ -44,6 +45,23 @@ public interface ComandaCobroService {
 
 	/** Cancela una comanda y la saca del conteo de deuda. */
 	ComandaCobroResponseDTO cancelar(Long id);
+
+	/**
+	 * Emite la comanda de GUARDERIA de una reserva recien creada, a nombre del
+	 * tutor autorizado a retirar mas antiguo (o del primero vinculado si ninguno
+	 * esta autorizado). Devuelve el id, o {@code null} si la mascota no tiene
+	 * tutor: sin titular no hay a quien cobrarle.
+	 */
+	Long emitirParaReserva(ReservaGuarderia reserva, java.util.function.Supplier<java.math.BigDecimal> monto);
+
+	/** Al cancelar una reserva: anula sus comandas sin pagos y deja las que ya tienen pagos. */
+	void anularDeReserva(Long reservaId);
+
+	/** Al eliminar una reserva: borra sus comandas sin pagos; si alguna tiene pagos responde 409. */
+	void eliminarDeReserva(Long reservaId);
+
+	/** Id de la comanda vigente de una reserva, o {@code null}. */
+	Long comandaDeReserva(Long reservaId);
 
 	/** Estado consolidado de morosidad de un tutor (regla 2.5). */
 	DeudaTutorResponseDTO consultarDeuda(Long tutorId);

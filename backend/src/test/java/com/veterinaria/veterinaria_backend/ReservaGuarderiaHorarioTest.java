@@ -196,6 +196,6 @@ class ReservaGuarderiaHorarioTest {
 
 	private ReservaGuarderiaRequestDTO pedir(long mascotaId, LocalTime entrada, LocalTime salida,
 			ReservaGuarderiaRequestDTO.TipoEstadiaRequestDTO tipo) {
-		return new ReservaGuarderiaRequestDTO(DIA, tipo, mascotaId, entrada, salida, null, null);
+		return new ReservaGuarderiaRequestDTO(DIA, null, tipo, mascotaId, entrada, salida, null, null);
 	}
 }

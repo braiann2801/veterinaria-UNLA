@@ -10,8 +10,12 @@ import com.veterinaria.veterinaria_backend.dto.ProfesionalRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ProfesionalResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.Profesional;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
+import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
+import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
+import com.veterinaria.veterinaria_backend.repository.ConsultaMedicaRepository;
 import com.veterinaria.veterinaria_backend.repository.ProfesionalRepository;
+import com.veterinaria.veterinaria_backend.repository.TurnoClinicoRepository;
 import com.veterinaria.veterinaria_backend.service.ProfesionalService;
 
 /**
@@ -29,10 +33,15 @@ public class ProfesionalServiceImpl implements ProfesionalService {
 
 	private final ProfesionalRepository profesionalRepository;
 	private final EntityMapper mapper;
+	private final TurnoClinicoRepository turnoRepository;
+	private final ConsultaMedicaRepository consultaRepository;
 
-	public ProfesionalServiceImpl(ProfesionalRepository profesionalRepository, EntityMapper mapper) {
+	public ProfesionalServiceImpl(ProfesionalRepository profesionalRepository, EntityMapper mapper,
+			TurnoClinicoRepository turnoRepository, ConsultaMedicaRepository consultaRepository) {
 		this.profesionalRepository = profesionalRepository;
 		this.mapper = mapper;
+		this.turnoRepository = turnoRepository;
+		this.consultaRepository = consultaRepository;
 	}
 
 	@Override
@@ -61,7 +70,50 @@ public class ProfesionalServiceImpl implements ProfesionalService {
 		return mapper.toResponse(profesionalRepository.save(profesional));
 	}
 
+	@Override
+	@Transactional
+	public ProfesionalResponseDTO actualizar(Long id, ProfesionalRequestDTO request) {
+		Profesional profesional = obtener(id);
+		String dni = normalizar(request.dni());
+		String matricula = normalizarMatricula(request.matricula());
+
+		// Misma unicidad que el alta, pero sin contarse a si mismo: conservar la
+		// propia matricula al editar el telefono no es un duplicado.
+		rechazarDuplicado(sinElMismo(profesionalRepository.findByMatricula(matricula).stream().toList(), id),
+				matricula, "La matricula");
+		rechazarDuplicado(sinElMismo(profesionalRepository.findByDni(dni), id), dni, "El DNI");
+
+		profesional.setNombre(request.nombre().trim());
+		profesional.setApellido(request.apellido().trim());
+		profesional.setDni(dni);
+		profesional.setMatricula(matricula);
+		profesional.setTelefono(normalizarTelefono(request.telefono()));
+		return mapper.toResponse(profesionalRepository.save(profesional));
+	}
+
+	@Override
+	@Transactional
+	public void eliminar(Long id) {
+		Profesional profesional = obtener(id);
+		// Igual que con las mascotas: la FK impediria el borrado con un 500 opaco.
+		// Se rechaza con 409 y un motivo legible.
+		if (turnoRepository.existsByProfesionalId(id) || consultaRepository.existsByProfesionalId(id)) {
+			throw new BusinessConflictException("No se puede eliminar a " + profesional.getNombreCompleto()
+					+ ": tiene turnos o consultas registrados.");
+		}
+		profesionalRepository.delete(profesional);
+	}
+
 	// ------------------------------------------------------------- internos
+
+	private Profesional obtener(Long id) {
+		return profesionalRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("No existe el profesional " + id));
+	}
+
+	private static List<Profesional> sinElMismo(List<Profesional> encontrados, Long id) {
+		return encontrados.stream().filter(p -> !p.getId().equals(id)).toList();
+	}
 
 	/**
 	 * Corta el alta si el identificador ya pertenece a otro profesional.

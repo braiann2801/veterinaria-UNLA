@@ -27,4 +27,7 @@ public interface ConsultaMedicaRepository extends JpaRepository<ConsultaMedica, 
 
 	/** ¿La mascota tiene consultas registradas? Bloquea su borrado desde el padron. */
 	boolean existsByMascotaId(Long mascotaId);
+
+	/** ¿El profesional firmo consultas? Bloquea su baja. */
+	boolean existsByProfesionalId(Long profesionalId);
 }
