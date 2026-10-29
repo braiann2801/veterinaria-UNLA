@@ -25,7 +25,7 @@ import { useApi } from "@/lib/use-api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
-import { Recurso, TOQUE_MINIMO, formatearDni } from "@/lib/vista"
+import { Recurso, TOQUE_MINIMO, filtrarPorModo, formatearDni } from "@/lib/vista"
 import { Paginado } from "@/components/ui/paginado"
 import { AltaMascota, CONDUCTAS, ESPECIES } from "@/components/modules/alta-mascota"
 
@@ -1048,7 +1048,7 @@ function Campo({
       <span className="text-xs font-medium text-muted-foreground">{etiqueta}</span>
       <TextInput
         value={valor}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(filtrarPorModo(inputMode, e.target.value))}
         inputMode={inputMode}
         placeholder={placeholder}
         className={TOQUE_MINIMO}

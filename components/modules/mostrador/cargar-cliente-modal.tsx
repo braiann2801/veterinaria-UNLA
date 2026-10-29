@@ -8,7 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { mascotas as apiMascotas, tutores as apiTutores, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
-import { TOQUE_MINIMO, formatearDni, limpiarDni } from "@/lib/vista"
+import { TOQUE_MINIMO, formatearDni, limpiarDni, soloDecimal, soloDni, soloTelefono } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie` del backend, con la etiqueta que ve el operador. */
 const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
@@ -276,7 +276,7 @@ export function CargarClienteModal({
             <Field label="DNI">
               <TextInput
                 value={tutor.dni}
-                onChange={(e) => setTutor((f) => ({ ...f, dni: e.target.value }))}
+                onChange={(e) => setTutor((f) => ({ ...f, dni: soloDni(e.target.value) }))}
                 inputMode="numeric"
                 className={TOQUE_MINIMO}
               />
@@ -284,7 +284,7 @@ export function CargarClienteModal({
             <Field label="Teléfono">
               <TextInput
                 value={tutor.telefono}
-                onChange={(e) => setTutor((f) => ({ ...f, telefono: e.target.value }))}
+                onChange={(e) => setTutor((f) => ({ ...f, telefono: soloTelefono(e.target.value) }))}
                 inputMode="tel"
                 className={TOQUE_MINIMO}
               />
@@ -369,7 +369,7 @@ export function CargarClienteModal({
             <Field label="Peso (kg)">
               <TextInput
                 value={mascota.peso}
-                onChange={(e) => setMascota((f) => ({ ...f, peso: e.target.value }))}
+                onChange={(e) => setMascota((f) => ({ ...f, peso: soloDecimal(e.target.value) }))}
                 inputMode="decimal"
                 placeholder="Ej: 12.5"
                 className={TOQUE_MINIMO}

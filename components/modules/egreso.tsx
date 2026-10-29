@@ -34,7 +34,7 @@ import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Panel, Select, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
-import { ErrorBox, Semforo, TOQUE_MINIMO, formatearDni, money } from "@/lib/vista"
+import { ErrorBox, Semforo, TOQUE_MINIMO, formatearDni, money, soloDni } from "@/lib/vista"
 
 const ETIQUETA_CONDUCTA: Record<string, string> = {
   normal: "normal",
@@ -243,7 +243,7 @@ function ModalValidar({
           {modo === "dni" && (
             <TextInput
               value={dni}
-              onChange={(e) => setDni(e.target.value)}
+              onChange={(e) => setDni(soloDni(e.target.value))}
               placeholder="DNI del tutor"
               inputMode="numeric"
               aria-label="DNI del tutor que se presenta"

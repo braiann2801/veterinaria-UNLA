@@ -28,7 +28,7 @@ import { mascotas as apiMascotas, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
-import { TOQUE_MINIMO, formatearDni } from "@/lib/vista"
+import { TOQUE_MINIMO, filtrarPorModo, formatearDni } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie`. La etiqueta es la que ve el operador. */
 export const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
@@ -316,7 +316,7 @@ function Campo({
       <span className="text-xs font-medium text-muted-foreground">{etiqueta}</span>
       <TextInput
         value={valor}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(filtrarPorModo(inputMode, e.target.value))}
         inputMode={inputMode}
         placeholder={placeholder}
         className={TOQUE_MINIMO}
