@@ -42,7 +42,7 @@ import { useApi } from "@/lib/use-api"
 import { Panel, Select } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { DatePicker } from "@/components/ui/date-picker"
-import { Recurso, Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
+import { Recurso, Semforo, TOQUE_MINIMO, formatearDni, money } from "@/lib/vista"
 
 const METODOS: { valor: MetodoPago; etiqueta: string }[] = [
   { valor: "EFECTIVO", etiqueta: "Efectivo" },
@@ -175,7 +175,7 @@ export function Caja() {
 
         {tutorElegido && (
           <p className="mt-3 text-xs text-muted-foreground">
-            {tutorElegido.nombreCompleto} · DNI {tutorElegido.dni} ·{" "}
+            {tutorElegido.nombreCompleto} · DNI {formatearDni(tutorElegido.dni)} ·{" "}
             {tutorElegido.mascotas.length} mascota{tutorElegido.mascotas.length === 1 ? "" : "s"} en la
             jornada.
           </p>

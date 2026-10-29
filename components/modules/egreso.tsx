@@ -34,7 +34,7 @@ import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Panel, Select, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
-import { ErrorBox, Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
+import { ErrorBox, Semforo, TOQUE_MINIMO, formatearDni, money } from "@/lib/vista"
 
 const ETIQUETA_CONDUCTA: Record<string, string> = {
   normal: "normal",
@@ -233,7 +233,7 @@ function ModalValidar({
             >
               {mascota.tutores.map((t) => (
                 <option key={t.tutorId} value={String(t.tutorId)}>
-                  {t.nombreCompleto} · DNI {t.dni}
+                  {t.nombreCompleto} · DNI {formatearDni(t.dni)}
                   {t.autorizadoRetiro ? "" : " · no autorizado a retirar"}
                 </option>
               ))}

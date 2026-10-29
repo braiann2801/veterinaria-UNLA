@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.dto;
 
 import com.veterinaria.veterinaria_backend.entity.Usuario;
+import com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -15,4 +16,8 @@ public record UsuarioUpdateDTO(
 
 		@NotNull(message = "El rol es obligatorio")
 		Usuario.Rol rol) {
+
+	public UsuarioUpdateDTO {
+		nombreCompleto = NormalizadorAr.nombrePropio(nombreCompleto);
+	}
 }

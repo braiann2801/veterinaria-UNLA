@@ -50,8 +50,8 @@ class TutorMascotaRequestValidationTest {
 		assertThat(violaciones).extracting("message")
 				.contains("El nombre del tutor es obligatorio",
 						"El apellido del tutor es obligatorio",
-						"El DNI debe contener entre 7 y 10 digitos",
-						"El telefono debe contener entre 6 y 15 digitos",
+						"El DNI debe tener 7 u 8 digitos (ej.: 30.123.456)",
+						"El telefono debe tener 10 digitos con el codigo de area, sin 0 ni 15 (ej.: 11 2345-6789)",
 						"El email no tiene un formato valido");
 	}
 

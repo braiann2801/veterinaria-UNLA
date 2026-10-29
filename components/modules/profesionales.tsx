@@ -22,7 +22,7 @@ import type { Profesional } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Panel, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
-import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { Recurso, TOQUE_MINIMO, formatearDni } from "@/lib/vista"
 import { Paginado } from "@/components/ui/paginado"
 
 /** Botón de acción de fila (editar/eliminar): cuadrado táctil de 44 px, igual que en el Padrón. */
@@ -89,7 +89,7 @@ export function Profesionales() {
                 <p className="text-xs text-muted-foreground">
                   {[
                     p.matricula ? `Mat. ${p.matricula}` : null,
-                    p.dni ? `DNI ${p.dni}` : null,
+                    p.dni ? `DNI ${formatearDni(p.dni)}` : null,
                     p.telefono,
                   ]
                     .filter(Boolean)

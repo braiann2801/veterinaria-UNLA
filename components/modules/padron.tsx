@@ -25,7 +25,7 @@ import { useApi } from "@/lib/use-api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
-import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
+import { Recurso, TOQUE_MINIMO, formatearDni } from "@/lib/vista"
 import { Paginado } from "@/components/ui/paginado"
 import { AltaMascota, CONDUCTAS, ESPECIES } from "@/components/modules/alta-mascota"
 
@@ -101,7 +101,7 @@ export function Padron() {
                   >
                     <span className="truncate text-sm font-medium">{t.nombreCompleto}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      DNI {t.dni}
+                      DNI {formatearDni(t.dni)}
                       {t.telefono ? ` · ${t.telefono}` : ""} · {t.mascotas.length} mascota
                       {t.mascotas.length === 1 ? "" : "s"}
                     </span>
@@ -979,7 +979,7 @@ function ModalAgregarCotutor({
               <option value="">Elegí un tutor…</option>
               {disponibles.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.nombre} {t.apellido} · DNI {t.dni}
+                  {t.nombre} {t.apellido} · DNI {formatearDni(t.dni)}
                 </option>
               ))}
             </Select>

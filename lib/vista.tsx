@@ -18,6 +18,19 @@ import { cn } from "@/lib/utils"
 /** Ancho de la zona de toque tactil (regla 3.4 de AGENTS.md). */
 export const TOQUE_MINIMO = "min-h-[44px]"
 
+/**
+ * DNI con puntos de miles para mostrar ("30123456" -> "30.123.456"). El backend
+ * lo guarda solo con digitos; esto es solo presentacion, nunca va a la API.
+ */
+export function formatearDni(dni: string): string {
+  return /^\d+$/.test(dni) ? dni.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : dni
+}
+
+/** Quita puntos, espacios y guiones de un DNI, igual que el backend antes de validarlo. */
+export function limpiarDni(dni: string): string {
+  return dni.replace(/[.\s-]/g, "")
+}
+
 export function Cargando({ texto = "Cargando" }: { texto?: string }) {
   return (
     <div

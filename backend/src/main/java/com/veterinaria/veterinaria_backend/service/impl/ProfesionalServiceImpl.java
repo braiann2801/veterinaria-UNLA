@@ -1,7 +1,6 @@
 package com.veterinaria.veterinaria_backend.service.impl;
 
 import java.util.List;
-import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +12,7 @@ import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
+import com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr;
 import com.veterinaria.veterinaria_backend.repository.ConsultaMedicaRepository;
 import com.veterinaria.veterinaria_backend.repository.ProfesionalRepository;
 import com.veterinaria.veterinaria_backend.repository.TurnoClinicoRepository;
@@ -132,40 +132,22 @@ public class ProfesionalServiceImpl implements ProfesionalService {
 		throw new BadRequestException(etiqueta + " " + valor + " ya esta registrada");
 	}
 
-	/** Recorta y pasa a mayusculas. Un DNI o matricula en blanco se trata como null. */
+	/**
+	 * El DTO ya llega normalizado (ver {@link NormalizadorAr}); se vuelve a pasar
+	 * por el normalizador para que el servicio no dependa de quien lo construyo.
+	 * Un DNI en blanco se trata como null.
+	 */
 	private String normalizar(String valor) {
-		if (valor == null) {
-			return null;
-		}
-		String recortado = valor.trim().toUpperCase(Locale.ROOT);
-		return recortado.isEmpty() ? null : recortado;
+		return NormalizadorAr.dni(valor);
 	}
 
-	/**
-	 * La matricula se compara sin espacios internos ("MAT 01" y "MAT01" son la
-	 * misma), pero se guarda con ellos: la matricula se muestra en la ficha
-	 * clinica y se lee en voz alta, y "MAT-01" queda mejor que "MAT01".
-	 */
+	/** Matricula comparable: "m.p. 1234" y "MP1234" son la misma ("MP 1234"). */
 	private String normalizarMatricula(String valor) {
-		if (valor == null) {
-			return null;
-		}
-		String recortado = valor.trim().toUpperCase(Locale.ROOT);
-		if (recortado.isEmpty()) {
-			return null;
-		}
-		return recortado.replaceAll("\\s+", " ");
+		return NormalizadorAr.matricula(valor);
 	}
 
-	/**
-	 * El telefono se guarda tal cual, sin pasar por mayusculas: no tiene letras
-	 * que normalizar y los prefijos con "+" se leen mejor intactos.
-	 */
+	/** Telefono como numero nacional de 10 digitos. */
 	private String normalizarTelefono(String valor) {
-		if (valor == null) {
-			return null;
-		}
-		String recortado = valor.trim();
-		return recortado.isEmpty() ? null : recortado;
+		return NormalizadorAr.telefono(valor);
 	}
 }

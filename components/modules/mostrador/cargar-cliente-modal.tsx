@@ -8,7 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { mascotas as apiMascotas, tutores as apiTutores, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
-import { TOQUE_MINIMO } from "@/lib/vista"
+import { TOQUE_MINIMO, formatearDni, limpiarDni } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie` del backend, con la etiqueta que ve el operador. */
 const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
@@ -158,11 +158,11 @@ export function CargarClienteModal({
     setError(null)
     setExito(null)
 
-    // El DNI se valida acá para no gastar un viaje con un 400 previsible: el
-    // backend exige 7 a 10 dígitos y el mensaje no dice cuántos.
-    const dni = tutor.dni.trim()
-    if (!/^\d{7,10}$/.test(dni)) {
-      setError("El DNI debe tener entre 7 y 10 dígitos, solo números.")
+    // El DNI se valida acá para no gastar un viaje con un 400 previsible. Se
+    // aceptan puntos y espacios ("30.123.456"): se limpian igual que en el backend.
+    const dni = limpiarDni(tutor.dni)
+    if (!/^\d{7,8}$/.test(dni)) {
+      setError("El DNI debe tener 7 u 8 dígitos (ej.: 30.123.456).")
       setGuardando(false)
       return
     }
@@ -241,7 +241,7 @@ export function CargarClienteModal({
   }
 
   // El tutor que se está cargando no puede ser su propio cotutor.
-  const candidatosCotutor = padron.filter((t) => t.dni.trim() !== tutor.dni.trim())
+  const candidatosCotutor = padron.filter((t) => t.dni !== limpiarDni(tutor.dni))
 
   const listo =
     tutor.nombre.trim().length > 0 &&
@@ -444,7 +444,7 @@ export function CargarClienteModal({
               <option value="">Sin cotutor</option>
               {candidatosCotutor.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.nombreCompleto} · DNI {t.dni}
+                  {t.nombreCompleto} · DNI {formatearDni(t.dni)}
                 </option>
               ))}
             </Select>

@@ -28,7 +28,7 @@ import { mascotas as apiMascotas, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
-import { TOQUE_MINIMO } from "@/lib/vista"
+import { TOQUE_MINIMO, formatearDni } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie`. La etiqueta es la que ve el operador. */
 export const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
@@ -249,7 +249,7 @@ export function AltaMascota({
                 <option value="">Sin tutor por ahora</option>
                 {tutores.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.nombreCompleto} · DNI {t.dni}
+                    {t.nombreCompleto} · DNI {formatearDni(t.dni)}
                   </option>
                 ))}
               </Select>

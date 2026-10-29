@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -52,6 +54,12 @@ public record MascotaRequestDTO(
 		String observaciones,
 
 		List<@Valid VinculoTutorDTO> tutores) {
+
+	/** Nombre y raza con mayuscula inicial, como los nombres de personas. */
+	public MascotaRequestDTO {
+		nombre = NormalizadorAr.nombrePropio(nombre);
+		raza = NormalizadorAr.nombrePropio(raza);
+	}
 
 	public enum EspecieRequestDTO {
 		CANINO,

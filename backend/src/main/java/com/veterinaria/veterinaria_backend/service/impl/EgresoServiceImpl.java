@@ -29,6 +29,7 @@ import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
+import com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr;
 import com.veterinaria.veterinaria_backend.repository.ConsultaMedicaRepository;
 import com.veterinaria.veterinaria_backend.repository.EgresoMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
@@ -175,10 +176,11 @@ public class EgresoServiceImpl implements EgresoService {
 			throw new BadRequestException("El DNI del tutor es obligatorio");
 		}
 		// findByDni y no un filtro en memoria: el DNI es la identidad con la que
-		// llega la persona al mostrador, y no admitimos espacios ni mayusculas
-		// distintas a como la guardo el alta.
-		Tutor tutor = tutorRepository.findByDni(tutorDni.trim())
-				.orElseThrow(() -> ResourceNotFoundException.tutorPorDni(tutorDni.trim()));
+		// llega la persona al mostrador. Se normaliza igual que en el alta, asi
+		// "30.123.456" encuentra al tutor guardado como "30123456".
+		String dni = NormalizadorAr.dni(tutorDni);
+		Tutor tutor = tutorRepository.findByDni(dni)
+				.orElseThrow(() -> ResourceNotFoundException.tutorPorDni(dni));
 		return validar(mascotaId, tutor);
 	}
 
