@@ -24,6 +24,8 @@ import java.time.LocalDateTime;
  * @param monto         importe del pago, ya normalizado a 2 decimales
  * @param concepto      motivo de la comanda cobrada
  * @param nombreTutor   deudor de la comanda (no necesariamente quien pago)
+ * @param nombrePagador quien pago: un cotutor puede saldar la comanda del
+ *                      titular. {@code null} en pagos sin pagador registrado
  * @param nombreMascota puede ser {@code null}: las comandas de guarderia sin
  *                      mascota no la tienen
  * @param estadoComanda estado de la comanda despues del pago
@@ -36,6 +38,7 @@ public record MovimientoCajaDTO(
 		BigDecimal monto,
 		String concepto,
 		String nombreTutor,
+		String nombrePagador,
 		String nombreMascota,
 		String estadoComanda) {
 }

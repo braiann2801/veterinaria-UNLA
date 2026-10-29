@@ -177,6 +177,7 @@ public class CajaServiceImpl implements CajaService {
 				fila.getMonto(),
 				fila.getConcepto() != null ? fila.getConcepto().name() : null,
 				fila.getNombreTutor(),
+				fila.getNombrePagador(),
 				fila.getNombreMascota(),
 				fila.getEstadoComanda() != null ? fila.getEstadoComanda().name() : null);
 	}

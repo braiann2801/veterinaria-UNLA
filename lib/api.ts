@@ -379,6 +379,8 @@ export interface MovimientoCaja {
   concepto: ConceptoCobro
   /** Deudor de la comanda, no necesariamente quien pagó. */
   nombreTutor: string
+  /** Quién pagó (un cotutor puede saldar la comanda del titular). `null` si no se registró. */
+  nombrePagador: string | null
   /** `null` en las comandas de guardería sin mascota. */
   nombreMascota: string | null
   estadoComanda: EstadoComanda

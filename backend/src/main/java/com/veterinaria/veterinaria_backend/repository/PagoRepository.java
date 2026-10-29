@@ -56,11 +56,13 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 			       p.monto AS monto,
 			       c.concepto AS concepto,
 			       CONCAT(CONCAT(t.nombre, ' '), t.apellido) AS nombreTutor,
+			       CONCAT(CONCAT(tp.nombre, ' '), tp.apellido) AS nombrePagador,
 			       m.nombre AS nombreMascota,
 			       c.estado AS estadoComanda
 			FROM Pago p
 			JOIN p.comanda c
 			JOIN c.tutor t
+			LEFT JOIN p.tutorPagador tp
 			LEFT JOIN c.mascota m
 			WHERE p.fechaHora >= :desde AND p.fechaHora < :hasta
 			ORDER BY p.fechaHora ASC, p.id ASC

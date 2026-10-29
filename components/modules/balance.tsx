@@ -256,6 +256,15 @@ function TarjetaCargando({ className }: { className?: string }) {
  * columnas la tabla no entra y el operador termina leyendo una fila partida. En
  * escritorio la tabla ordenada es más útil para el arqueo.
  */
+/**
+ * Quién pagó, cuando no es el titular de la comanda: un cotutor puede saldar la
+ * deuda de otro, y el arqueo tiene que poder decir quién entregó la plata.
+ */
+function PagadoPor({ m }: { m: MovimientoVista }) {
+  if (!m.nombrePagador || m.nombrePagador === m.nombreTutor) return null
+  return <span className="block text-xs text-muted-foreground">Pagó {m.nombrePagador}</span>
+}
+
 function ListaMovimientos({ movimientos }: { movimientos: MovimientoVista[] }) {
   return (
     <>
@@ -265,6 +274,7 @@ function ListaMovimientos({ movimientos }: { movimientos: MovimientoVista[] }) {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate font-medium">{m.nombreTutor}</p>
+                <PagadoPor m={m} />
                 <p className="truncate text-xs text-muted-foreground">
                   {m.nombreMascota ?? "Sin mascota"} · {horaDe(m.fechaHora)}
                 </p>
@@ -304,7 +314,10 @@ function ListaMovimientos({ movimientos }: { movimientos: MovimientoVista[] }) {
                 <td className="px-4 py-3 tabular-nums text-muted-foreground">
                   {horaDe(m.fechaHora)}
                 </td>
-                <td className="px-4 py-3 font-medium">{m.nombreTutor}</td>
+                <td className="px-4 py-3">
+                  <span className="font-medium">{m.nombreTutor}</span>
+                  <PagadoPor m={m} />
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">{m.nombreMascota ?? "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {ETIQUETA_CONCEPTO[m.concepto] ?? m.concepto}
