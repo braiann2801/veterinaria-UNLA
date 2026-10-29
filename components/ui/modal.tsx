@@ -108,7 +108,8 @@ export function Modal({
             </h2>
             <button
               onClick={onClose}
-              className="rounded-xl p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              type="button"
+              className="-my-2 -mr-2 inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               aria-label="Cerrar"
             >
               <X className="h-4 w-4" />
