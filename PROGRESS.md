@@ -16,7 +16,7 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
 - **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
-  187 tests de Spring Boot, 0 fallos).
+  222 tests de Spring Boot, 0 fallos).
 
 ## Hitos completados
 
@@ -68,6 +68,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `PATCH` sobre `/api/**`. Se mantiene la whitelist de orígenes
       (localhost:3000, 127.0.0.1:3000, `*.vercel.app`), `allowCredentials`,
       `exposedHeaders("Location")` y `maxAge(3600)`. Alineado a AGENTS.md §1.
+- [x] **Guardería por rango y tarifas** — estadía con entrada/salida (fecha y
+      hora) en el DateRangePicker de HeroUI; aforo validado cada día del rango;
+      monto por horas o por noches con precios del Dueño (pestaña Tarifas); la
+      comanda GUARDERIA se emite al reservar; el egreso registra la entrega y
+      finaliza la estadía. Detalle: `odd/tasks/guarderia-tarifas-rango.md`.
 - [x] **Autenticación y landing** — `/` landing pública (`lib/negocio.ts`),
       `/login`, `/app` protegido. Spring Security + JWT HS256; roles
       DUENIO/VETERINARIO/RECEPCION/GUARDERIA (Guardería = Recepción); Balance,

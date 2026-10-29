@@ -18,7 +18,7 @@ Rama: `feat/autenticacion` (continúa sobre el PR #1) · Tests: `./mvnw test` (M
 | T1 | S1, S2 | inline | hecho (215 tests verdes; RED observado) | ver git log |
 | T2 | S1, S4, S5 | inline | hecho (222 tests verdes; RED 6/7 observado) | ver git log |
 | T3 | S3, S4 | inline | hecho (tsc + e2e: monto en vivo, comanda #7 = $24.000) | ver git log |
-| T4 | — | inline | pendiente | |
+| T4 | — | inline | hecho (CLAUDE.md, PROGRESS.md) | ver git log |
 
 T1: tarifas de guardería (hora/noche) + pestaña Tarifas del Dueño. T2: reserva por rango, aforo por día, cotización y comanda con monto calculado. T3: modal con DateRangePicker de HeroUI + monto en vivo. T4: docs (CLAUDE.md, PROGRESS.md).
 Riesgo: ítem 4 (locks de aforo en varios días), ítem 1 (columnas nuevas en reserva), ítem 5 (dependencias HeroUI). Verificación independiente al cierre.
@@ -27,3 +27,6 @@ Riesgo: ítem 4 (locks de aforo en varios días), ítem 1 (columnas nuevas en re
 
 - **L1** (2026-10-28, pedido): "hay un error de flujo, el abono de la guarderia no debe ser fija en $10000. debe variar dependiendo: si es por hora o por noche. el duenio debe poder ajustar estos valores. dentro del modal de reserva de guarderia quiero que tenga este componente [DateRangePicker de HeroUI v3] y que se autocalcule el monto a abonar segun los valores que ponga el duenio"
 - **L2**: cálculo = "Por horas o por noches (Recomendado)"; componente = "El de HeroUI que pegaste".
+- **L3**: HeroUI 3.2.6 (no 3.2.7: publicada el mismo día). Sus tokens `--muted`/`--accent` chocan con shadcn; se reasignan dentro de `.rango-estadia` (variables globales verificadas sin cambios).
+- **L4** (pedido): "se ve re feo, mejoralo" → campo con estilo de input, colores reasignados, resumen legible, alto flexible en móvil (`c6479d0`).
+- **L5**: e2e — 1 noche $12.000; 2 noches $24.000; 08:00–13:30 = 6 h × $2.000; salida anterior → error; Escape/Tab del calendario no afectan al modal; comanda #7 = $24.000.
