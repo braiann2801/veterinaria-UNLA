@@ -88,11 +88,15 @@ export function Paginado<T>({
     <>
       {children(visibles)}
       {total > OPCIONES_POR_PAGINA[0] && (
+        // @container: el diseño depende del ancho de la lista, no de la ventana. En
+        // una columna angosta (los Pacientes del Historial en pantalla completa)
+        // un breakpoint de viewport la ponía en una fila que desbordaba la tarjeta.
+        <div className="@container mt-3 border-t border-border pt-3">
         <nav
           aria-label="Paginación"
-          className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 text-sm @lg:flex-row @lg:items-center @lg:justify-between"
         >
-          <label className="flex items-center gap-2 text-muted-foreground">
+          <label className="flex items-center gap-2 whitespace-nowrap text-muted-foreground">
             Mostrar
             <select
               value={porPagina}
@@ -109,8 +113,8 @@ export function Paginado<T>({
             por página
           </label>
 
-          <div className="flex items-center justify-between gap-2 sm:justify-end">
-            <span className="text-muted-foreground" aria-live="polite">
+          <div className="flex items-center justify-between gap-2 @lg:justify-end">
+            <span className="whitespace-nowrap text-muted-foreground" aria-live="polite">
               {desde + 1}–{Math.min(desde + porPagina, total)} de {total}
             </span>
             <div className="flex gap-1">
@@ -126,7 +130,7 @@ export function Paginado<T>({
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden />
               </button>
-              <span className="inline-flex min-w-[4.5rem] items-center justify-center text-xs text-muted-foreground">
+              <span className="inline-flex min-w-[4.5rem] items-center justify-center whitespace-nowrap text-xs text-muted-foreground">
                 Pág. {actual} de {totalPaginas}
               </span>
               <button
@@ -144,6 +148,7 @@ export function Paginado<T>({
             </div>
           </div>
         </nav>
+        </div>
       )}
     </>
   )
