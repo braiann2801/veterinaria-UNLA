@@ -13,7 +13,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.DeudaMascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoRegistradoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoRegistroRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.EgresoValidacionResponseDTO;
@@ -46,8 +46,12 @@ import com.veterinaria.veterinaria_backend.service.JornadaDelDiaService;
  * el semaforo y decide. Registrar el egreso efectivo es otra operacion, porque
  * una consulta de "¿puedo?" jamas debe dejar rastro de que se hizo.</p>
  *
+ * <p>La deuda que bloquea es la de la mascota, no la del tutor: si un tutor
+ * tiene dos mascotas y salda la comanda de una, esa ya se puede retirar
+ * aunque la otra siga debiendo.</p>
+ *
  * <p>El estado contable no se consulta con una query propia contra
- * {@code comanda_cobro}: se delega en {@link ComandaCobroService#consultarDeuda}
+ * {@code comanda_cobro}: se delega en {@link ComandaCobroService#consultarDeudaDeMascota}
  * para que el saldo que ve el mostrador sea exactamente el mismo que ve el
  * modulo de caja. Duplicar esa suma en dos lugares es como aparecen dos
  * morosidad distintas para la misma persona.</p>
@@ -201,7 +205,7 @@ public class EgresoServiceImpl implements EgresoService {
 
 		boolean autorizado = esTutorAutorizado(mascotaId, tutor.getId());
 
-		DeudaTutorResponseDTO deuda = comandaService.consultarDeuda(tutor.getId());
+		DeudaMascotaResponseDTO deuda = comandaService.consultarDeudaDeMascota(mascotaId);
 		boolean tieneDeuda = Boolean.TRUE.equals(deuda.tieneDeuda());
 		BigDecimal saldo = normalizar(deuda.totalDeuda());
 
@@ -220,8 +224,8 @@ public class EgresoServiceImpl implements EgresoService {
 		} else if (tieneDeuda) {
 			motivo = MotivoBloqueo.DEUDA_PENDIENTE;
 			mensaje = formatear(saldo) + " pendientes en "
-					+ deuda.cantidadComandas() + " comanda(s) a nombre de "
-					+ tutor.getNombreCompleto() + ".";
+					+ deuda.cantidadComandas() + " comanda(s) de "
+					+ mascota.getNombre() + ".";
 		} else {
 			motivo = MotivoBloqueo.NINGUNO;
 			mensaje = "Retiro habilitado para " + mascota.getNombre() + ".";

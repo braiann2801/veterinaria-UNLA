@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.DeudaMascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ReservaGuarderia;
 
@@ -65,6 +66,12 @@ public interface ComandaCobroService {
 
 	/** Estado consolidado de morosidad de un tutor (regla 2.5). */
 	DeudaTutorResponseDTO consultarDeuda(Long tutorId);
+
+	/**
+	 * Deuda de una mascota: el saldo de las comandas emitidas para ella, a
+	 * nombre de cualquier tutor. Es la que bloquea su egreso.
+	 */
+	DeudaMascotaResponseDTO consultarDeudaDeMascota(Long mascotaId);
 
 	/** Precios vigentes de todos los conceptos. */
 	Map<String, BigDecimal> listarTarifas();

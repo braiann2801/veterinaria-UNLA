@@ -340,7 +340,7 @@ function Veredicto({ veredicto }: { veredicto: EgresoValidacion }) {
 
       {veredicto.tieneDeuda && (
         <p className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
-          <span>Deuda pendiente del tutor</span>
+          <span>Deuda pendiente de {veredicto.mascotaNombre}</span>
           <span className="font-medium">{money(veredicto.saldoDeuda)}</span>
         </p>
       )}

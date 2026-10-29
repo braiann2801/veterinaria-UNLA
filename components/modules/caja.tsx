@@ -232,13 +232,14 @@ export function Caja() {
               {deuda.datos.nombreTutor} debe {money(deuda.datos.totalDeuda)} en{" "}
               {deuda.datos.cantidadComandas} comanda
               {deuda.datos.cantidadComandas === 1 ? "" : "s"} pendiente
-              {deuda.datos.cantidadComandas === 1 ? "" : "s"}. El egreso queda bloqueado
-              hasta regularizar.
+              {deuda.datos.cantidadComandas === 1 ? "" : "s"}. Cada mascota queda retenida
+              hasta saldar sus propias comandas.
             </p>
             <ul className="mt-2 flex flex-col gap-0.5">
               {deuda.datos.comandasPendientes.map((c) => (
                 <li key={c.id} className="text-xs text-red-800 dark:text-red-300">
-                  #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto} ·{" "}
+                  #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto}
+                  {c.nombreMascota ? ` de ${c.nombreMascota}` : ""} ·{" "}
                   {money(c.saldoPendiente)} · {c.diasDeAntiguedad} día
                   {c.diasDeAntiguedad === 1 ? "" : "s"} de atraso
                 </li>

@@ -24,12 +24,16 @@ public record DeudaTutorResponseDTO(
 	 *
 	 * @param diasDeAntiguedad dias desde la emision: avisa cuando una deuda
 	 *                          envejece y hay que perseguirla
+	 * @param mascotaId        mascota de la comanda, o {@code null} si no es de
+	 *                          ninguna: solo esa mascota queda retenida
 	 */
 	public record ComandaPendienteDTO(
 			Long id,
 			String concepto,
 			BigDecimal saldoPendiente,
 			LocalDate fechaEmision,
-			long diasDeAntiguedad) {
+			long diasDeAntiguedad,
+			Long mascotaId,
+			String nombreMascota) {
 	}
 }
