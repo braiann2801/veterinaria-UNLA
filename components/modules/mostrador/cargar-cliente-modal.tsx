@@ -8,7 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { mascotas as apiMascotas, tutores as apiTutores, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
-import { TOQUE_MINIMO } from "@/lib/vista"
+import { TOQUE_MINIMO, formatearDni, limpiarDni, soloDecimal, soloDni, soloTelefono } from "@/lib/vista"
 
 /** Especies del enum `Mascota.Especie` del backend, con la etiqueta que ve el operador. */
 const ESPECIES: { valor: EspecieMascota; etiqueta: string }[] = [
@@ -97,6 +97,8 @@ export function CargarClienteModal({
   const [autorizado, setAutorizado] = useState(true)
   const [cotutorId, setCotutorId] = useState<string>("")
   const [padron, setPadron] = useState<Tutor[]>([])
+  // La lista vacía sola no distingue "todavía no hay tutores" de "falló el GET".
+  const [estadoPadron, setEstadoPadron] = useState<"cargando" | "listo" | "error">("cargando")
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -114,15 +116,20 @@ export function CargarClienteModal({
     let vigente = true
     setError(null)
     setExito(null)
+    setEstadoPadron("cargando")
     apiTutores
       .listar()
       .then((lista) => {
-        if (vigente) setPadron(lista)
+        if (!vigente) return
+        setPadron(lista)
+        setEstadoPadron("listo")
       })
       .catch(() => {
         // El cotutor es opcional: si el padrón no carga, el alta igual tiene que
         // poder hacerse con el tutor principal. Se avisa abajo.
-        if (vigente) setPadron([])
+        if (!vigente) return
+        setPadron([])
+        setEstadoPadron("error")
       })
     return () => {
       vigente = false
@@ -151,11 +158,11 @@ export function CargarClienteModal({
     setError(null)
     setExito(null)
 
-    // El DNI se valida acá para no gastar un viaje con un 400 previsible: el
-    // backend exige 7 a 10 dígitos y el mensaje no dice cuántos.
-    const dni = tutor.dni.trim()
-    if (!/^\d{7,10}$/.test(dni)) {
-      setError("El DNI debe tener entre 7 y 10 dígitos, solo números.")
+    // El DNI se valida acá para no gastar un viaje con un 400 previsible. Se
+    // aceptan puntos y espacios ("30.123.456"): se limpian igual que en el backend.
+    const dni = limpiarDni(tutor.dni)
+    if (!/^\d{7,8}$/.test(dni)) {
+      setError("El DNI debe tener 7 u 8 dígitos (ej.: 30.123.456).")
       setGuardando(false)
       return
     }
@@ -233,6 +240,9 @@ export function CargarClienteModal({
     }
   }
 
+  // El tutor que se está cargando no puede ser su propio cotutor.
+  const candidatosCotutor = padron.filter((t) => t.dni !== limpiarDni(tutor.dni))
+
   const listo =
     tutor.nombre.trim().length > 0 &&
     tutor.apellido.trim().length > 0 &&
@@ -266,7 +276,7 @@ export function CargarClienteModal({
             <Field label="DNI">
               <TextInput
                 value={tutor.dni}
-                onChange={(e) => setTutor((f) => ({ ...f, dni: e.target.value }))}
+                onChange={(e) => setTutor((f) => ({ ...f, dni: soloDni(e.target.value) }))}
                 inputMode="numeric"
                 className={TOQUE_MINIMO}
               />
@@ -274,7 +284,7 @@ export function CargarClienteModal({
             <Field label="Teléfono">
               <TextInput
                 value={tutor.telefono}
-                onChange={(e) => setTutor((f) => ({ ...f, telefono: e.target.value }))}
+                onChange={(e) => setTutor((f) => ({ ...f, telefono: soloTelefono(e.target.value) }))}
                 inputMode="tel"
                 className={TOQUE_MINIMO}
               />
@@ -359,7 +369,7 @@ export function CargarClienteModal({
             <Field label="Peso (kg)">
               <TextInput
                 value={mascota.peso}
-                onChange={(e) => setMascota((f) => ({ ...f, peso: e.target.value }))}
+                onChange={(e) => setMascota((f) => ({ ...f, peso: soloDecimal(e.target.value) }))}
                 inputMode="decimal"
                 placeholder="Ej: 12.5"
                 className={TOQUE_MINIMO}
@@ -432,18 +442,20 @@ export function CargarClienteModal({
               aria-label="Cotutor a vincular"
             >
               <option value="">Sin cotutor</option>
-              {padron
-                .filter((t) => t.dni.trim() !== tutor.dni.trim())
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombreCompleto} · DNI {t.dni}
-                  </option>
-                ))}
+              {candidatosCotutor.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombreCompleto} · DNI {formatearDni(t.dni)}
+                </option>
+              ))}
             </Select>
             <span className="text-xs text-muted-foreground">
-              {padron.length === 0
-                ? "No se pudo leer el padrón, se puede guardar igual sin cotutor."
-                : "El cotutor se vincula sin autorización de retiro."}
+              {estadoPadron === "cargando"
+                ? "Cargando el padrón…"
+                : estadoPadron === "error"
+                  ? "No se pudo leer el padrón, se puede guardar igual sin cotutor."
+                  : candidatosCotutor.length === 0
+                    ? "Todavía no hay otros tutores en el padrón."
+                    : "El cotutor se vincula sin autorización de retiro."}
             </span>
           </label>
         </div>

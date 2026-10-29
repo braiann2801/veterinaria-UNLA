@@ -2,6 +2,8 @@ package com.veterinaria.veterinaria_backend.dto;
 
 import java.util.List;
 
+import com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -25,10 +27,10 @@ public record TutorRequestDTO(
 		String apellido,
 
 		@NotBlank(message = "El DNI del tutor es obligatorio")
-		@Pattern(regexp = "\\d{7,10}", message = "El DNI debe contener entre 7 y 10 digitos")
+		@Pattern(regexp = "\\d{7,8}", message = "El DNI debe tener 7 u 8 digitos (ej.: 30.123.456)")
 		String dni,
 
-		@Pattern(regexp = "\\d{6,15}", message = "El telefono debe contener entre 6 y 15 digitos")
+		@Pattern(regexp = "\\d{10}", message = "El telefono debe tener 10 digitos con el codigo de area, sin 0 ni 15 (ej.: 11 2345-6789)")
 		String telefono,
 
 		@Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
@@ -39,6 +41,16 @@ public record TutorRequestDTO(
 		String direccion,
 
 		List<@Valid VinculoMascotaDTO> vinculos) {
+
+	/** Normaliza antes de validar: las anotaciones ven el valor ya normalizado. */
+	public TutorRequestDTO {
+		nombre = NormalizadorAr.nombrePropio(nombre);
+		apellido = NormalizadorAr.nombrePropio(apellido);
+		dni = NormalizadorAr.dni(dni);
+		telefono = NormalizadorAr.telefono(telefono);
+		email = NormalizadorAr.email(email);
+		direccion = NormalizadorAr.texto(direccion);
+	}
 
 	/**
 	 * Mascota a vincular con el tutor, identificada por su id.

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.DeudaMascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ComandaCobro;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
@@ -154,20 +155,48 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 	@Override
 	public DeudaTutorResponseDTO consultarDeuda(Long tutorId) {
 		Tutor tutor = obtenerTutor(tutorId);
-
 		List<ComandaCobro> pendientes =
 				comandaRepository.findByTutorIdAndEstadoInOrderByFechaEmisionAsc(tutorId, ESTADOS_CON_DEUDA);
+		BigDecimal total = sumarSaldos(pendientes);
+		return new DeudaTutorResponseDTO(
+				tutor.getId(),
+				tutor.getNombreCompleto(),
+				total.compareTo(BigDecimal.ZERO) > 0,
+				total,
+				pendientes.size(),
+				detallar(pendientes));
+	}
 
-		// El total se recalcula sumando y no leyendo sumarDeudaPendiente(): asi el
-		// detalle y el total salen de la misma lectura y no pueden contradecirse.
-		BigDecimal total = pendientes.stream()
+	@Override
+	public DeudaMascotaResponseDTO consultarDeudaDeMascota(Long mascotaId) {
+		Mascota mascota = obtenerMascota(mascotaId);
+		List<ComandaCobro> pendientes =
+				comandaRepository.findByMascotaIdAndEstadoInOrderByFechaEmisionAsc(mascotaId, ESTADOS_CON_DEUDA);
+		BigDecimal total = sumarSaldos(pendientes);
+		return new DeudaMascotaResponseDTO(
+				mascota.getId(),
+				mascota.getNombre(),
+				total.compareTo(BigDecimal.ZERO) > 0,
+				total,
+				pendientes.size(),
+				detallar(pendientes));
+	}
+
+	/**
+	 * El total se recalcula sumando y no leyendo sumarDeudaPendiente(): asi el
+	 * detalle y el total salen de la misma lectura y no pueden contradecirse.
+	 */
+	private static BigDecimal sumarSaldos(List<ComandaCobro> pendientes) {
+		return pendientes.stream()
 				.map(ComandaCobro::getSaldoPendiente)
 				.filter(Objects::nonNull)
 				.reduce(BigDecimal.ZERO, BigDecimal::add)
 				.setScale(2, RoundingMode.HALF_UP);
+	}
 
+	private static List<DeudaTutorResponseDTO.ComandaPendienteDTO> detallar(List<ComandaCobro> pendientes) {
 		LocalDate hoy = LocalDate.now();
-		List<DeudaTutorResponseDTO.ComandaPendienteDTO> detalle = pendientes.stream()
+		return pendientes.stream()
 				.map(comanda -> new DeudaTutorResponseDTO.ComandaPendienteDTO(
 						comanda.getId(),
 						comanda.getConcepto() != null ? comanda.getConcepto().name() : null,
@@ -177,16 +206,10 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 								: null,
 						comanda.getFechaEmision() != null
 								? ChronoUnit.DAYS.between(comanda.getFechaEmision().toLocalDate(), hoy)
-								: 0))
+								: 0,
+						comanda.getMascota() != null ? comanda.getMascota().getId() : null,
+						comanda.getMascota() != null ? comanda.getMascota().getNombre() : null))
 				.toList();
-
-		return new DeudaTutorResponseDTO(
-				tutor.getId(),
-				tutor.getNombreCompleto(),
-				total.compareTo(BigDecimal.ZERO) > 0,
-				total,
-				pendientes.size(),
-				detalle);
 	}
 
 	@Override

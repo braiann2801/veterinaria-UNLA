@@ -22,8 +22,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param puedeRetirar          veredicto final; solo lo decide {@code motivoBloqueo}
  * @param motivoBloqueo         por que no se puede entregar, o {@link MotivoBloqueo#NINGUNO}
  * @param tutorAutorizado       el vinculo existe con {@code autorizadoRetiro=true}
- * @param tieneDeuda            el tutor debe en comandas pendientes
- * @param saldoDeuda            saldo pendiente del tutor, 0.00 si no debe
+ * @param tieneDeuda            la mascota debe en comandas pendientes
+ * @param saldoDeuda            saldo pendiente de la mascota, 0.00 si no debe
  * @param alertaConducta        avisar tomar con precaucion al entregar: no bloquea
  * @param conducta              conducta base de la mascota segun la ficha maestra
  * @param conductaUltimaConsulta conducta observada en la ultima atencion, si hubo
@@ -84,7 +84,7 @@ public record EgresoValidacionResponseDTO(
 		return switch (motivoBloqueo) {
 			case NINGUNO -> "Retiro permitido";
 			case TUTOR_NO_AUTORIZADO -> "Tutor sin autorización de retiro";
-			case DEUDA_PENDIENTE -> "Tutor con deuda pendiente";
+			case DEUDA_PENDIENTE -> "Mascota con deuda pendiente";
 		};
 	}
 }

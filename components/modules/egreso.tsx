@@ -34,7 +34,7 @@ import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Panel, Select, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
-import { ErrorBox, Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
+import { ErrorBox, Semforo, TOQUE_MINIMO, formatearDni, money, soloDni } from "@/lib/vista"
 
 const ETIQUETA_CONDUCTA: Record<string, string> = {
   normal: "normal",
@@ -233,7 +233,7 @@ function ModalValidar({
             >
               {mascota.tutores.map((t) => (
                 <option key={t.tutorId} value={String(t.tutorId)}>
-                  {t.nombreCompleto} · DNI {t.dni}
+                  {t.nombreCompleto} · DNI {formatearDni(t.dni)}
                   {t.autorizadoRetiro ? "" : " · no autorizado a retirar"}
                 </option>
               ))}
@@ -243,7 +243,7 @@ function ModalValidar({
           {modo === "dni" && (
             <TextInput
               value={dni}
-              onChange={(e) => setDni(e.target.value)}
+              onChange={(e) => setDni(soloDni(e.target.value))}
               placeholder="DNI del tutor"
               inputMode="numeric"
               aria-label="DNI del tutor que se presenta"
@@ -340,7 +340,7 @@ function Veredicto({ veredicto }: { veredicto: EgresoValidacion }) {
 
       {veredicto.tieneDeuda && (
         <p className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
-          <span>Deuda pendiente del tutor</span>
+          <span>Deuda pendiente de {veredicto.mascotaNombre}</span>
           <span className="font-medium">{money(veredicto.saldoDeuda)}</span>
         </p>
       )}

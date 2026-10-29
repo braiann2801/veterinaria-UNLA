@@ -18,6 +18,56 @@ import { cn } from "@/lib/utils"
 /** Ancho de la zona de toque tactil (regla 3.4 de AGENTS.md). */
 export const TOQUE_MINIMO = "min-h-[44px]"
 
+/**
+ * DNI con puntos de miles para mostrar ("30123456" -> "30.123.456"). El backend
+ * lo guarda solo con digitos; esto es solo presentacion, nunca va a la API.
+ */
+export function formatearDni(dni: string): string {
+  return /^\d+$/.test(dni) ? dni.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : dni
+}
+
+/**
+ * Filtros de entrada: se aplican en el `onChange` para que una letra nunca
+ * llegue a escribirse. El backend sigue validando, pero esta es la primera
+ * barrera. Al pegar "30.123.456" los puntos se descartan y queda "30123456".
+ */
+
+/** Solo dígitos, con tope opcional (el DNI argentino tiene 7 u 8). */
+export function soloDigitos(valor: string, max?: number): string {
+  const limpio = valor.replace(/\D/g, "")
+  return max === undefined ? limpio : limpio.slice(0, max)
+}
+
+/** DNI: solo dígitos, hasta 8. */
+export function soloDni(valor: string): string {
+  return soloDigitos(valor, 8)
+}
+
+/** Teléfono: dígitos y los separadores que se usan al escribirlo (+, espacio, guion, paréntesis, punto). */
+export function soloTelefono(valor: string): string {
+  return valor.replace(/[^\d+\s().-]/g, "").slice(0, 20)
+}
+
+/** Número con decimales: dígitos y un único separador decimal (la coma se convierte en punto). */
+export function soloDecimal(valor: string): string {
+  const limpio = valor.replace(/,/g, ".").replace(/[^\d.]/g, "")
+  const punto = limpio.indexOf(".")
+  return punto === -1 ? limpio : limpio.slice(0, punto + 1) + limpio.slice(punto + 1).replace(/\./g, "")
+}
+
+/** Filtro que corresponde a un `inputMode`; el resto de los modos no se filtra. */
+export function filtrarPorModo(modo: string | undefined, valor: string): string {
+  if (modo === "numeric") return soloDni(valor)
+  if (modo === "tel") return soloTelefono(valor)
+  if (modo === "decimal") return soloDecimal(valor)
+  return valor
+}
+
+/** Quita puntos, espacios y guiones de un DNI, igual que el backend antes de validarlo. */
+export function limpiarDni(dni: string): string {
+  return dni.replace(/[.\s-]/g, "")
+}
+
 export function Cargando({ texto = "Cargando" }: { texto?: string }) {
   return (
     <div

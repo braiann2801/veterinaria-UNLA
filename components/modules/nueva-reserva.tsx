@@ -37,7 +37,7 @@ import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Modal } from "@/components/ui/modal"
 import { RangoEstadiaPicker, aFechaHora, partes, type RangoEstadia } from "@/components/ui/rango-estadia"
 import { Select, TextArea, TextInput } from "@/components/ui/field"
-import { Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
+import { Semforo, TOQUE_MINIMO, money, soloDecimal } from "@/lib/vista"
 
 /** Fecha `YYYY-MM-DD` del día siguiente. */
 function diaSiguiente(fecha: string): string {
@@ -225,7 +225,7 @@ export function NuevaReservaGuarderia({
             <span className="text-xs font-medium text-muted-foreground">Seña</span>
             <TextInput
               value={sena}
-              onChange={(e) => setSena(e.target.value)}
+              onChange={(e) => setSena(soloDecimal(e.target.value))}
               inputMode="numeric"
               placeholder="0"
               className={TOQUE_MINIMO}

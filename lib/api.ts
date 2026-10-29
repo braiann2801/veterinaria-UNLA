@@ -368,6 +368,9 @@ export interface ComandaPendiente {
   saldoPendiente: number
   fechaEmision: string
   diasDeAntiguedad: number
+  /** Mascota de la comanda: su saldo es el que retiene a esa mascota. `null` si no es de ninguna. */
+  mascotaId: number | null
+  nombreMascota: string | null
 }
 
 export interface DeudaTutor {

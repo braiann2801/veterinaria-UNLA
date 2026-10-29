@@ -31,6 +31,7 @@ import type { MascotaVinculada, Tutor } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { useAuth } from "@/lib/auth"
 import { useStore, roleLabels } from "@/lib/store"
+import { formatearDni, limpiarDni } from "@/lib/vista"
 
 export function TopBar({
   onVerFichas,
@@ -56,8 +57,10 @@ export function TopBar({
     const salida: { mascota: MascotaVinculada; tutor: Tutor }[] = []
     for (const t of tutores.datos ?? []) {
       const nombreTutor = `${t.nombre} ${t.apellido}`.toLowerCase()
+      // El DNI se guarda sin puntos: "30.123" tiene que encontrar "30123456".
+      const qDni = limpiarDni(q)
       const coincideTutor =
-        t.dni.toLowerCase().includes(q) ||
+        (qDni !== "" && t.dni.includes(qDni)) ||
         (t.telefono ?? "").toLowerCase().includes(q) ||
         nombreTutor.includes(q)
       for (const m of t.mascotas) {
@@ -97,7 +100,7 @@ export function TopBar({
                 <div className="min-w-0">
                   <p className="truncate font-medium">{mascota.nombre}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {tutor.nombre} {tutor.apellido} · DNI {tutor.dni}
+                    {tutor.nombre} {tutor.apellido} · DNI {formatearDni(tutor.dni)}
                     {tutor.telefono ? ` · ${tutor.telefono}` : ""}
                   </p>
                 </div>

@@ -151,12 +151,12 @@ class ReservaGuarderiaHorarioTest {
 	void elListadoQuedaOrdenadoComoUnaJornada() {
 		// Se crean en orden inverso al esperado, con una sin horario en el medio.
 		guarderiaService.crear(pedir(crearMascota("Tarde"), LocalTime.of(17, 0), LocalTime.of(20, 0)));
-		guarderiaService.crear(pedir(crearMascota("SinHora"), null, null));
+		guarderiaService.crear(pedir(crearMascota("Sin Hora"), null, null));
 		guarderiaService.crear(pedir(crearMascota("Manana"), LocalTime.of(8, 0), LocalTime.of(13, 0)));
 		guarderiaService.crear(pedir(crearMascota("Mediodia"), LocalTime.of(13, 0), LocalTime.of(17, 0)));
 
 		assertThat(guarderiaService.listarPorFecha(DIA).stream().map(ReservaGuarderiaResponseDTO::nombreMascota))
-				.containsExactly("Manana", "Mediodia", "Tarde", "SinHora");
+				.containsExactly("Manana", "Mediodia", "Tarde", "Sin Hora");
 	}
 
 	@Test

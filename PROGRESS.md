@@ -6,17 +6,17 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** Autenticación (rama `feat/autenticacion`, detalle en
-  `odd/tasks/autenticacion.md`): landing pública, login JWT con roles, ABM de
-  usuarios por el Dueño. Implementada y verificada; pendiente de merge.
-- **Base Git:** `main` en `a80a808` (modal y tablero Kaban); la rama suma
-  backend auth, ABM, frontend y docs.
+- **Fase en curso:** rama `feat/deuda-mascota-normalizacion` (detalle en
+  `odd/tasks/deuda-mascota-normalizacion.md`): tickets Kaban 1, 2, 3 y 5,
+  deuda atada a la mascota y normalización argentina de datos personales.
+  Implementada y verificada; pendiente de push/PR (decisión del usuario).
+- **Base Git:** `main` en `3d35a49` (merge del PR #1, autenticación).
 - **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** `.\test-harness.ps1` en verde (tsc limpio, Next.js build OK,
-  222 tests de Spring Boot, 0 fallos).
+- **Harness:** tsc limpio, Next.js build OK, 244 tests de Spring Boot en verde
+  (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 
 ## Hitos completados
 
@@ -79,6 +79,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       Usuarios, cierre y tarifas solo Dueño (403). Dueño sembrado con clave
       default y cambio obligatorio; ABM de usuarios con clave temporal y
       revocación inmediata de sesiones. 187 tests backend.
+- [x] **Deuda por mascota y normalización** — el egreso se bloquea por la
+      deuda de la mascota (`consultarDeudaDeMascota`), no la del tutor;
+      `NormalizadorAr` normaliza nombres, DNI (7-8 dígitos), teléfono (10
+      dígitos nacionales), matrícula y email en los DTO de entrada. README
+      completo. 244 tests backend.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -90,8 +95,13 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
    deriva a `ComandaCobro` con precio desde `Tarifa`.
 4. **Conducta:** `Mascota.conducta` = normal/gruñe/muerde/miedoso;
    `ConsultaMedica.conductaObservada` = TRANQUILO/NERVIOSO/REACTIVO/AGRESIVO.
-5. **Egreso vs. Cobro:** retiro exige `autorizado_retiro=true` + sin deuda;
-   cualquier tutor vinculado puede pagar la comanda.
+5. **Egreso vs. Cobro:** retiro exige `autorizado_retiro=true` + que la
+   mascota no tenga comandas impagas (la deuda es de la mascota, no del tutor;
+   una comanda sin mascota no retiene a nadie). Cualquier tutor vinculado
+   puede pagar la comanda.
+10. **Normalización de datos:** vive en `normalizacion/NormalizadorAr` y corre
+   en los constructores de los DTO de entrada, antes de Bean Validation. Solo
+   afecta altas y ediciones: las filas viejas se normalizan al editarlas.
 6. **Arquitectura en capas estricta:** Controller → Service → Repository,
    DTOs planos (sin entidades serializadas), errores HTTP semánticos
    (400/404/409/500) vía `GlobalExceptionHandler`.
@@ -130,6 +140,9 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
    `ApplicationContext` (Caused by: `Communications link failure` /
    `Connection refused` en 3306), no es el código: MySQL se cayó. Reiniciar
    `C:\xampp\mysql\bin\mysqld.exe`, esperar el puerto y relanzar el harness.
+8. **Datos previos sin normalizar:** tutores con teléfono que no tenga 10
+   dígitos o DNI de 9-10 dígitos dan 400 al editarlos hasta corregir el dato.
+   No se reescribió la base existente.
 
 ## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
 
@@ -138,7 +151,7 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `/egreso/pacientes-hoy`), caja (`/comandas/dia`, `/caja/pagos/{id}`,
   `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
   consultas.
-- **Tests backend:** 165 en verde. Cobertura clave: aforo concurrente (lock
+- **Tests backend:** 244 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`).
@@ -158,5 +171,5 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `status` **numérico**. Rutas inexistentes → **404** (handler dedicado), no 500.
 - **CORS:** `CorsConfig` (`WebMvcConfigurer`) aplica sobre `/api/**` para
   localhost:3000, 127.0.0.1:3000 y `*.vercel.app`; métodos
-  GET/POST/PUT/DELETE/OPTIONS/**PATCH**; `allowCredentials=true`. No hay Spring
-  Security: esta es la única capa CORS del backend.
+  GET/POST/PUT/DELETE/OPTIONS/**PATCH**; `allowCredentials=true`. Spring Security
+  (JWT) toma esta misma configuración CORS.

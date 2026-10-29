@@ -76,7 +76,7 @@ class TutorControllerTest {
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.detalles").isArray())
 				.andExpect(jsonPath("$.detalles", org.hamcrest.Matchers.hasItem(
-						"El DNI debe contener entre 7 y 10 digitos")));
+						"El DNI debe tener 7 u 8 digitos (ej.: 30.123.456)")));
 	}
 
 	@Test

@@ -23,7 +23,7 @@ import {
 } from "@/lib/api"
 import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Field, Panel, TextInput } from "@/components/ui/field"
-import { Recurso, TOQUE_MINIMO, money } from "@/lib/vista"
+import { Recurso, TOQUE_MINIMO, money, soloDecimal } from "@/lib/vista"
 import { cn } from "@/lib/utils"
 
 const BOTON = cn(
@@ -93,10 +93,10 @@ function TarifasGuarderia() {
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Precio por hora">
-                <TextInput inputMode="decimal" value={hora} onChange={(e) => setHora(e.target.value)} className={TOQUE_MINIMO} />
+                <TextInput inputMode="decimal" value={hora} onChange={(e) => setHora(soloDecimal(e.target.value))} className={TOQUE_MINIMO} />
               </Field>
               <Field label="Precio por noche">
-                <TextInput inputMode="decimal" value={noche} onChange={(e) => setNoche(e.target.value)} className={TOQUE_MINIMO} />
+                <TextInput inputMode="decimal" value={noche} onChange={(e) => setNoche(soloDecimal(e.target.value))} className={TOQUE_MINIMO} />
               </Field>
             </div>
             {precioHora !== null && precioNoche !== null && (
@@ -170,7 +170,7 @@ function TarifaConsulta() {
               Monto de la comanda que se emite al guardar una ficha en Ficha médica.
             </p>
             <Field label="Precio de la consulta">
-              <TextInput inputMode="decimal" value={consulta} onChange={(e) => setConsulta(e.target.value)} className={TOQUE_MINIMO} />
+              <TextInput inputMode="decimal" value={consulta} onChange={(e) => setConsulta(soloDecimal(e.target.value))} className={TOQUE_MINIMO} />
             </Field>
             {estado && (
               <p

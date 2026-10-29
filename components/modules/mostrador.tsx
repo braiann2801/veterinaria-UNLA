@@ -57,6 +57,7 @@ import type {
   TurnoClinico,
 } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
+import { TOQUE_MINIMO } from "@/lib/vista"
 
 import { AgregarTurnoModal } from "./mostrador/agregar-turno-modal"
 import { AvisosImportantes } from "./mostrador/avisos-importantes"
@@ -118,14 +119,19 @@ export function Mostrador() {
             onChange={(nueva) => setFecha(nueva || hoyLocal())}
           />
           {fecha !== hoyLocal() && (
-            <Button variant="outline" onClick={() => setFecha(hoyLocal())} type="button">
+            <Button
+              variant="outline"
+              onClick={() => setFecha(hoyLocal())}
+              type="button"
+              className={TOQUE_MINIMO}
+            >
               <CalendarDays className="h-4 w-4" /> Hoy
             </Button>
           )}
-          <Button variant="outline" onClick={() => setOpenCliente(true)}>
+          <Button variant="outline" onClick={() => setOpenCliente(true)} className={TOQUE_MINIMO}>
             <UserPlus className="h-4 w-4" /> Cargar cliente
           </Button>
-          <Button onClick={() => setOpenTurno(true)}>
+          <Button onClick={() => setOpenTurno(true)} className={TOQUE_MINIMO}>
             <CalendarPlus className="h-4 w-4" /> Agregar turno
           </Button>
         </div>

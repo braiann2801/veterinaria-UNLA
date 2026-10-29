@@ -99,13 +99,13 @@ class EgresoSeguroTest {
 	// ------------------------------------------------------------- morosidad
 
 	@Test
-	@DisplayName("Un tutor con saldo pendiente no puede retirar y ve su deuda")
+	@DisplayName("Una mascota con saldo pendiente no se retira y el tutor ve la deuda")
 	void tutorMorosoNoRetira() throws Exception {
 		long mascotaId = crearMascota("Chispa", "normal");
 		long tutorId = crearTutor("35000004");
 		mockMvc.perform(post("/api/v1/tutores/{t}/mascotas/{m}?autorizadoRetiro=true",
 				tutorId, mascotaId)).andExpect(status().isCreated());
-		emitirComanda(tutorId, "GUARDERIA", 10000);
+		emitirComanda(tutorId, mascotaId, "GUARDERIA", 10000);
 
 		mockMvc.perform(validar(mascotaId, tutorId))
 				.andExpect(status().isOk())
@@ -116,7 +116,7 @@ class EgresoSeguroTest {
 				.andExpect(jsonPath("$.tutorAutorizado").value(true))
 				.andExpect(jsonPath("$.tieneDeuda").value(true))
 				.andExpect(jsonPath("$.saldoDeuda").value(10000.00))
-				.andExpect(jsonPath("$.etiquetaMotivo").value("Tutor con deuda pendiente"));
+				.andExpect(jsonPath("$.etiquetaMotivo").value("Mascota con deuda pendiente"));
 	}
 
 	@Test
@@ -127,7 +127,7 @@ class EgresoSeguroTest {
 		mockMvc.perform(post("/api/v1/tutores/{t}/mascotas/{m}?autorizadoRetiro=true",
 				tutorId, mascotaId)).andExpect(status().isCreated());
 
-		long comandaId = emitirComanda(tutorId, "GUARDERIA", 8000);
+		long comandaId = emitirComanda(tutorId, mascotaId, "GUARDERIA", 8000);
 		mockMvc.perform(post("/api/v1/caja/pagos/{id}", comandaId)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"pagos\":[{\"metodoPago\":\"EFECTIVO\",\"monto\":8000}]}"))
@@ -150,7 +150,7 @@ class EgresoSeguroTest {
 		mockMvc.perform(post("/api/v1/tutores/{t}/mascotas/{m}?autorizadoRetiro=true",
 				tutorId, mascotaId)).andExpect(status().isCreated());
 
-		long comandaId = emitirComanda(tutorId, "GUARDERIA", 10000);
+		long comandaId = emitirComanda(tutorId, mascotaId, "GUARDERIA", 10000);
 		mockMvc.perform(post("/api/v1/caja/pagos/{id}", comandaId)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"pagos\":[{\"metodoPago\":\"EFECTIVO\",\"monto\":4000}]}"))
@@ -172,7 +172,7 @@ class EgresoSeguroTest {
 		long tutorId = crearTutor("35000007");
 		mockMvc.perform(post("/api/v1/tutores/{t}/mascotas/{m}?autorizadoRetiro=false",
 				tutorId, mascotaId)).andExpect(status().isCreated());
-		emitirComanda(tutorId, "OTRO", 5000);
+		emitirComanda(tutorId, mascotaId, "OTRO", 5000);
 
 		mockMvc.perform(validar(mascotaId, tutorId))
 				.andExpect(status().isOk())
@@ -349,7 +349,7 @@ class EgresoSeguroTest {
 		long tutorId = crearTutor("35000015");
 		mockMvc.perform(post("/api/v1/tutores/{t}/mascotas/{m}?autorizadoRetiro=true",
 				tutorId, mascotaId)).andExpect(status().isCreated());
-		long comandaId = emitirComanda(tutorId, "GUARDERIA", 12000);
+		long comandaId = emitirComanda(tutorId, mascotaId, "GUARDERIA", 12000);
 		mockMvc.perform(post("/api/v1/caja/pagos/{id}", comandaId)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"pagos\":[{\"metodoPago\":\"EFECTIVO\",\"monto\":5000}]}"))
@@ -484,6 +484,11 @@ class EgresoSeguroTest {
 	}
 
 	private long emitirComanda(long tutorId, String concepto, long monto) throws Exception {
+		return emitirComanda(tutorId, null, concepto, monto);
+	}
+
+	/** La deuda que bloquea el egreso es la de la mascota: sin mascotaId la comanda no retiene a nadie. */
+	private long emitirComanda(long tutorId, Long mascotaId, String concepto, long monto) throws Exception {
 		mockMvc.perform(put("/api/v1/comandas/tarifas/{concepto}", concepto)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"monto\":%d}".formatted(monto)))
@@ -492,8 +497,8 @@ class EgresoSeguroTest {
 		String json = mockMvc.perform(post("/api/v1/comandas")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"concepto":"%s","tutorId":%d,"descripcion":"Consumo"}
-								""".formatted(concepto, tutorId)))
+								{"concepto":"%s","tutorId":%d,"mascotaId":%s,"descripcion":"Consumo"}
+								""".formatted(concepto, tutorId, mascotaId == null ? "null" : mascotaId)))
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		return objectMapper.readTree(json).get("id").asLong();

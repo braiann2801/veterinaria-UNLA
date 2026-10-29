@@ -25,6 +25,10 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 	List<ComandaCobro> findByTutorIdAndEstadoInOrderByFechaEmisionAsc(Long tutorId,
 			List<ComandaCobro.EstadoComanda> estados);
 
+	/** Comandas con saldo por cobrar de una mascota: la base del bloqueo de egreso. */
+	List<ComandaCobro> findByMascotaIdAndEstadoInOrderByFechaEmisionAsc(Long mascotaId,
+			List<ComandaCobro.EstadoComanda> estados);
+
 	/**
 	 * Deuda consolidada de un tutor.
 	 *

@@ -42,7 +42,7 @@ import { useApi } from "@/lib/use-api"
 import { Panel, Select } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { DatePicker } from "@/components/ui/date-picker"
-import { Recurso, Semforo, TOQUE_MINIMO, money } from "@/lib/vista"
+import { Recurso, Semforo, TOQUE_MINIMO, formatearDni, money } from "@/lib/vista"
 
 const METODOS: { valor: MetodoPago; etiqueta: string }[] = [
   { valor: "EFECTIVO", etiqueta: "Efectivo" },
@@ -175,7 +175,7 @@ export function Caja() {
 
         {tutorElegido && (
           <p className="mt-3 text-xs text-muted-foreground">
-            {tutorElegido.nombreCompleto} · DNI {tutorElegido.dni} ·{" "}
+            {tutorElegido.nombreCompleto} · DNI {formatearDni(tutorElegido.dni)} ·{" "}
             {tutorElegido.mascotas.length} mascota{tutorElegido.mascotas.length === 1 ? "" : "s"} en la
             jornada.
           </p>
@@ -232,13 +232,14 @@ export function Caja() {
               {deuda.datos.nombreTutor} debe {money(deuda.datos.totalDeuda)} en{" "}
               {deuda.datos.cantidadComandas} comanda
               {deuda.datos.cantidadComandas === 1 ? "" : "s"} pendiente
-              {deuda.datos.cantidadComandas === 1 ? "" : "s"}. El egreso queda bloqueado
-              hasta regularizar.
+              {deuda.datos.cantidadComandas === 1 ? "" : "s"}. Cada mascota queda retenida
+              hasta saldar sus propias comandas.
             </p>
             <ul className="mt-2 flex flex-col gap-0.5">
               {deuda.datos.comandasPendientes.map((c) => (
                 <li key={c.id} className="text-xs text-red-800 dark:text-red-300">
-                  #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto} ·{" "}
+                  #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto}
+                  {c.nombreMascota ? ` de ${c.nombreMascota}` : ""} ·{" "}
                   {money(c.saldoPendiente)} · {c.diasDeAntiguedad} día
                   {c.diasDeAntiguedad === 1 ? "" : "s"} de atraso
                 </li>
