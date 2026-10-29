@@ -16,6 +16,7 @@
 
 import { useState } from "react"
 import {
+  BadgeDollarSign,
   CalendarDays,
   ClipboardList,
   Dog,
@@ -44,6 +45,7 @@ export type TabId =
   | "egreso"
   | "fichas"
   | "usuarios"
+  | "tarifas"
 
 /** Guardería ve lo mismo que Recepción (S3 de `odd/tasks/autenticacion.md`). */
 const EMPLEADOS: Role[] = ["recepcion", "veterinario", "duenio", "guarderia"]
@@ -91,6 +93,8 @@ export const TABS: TabDef[] = [
   { id: "balance", label: "Balance", icon: ClipboardList, roles: ["duenio"] },
   // ABM de cuentas: solo el Dueño (el backend responde 403 al resto).
   { id: "usuarios", label: "Usuarios", icon: UserCog, roles: ["duenio"] },
+  // Precios de consulta y guardería: solo el Dueño (el backend responde 403 al resto).
+  { id: "tarifas", label: "Tarifas", icon: BadgeDollarSign, roles: ["duenio"] },
   { id: "egreso", label: "Egreso", icon: LogOut, roles: EMPLEADOS },
 ]
 

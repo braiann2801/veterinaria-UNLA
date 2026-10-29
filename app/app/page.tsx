@@ -30,6 +30,7 @@ import { Mostrador } from "@/components/modules/mostrador"
 import { Padron } from "@/components/modules/padron"
 import { Profesionales } from "@/components/modules/profesionales"
 import { Usuarios } from "@/components/modules/usuarios"
+import { Tarifas } from "@/components/modules/tarifas"
 
 function Shell({ role }: { role: Role }) {
   const [active, setActive] = useState<TabId>("mostrador")
@@ -84,6 +85,7 @@ function Shell({ role }: { role: Role }) {
                 dia, solo las comandas que tiene delante. */}
             {active === "balance" && esDuenio && <Balance />}
             {active === "usuarios" && esDuenio && <Usuarios />}
+            {active === "tarifas" && esDuenio && <Tarifas />}
           </div>
         </main>
       </div>

@@ -635,6 +635,9 @@ export const comandas = {
     post<ComandaCobro>("/comandas", body),
   cancelar: (id: number) => put<ComandaCobro>(`/comandas/${id}/cancelar`),
   tarifas: () => get<Record<string, number>>("/comandas/tarifas"),
+  /** Solo el Dueño (403 al resto). */
+  actualizarTarifa: (concepto: ConceptoCobro, monto: number) =>
+    put<{ concepto: string; monto: number }>(`/comandas/tarifas/${concepto}`, { monto }),
 }
 
 // -------------------------------------------------------------------- caja
@@ -722,6 +725,30 @@ export const usuarios = {
   cambiarActivo: (id: number, activo: boolean) => put<UsuarioSesion>(`/usuarios/${id}/activo`, { activo }),
   resetearPassword: (id: number) => post<UsuarioConClaveTemporal>(`/usuarios/${id}/reset-password`),
   eliminar: (id: number) => del<void>(`/usuarios/${id}`),
+}
+
+// ------------------------------------------------------- tarifas guardería
+
+export interface TarifaGuarderia {
+  precioHora: number
+  precioNoche: number
+}
+
+/** Monto de una estadía: por horas si entra y sale el mismo día, por noches si pasa al menos una. */
+export interface CotizacionGuarderia {
+  modalidad: "HORAS" | "NOCHES"
+  cantidad: number
+  precioUnitario: number
+  total: number
+}
+
+export const tarifasGuarderia = {
+  obtener: () => get<TarifaGuarderia>("/guarderia/tarifas"),
+  /** Solo el Dueño (403 al resto). */
+  actualizar: (tarifas: TarifaGuarderia) => put<TarifaGuarderia>("/guarderia/tarifas", tarifas),
+  /** `desde`/`hasta` en ISO local sin zona: `2031-06-02T09:00:00`. */
+  cotizar: (desde: string, hasta: string) =>
+    get<CotizacionGuarderia>(`/guarderia/cotizar?${query({ desde, hasta })}`),
 }
 
 // ----------------------------------------------------------------- helpers

@@ -82,6 +82,7 @@ public class SecurityConfig {
 						// cae en la de empleados y Spring MVC igual ejecuta el handler de GET.
 						.requestMatchers("/api/v1/caja/cierre").hasRole("DUENIO")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/comandas/tarifas/**").hasRole("DUENIO")
+						.requestMatchers(HttpMethod.PUT, "/api/v1/guarderia/tarifas").hasRole("DUENIO")
 						// Cualquier empleado con la clave ya cambiada.
 						.requestMatchers("/api/**").hasAnyRole(EMPLEADOS)
 						.anyRequest().authenticated())
