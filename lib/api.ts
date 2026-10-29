@@ -260,6 +260,8 @@ export interface AforoGuarderia {
 export interface ReservaGuarderia {
   id: number
   fecha: string
+  /** Último día de la estadía; `null` en las de un solo día. */
+  fechaSalida: string | null
   tipoEstadia: TipoEstadiaGuarderia
   estado: string
   mascotaId: number
@@ -277,7 +279,13 @@ export interface ReservaGuarderia {
 
 export interface ReservaGuarderiaInput {
   fecha: string
-  tipoEstadia: TipoEstadiaGuarderia
+  /**
+   * Último día de una estadía por rango (requiere `horaEntrada` y `horaSalida`).
+   * Sin él, la reserva es de un solo día, como siempre.
+   */
+  fechaSalida?: string
+  /** Opcional: con rango el backend lo deduce de las fechas. */
+  tipoEstadia?: TipoEstadiaGuarderia
   mascotaId: number
   /**
    * Horarios en `HH:mm`. Se mandan juntos o ninguno: el backend rechaza media

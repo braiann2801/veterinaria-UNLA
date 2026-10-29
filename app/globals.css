@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+/* HeroUI v3 (DateRangePicker de la reserva de guardería). Va antes de los tokens
+   del proyecto: comparte nombres de variables (--background, --muted, --accent,
+   --radius...) y los :root/.dark de abajo tienen que ganar. */
+@import '@heroui/styles';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 

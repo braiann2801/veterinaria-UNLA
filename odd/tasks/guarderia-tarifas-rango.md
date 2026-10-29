@@ -17,7 +17,7 @@ Rama: `feat/autenticacion` (continúa sobre el PR #1) · Tests: `./mvnw test` (M
 |---|---|---|---|---|
 | T1 | S1, S2 | inline | hecho (215 tests verdes; RED observado) | ver git log |
 | T2 | S1, S4, S5 | inline | hecho (222 tests verdes; RED 6/7 observado) | ver git log |
-| T3 | S3, S4 | inline | pendiente | |
+| T3 | S3, S4 | inline | hecho (tsc + e2e: monto en vivo, comanda #7 = $24.000) | ver git log |
 | T4 | — | inline | pendiente | |
 
 T1: tarifas de guardería (hora/noche) + pestaña Tarifas del Dueño. T2: reserva por rango, aforo por día, cotización y comanda con monto calculado. T3: modal con DateRangePicker de HeroUI + monto en vivo. T4: docs (CLAUDE.md, PROGRESS.md).
