@@ -2,6 +2,7 @@ package com.veterinaria.veterinaria_backend.service.impl;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 
@@ -51,6 +52,26 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 		// Sin fecha el backend responde por hoy, no por todo el historico: la
 		// agenda manda siempre la fecha que el usuario tiene seleccionada.
 		return turnoRepository.findDelDia(inicioDelDia(dia), finDelDia(dia)).stream()
+				.map(this::toResponse)
+				.toList();
+	}
+
+	/** Tope del rango: alcanza para un mes con las semanas de los bordes, y acota la consulta. */
+	private static final long DIAS_MAXIMOS_DEL_RANGO = 62;
+
+	@Override
+	public List<TurnoClinicoResponseDTO> listarEntre(LocalDate desde, LocalDate hasta) {
+		if (desde == null || hasta == null) {
+			throw new BadRequestException("Hay que indicar desde y hasta juntos");
+		}
+		if (hasta.isBefore(desde)) {
+			throw new BadRequestException("La fecha hasta no puede ser anterior a desde");
+		}
+		if (ChronoUnit.DAYS.between(desde, hasta) + 1 > DIAS_MAXIMOS_DEL_RANGO) {
+			throw new BadRequestException("El rango no puede superar los 62 dias");
+		}
+		// Mismo rango semiabierto que el listado del dia: [inicio de desde, fin de hasta).
+		return turnoRepository.findDelDia(inicioDelDia(desde), finDelDia(hasta)).stream()
 				.map(this::toResponse)
 				.toList();
 	}
