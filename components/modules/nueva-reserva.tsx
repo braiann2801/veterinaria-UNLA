@@ -29,7 +29,7 @@ import { Clock, Loader2 } from "lucide-react"
 
 import { guarderia as apiGuarderia, mascotas as apiMascotas } from "@/lib/api"
 import { ApiError } from "@/lib/api"
-import type { AforoGuarderia, Mascota, TipoEstadiaGuarderia } from "@/lib/api"
+import type { AforoGuarderia, Mascota, ReservaGuarderia, TipoEstadiaGuarderia } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Modal } from "@/components/ui/modal"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -92,6 +92,9 @@ export function NuevaReservaGuarderia({
   const [observaciones, setObservaciones] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  // Despues de guardar se muestra a que comanda quedo atada la estadia (o que no
+  // se pudo emitir por falta de tutor) en vez de cerrar el modal en silencio.
+  const [creada, setCreada] = useState<ReservaGuarderia | null>(null)
 
   // El aforo de la fecha elegida, que es distinto del de la fecha abierta en la
   // agenda: el operador puede reservar para mañana y el semáforo que le
@@ -116,7 +119,7 @@ export function NuevaReservaGuarderia({
     setGuardando(true)
     setError(null)
     try {
-      await apiGuarderia.crear({
+      const reserva = await apiGuarderia.crear({
         fecha,
         tipoEstadia: tipo,
         mascotaId: mascotaId as number,
@@ -128,7 +131,7 @@ export function NuevaReservaGuarderia({
         observaciones: observaciones.trim() || undefined,
       })
       await onCreada()
-      onCerrar()
+      setCreada(reserva)
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear la reserva")
       // Un 409 por aforo lleno deja de estar al día lo que muestra el semáforo:
@@ -141,6 +144,33 @@ export function NuevaReservaGuarderia({
 
   const listo = mascotaId !== null
   const sinMascotas = mascotas.datos !== null && mascotas.datos.length === 0
+
+  if (creada) {
+    return (
+      <Modal open onClose={onCerrar} title="Reserva creada">
+        <div className="flex flex-col gap-3">
+          {creada.comandaId !== null ? (
+            <p className="text-sm" role="status">
+              Se emitió la comanda #{creada.comandaId} de guardería para {creada.nombreMascota}. Se cobra en
+              Caja: ahí se puede registrar la seña o el pago completo, y el egreso no se habilita hasta que esté
+              saldada.
+            </p>
+          ) : (
+            <p className="rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300" role="alert">
+              {creada.nombreMascota} no tiene tutor vinculado, así que la estadía no generó comanda. Para poder
+              cobrarla: cancelá esta reserva, vinculá un tutor en el Padrón y volvé a reservar.
+            </p>
+          )}
+          <button
+            onClick={onCerrar}
+            className={`rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground ${TOQUE_MINIMO}`}
+          >
+            Listo
+          </button>
+        </div>
+      </Modal>
+    )
+  }
 
   return (
     <Modal open onClose={onCerrar} title="Nueva reserva de guardería">

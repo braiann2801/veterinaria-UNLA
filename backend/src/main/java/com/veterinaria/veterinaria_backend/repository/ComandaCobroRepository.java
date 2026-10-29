@@ -62,6 +62,9 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 	/** Comanda emitida para una ficha clinica, si ya existe. */
 	Optional<ComandaCobro> findByConsultaMedicaId(Long consultaMedicaId);
 
+	/** Comandas emitidas por una reserva de guarderia (a lo sumo una hoy). */
+	List<ComandaCobro> findByReservaGuarderiaId(Long reservaGuarderiaId);
+
 	/** Evita emitir una segunda comanda para la misma consulta. */
 	boolean existsByConsultaMedicaId(Long consultaMedicaId);
 

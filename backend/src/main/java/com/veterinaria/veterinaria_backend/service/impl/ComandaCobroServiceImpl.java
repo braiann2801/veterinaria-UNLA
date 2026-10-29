@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,9 +20,12 @@ import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ComandaCobro;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
+import com.veterinaria.veterinaria_backend.entity.ReservaGuarderia;
 import com.veterinaria.veterinaria_backend.entity.Tarifa;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
+import com.veterinaria.veterinaria_backend.entity.TutorMascota;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
+import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.CobroMapper;
 import com.veterinaria.veterinaria_backend.repository.ComandaCobroRepository;
@@ -229,6 +233,69 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 	 * default: emitir una comanda de $0 por falta de configuracion es peor que
 	 * fallar, porque el cliente se va pensando que debe nada.</p>
 	 */
+	@Override
+	@Transactional
+	public Long emitirParaReserva(ReservaGuarderia reserva) {
+		Mascota mascota = reserva.getMascota();
+		Tutor titular = mascota.getVinculos() == null ? null : mascota.getVinculos().stream()
+				.filter(v -> v.getTutor() != null)
+				// Primero el que puede retirar: es quien trae y lleva al perro.
+				.sorted(Comparator.comparing((TutorMascota v) -> !v.isAutorizadoRetiro())
+						.thenComparing(TutorMascota::getVinculadoDesde,
+								Comparator.nullsLast(Comparator.naturalOrder()))
+						.thenComparing(v -> v.getTutor().getId()))
+				.map(TutorMascota::getTutor)
+				.findFirst()
+				.orElse(null);
+		if (titular == null) {
+			return null;
+		}
+
+		BigDecimal monto = precioDelConcepto(ComandaCobro.Concepto.GUARDERIA.name());
+		ComandaCobro comanda = new ComandaCobro();
+		comanda.setConcepto(ComandaCobro.Concepto.GUARDERIA);
+		comanda.setMontoTotal(monto);
+		comanda.setSaldoPendiente(monto);
+		comanda.setEstado(monto.compareTo(BigDecimal.ZERO) > 0
+				? ComandaCobro.EstadoComanda.PENDIENTE
+				: ComandaCobro.EstadoComanda.PAGADA);
+		comanda.setTutor(titular);
+		comanda.setMascota(mascota);
+		comanda.setReservaGuarderia(reserva);
+		return comandaRepository.save(comanda).getId();
+	}
+
+	@Override
+	@Transactional
+	public void anularDeReserva(Long reservaId) {
+		for (ComandaCobro comanda : comandaRepository.findByReservaGuarderiaId(reservaId)) {
+			boolean sinPagos = comanda.getPagos() == null || comanda.getPagos().isEmpty();
+			if (sinPagos && comanda.getEstado() == ComandaCobro.EstadoComanda.PENDIENTE) {
+				comanda.setEstado(ComandaCobro.EstadoComanda.CANCELADA);
+			}
+		}
+	}
+
+	@Override
+	@Transactional
+	public void eliminarDeReserva(Long reservaId) {
+		List<ComandaCobro> comandas = comandaRepository.findByReservaGuarderiaId(reservaId);
+		boolean conPagos = comandas.stream().anyMatch(c -> c.getPagos() != null && !c.getPagos().isEmpty());
+		if (conPagos) {
+			throw new BusinessConflictException("La reserva " + reservaId
+					+ " tiene pagos registrados: hay que cancelarla en lugar de eliminarla para no perder el movimiento de caja.");
+		}
+		comandaRepository.deleteAll(comandas);
+	}
+
+	@Override
+	public Long comandaDeReserva(Long reservaId) {
+		return comandaRepository.findByReservaGuarderiaId(reservaId).stream()
+				.map(ComandaCobro::getId)
+				.findFirst()
+				.orElse(null);
+	}
+
 	private BigDecimal precioDelConcepto(String concepto) {
 		ComandaCobro.Concepto enumConcepto = parseConcepto(concepto);
 

@@ -84,6 +84,14 @@ public class ComandaCobro {
 	@JoinColumn(name = "consulta_medica_id")
 	private ConsultaMedica consultaMedica;
 
+	/**
+	 * Reserva de guarderia que origino esta comanda (concepto GUARDERIA). Permite
+	 * anularla al cancelar la reserva y borrarla con ella si no tiene pagos.
+	 */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "reserva_guarderia_id")
+	private ReservaGuarderia reservaGuarderia;
+
 	@Column(name = "fecha_emision", nullable = false)
 	private LocalDateTime fechaEmision = LocalDateTime.now();
 

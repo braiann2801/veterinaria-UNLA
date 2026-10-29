@@ -22,5 +22,7 @@ public record ReservaGuarderiaResponseDTO(
 		BigDecimal sena,
 		String observaciones,
 		long cuposOcupados,
-		int aforoMaximo) {
+		int aforoMaximo,
+		/** Comanda de GUARDERIA emitida por la reserva; {@code null} si la mascota no tiene tutor. */
+		Long comandaId) {
 }

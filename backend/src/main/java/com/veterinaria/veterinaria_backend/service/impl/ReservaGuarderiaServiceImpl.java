@@ -19,6 +19,7 @@ import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.ReservaGuarderiaRepository;
+import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.ReservaGuarderiaService;
 
 /**
@@ -44,12 +45,15 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	private final ReservaGuarderiaRepository reservaRepository;
 	private final MascotaRepository mascotaRepository;
 	private final ControlAforoService controlAforoService;
+	private final ComandaCobroService comandaService;
 
 	public ReservaGuarderiaServiceImpl(ReservaGuarderiaRepository reservaRepository,
-			MascotaRepository mascotaRepository, ControlAforoService controlAforoService) {
+			MascotaRepository mascotaRepository, ControlAforoService controlAforoService,
+			ComandaCobroService comandaService) {
 		this.reservaRepository = reservaRepository;
 		this.mascotaRepository = mascotaRepository;
 		this.controlAforoService = controlAforoService;
+		this.comandaService = comandaService;
 	}
 
 	@Override
@@ -114,10 +118,16 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 
 		ReservaGuarderia guardada = reservaRepository.save(reserva);
 
+		// La estadia se cobra desde la reserva: asi se puede pagar o señar por
+		// adelantado y el egreso exige que este saldada. En la misma transaccion
+		// que la reserva: si la comanda falla (p. ej. sin tarifa), no queda una
+		// reserva sin cobro.
+		Long comandaId = comandaService.emitirParaReserva(guardada);
+
 		// Instantanea informativa. La fuente de verdad sigue siendo el COUNT.
 		semaforo.setCuposOcupados((int) (ocupados + 1));
 
-		return toResponse(guardada, ocupados + 1);
+		return toResponse(guardada, ocupados + 1, comandaId);
 	}
 
 	@Override
@@ -145,13 +155,17 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 		}
 
 		reserva.setEstado(ReservaGuarderia.EstadoReserva.CANCELADO);
+		comandaService.anularDeReserva(id);
 		return toResponse(reserva, reservaRepository.contarCuposOcupados(reserva.getFecha()));
 	}
 
 	@Override
 	@Transactional
 	public void eliminar(Long id) {
-		reservaRepository.delete(obtenerReserva(id));
+		ReservaGuarderia reserva = obtenerReserva(id);
+		// Antes que la reserva: la comanda la referencia. Con pagos responde 409.
+		comandaService.eliminarDeReserva(id);
+		reservaRepository.delete(reserva);
 	}
 
 	@Override
@@ -228,6 +242,10 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	}
 
 	private ReservaGuarderiaResponseDTO toResponse(ReservaGuarderia reserva, long ocupados) {
+		return toResponse(reserva, ocupados, comandaService.comandaDeReserva(reserva.getId()));
+	}
+
+	private ReservaGuarderiaResponseDTO toResponse(ReservaGuarderia reserva, long ocupados, Long comandaId) {
 		Mascota mascota = reserva.getMascota();
 		return new ReservaGuarderiaResponseDTO(
 				reserva.getId(),
@@ -241,7 +259,8 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 				reserva.getSena(),
 				reserva.getObservaciones(),
 				ocupados,
-				ReservaGuarderia.AFORO_MAXIMO);
+				ReservaGuarderia.AFORO_MAXIMO,
+				comandaId);
 	}
 
 	private Mascota obtenerMascota(Long id) {

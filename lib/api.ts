@@ -271,6 +271,8 @@ export interface ReservaGuarderia {
   observaciones: string | null
   cuposOcupados: number
   aforoMaximo: number
+  /** Comanda de guardería emitida al reservar; `null` si la mascota no tiene tutor. */
+  comandaId: number | null
 }
 
 export interface ReservaGuarderiaInput {
