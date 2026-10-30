@@ -330,6 +330,8 @@ export interface ConsultaMedicaInput {
   diagnostico?: string
   tratamiento?: string
   conductaObservada?: ConductaObservada
+  /** Extras usados en la atención. Sin precio: lo pone el catálogo del Dueño. */
+  extras?: { extraId: number; cantidad: number }[]
 }
 
 export interface Pago {
@@ -360,6 +362,15 @@ export interface ComandaCobro {
   consultaMedicaId: number | null
   fechaEmision: string
   pagos: Pago[]
+  /** Detalle (consulta y extras) con el precio congelado al emitir. Vacío en comandas sin detalle. */
+  items: ComandaItem[]
+}
+
+export interface ComandaItem {
+  descripcion: string
+  cantidad: number
+  precioUnitario: number
+  subtotal: number
 }
 
 export interface ComandaPendiente {
@@ -632,6 +643,29 @@ export const guarderia = {
 }
 
 // --------------------------------------------------------------- consultas
+
+// ----------------------------------------------------------------- extras
+
+/** Extra del catálogo (vacuna, urgencia, insumo) con el precio que fija el Dueño. */
+export interface Extra {
+  id: number
+  nombre: string
+  precio: number
+  activo: boolean
+}
+
+export interface ExtraInput {
+  nombre: string
+  precio: number
+  activo?: boolean
+}
+
+export const extras = {
+  listar: (soloActivos = false) => get<Extra[]>(`/extras${soloActivos ? "?soloActivos=true" : ""}`),
+  /** Solo el Dueño: el backend responde 403 al resto. */
+  crear: (body: ExtraInput) => post<Extra>("/extras", body),
+  actualizar: (id: number, body: ExtraInput) => put<Extra>(`/extras/${id}`, body),
+}
 
 export const consultas = {
   registrar: (body: ConsultaMedicaInput) => post<ConsultaMedica>("/consultas", body),
