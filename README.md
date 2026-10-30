@@ -95,6 +95,9 @@ El frontend todavía no tiene test runner.
 - **Ficha clínica sin dinero:**
   - La consulta registra anamnesis, diagnóstico, tratamiento y conducta.
   - El cobro se genera como comanda para el mostrador.
+  - En la Agenda, cada turno pendiente tiene el botón **Atender**: abre la ficha ya vinculada al turno. Al finalizar, el turno queda como **Atendido**.
+  - El profesional puede sumar **extras** (vacunas, urgencias, insumos) del catálogo que arma el Dueño en **Tarifas**. No ve precios: la comanda suma la consulta más los extras, y Caja muestra el detalle de cada línea.
+  - Cambiar el precio de un extra rige para las atenciones nuevas; las comandas ya emitidas conservan su precio. Un extra no se borra, se desactiva.
 - **Tutores y mascotas:** la relación es N:M. Cada vínculo indica si ese tutor está autorizado a retirar a la mascota.
 - **Deuda por mascota:**
   - Se puede retirar una mascota cuando sus propias comandas están saldadas.
