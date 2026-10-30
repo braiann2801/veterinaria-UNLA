@@ -50,52 +50,53 @@ export type TabId =
 /** Guardería ve lo mismo que Recepción (S3 de `odd/tasks/autenticacion.md`). */
 const EMPLEADOS: Role[] = ["recepcion", "veterinario", "duenio", "guarderia"]
 
+type Seccion = "operacion" | "clientes" | "administracion"
+
 type TabDef = {
   id: TabId
   label: string
   icon: LucideIcon
   roles: Role[]
+  seccion: Seccion
 }
 
+/** Títulos de sección, en el orden en que se muestran. */
+const SECCIONES: { id: Seccion; titulo: string }[] = [
+  { id: "operacion", titulo: "Operación" },
+  { id: "clientes", titulo: "Clientes y caja" },
+  { id: "administracion", titulo: "Administración" },
+]
+
 /**
- * Orden de navegación unificado.
+ * Orden de navegación unificado, agrupado en secciones.
  *
  * <p>El orden de este array es el orden de la lista lateral y del cajón de móvil,
- * para todos los roles: no hay una lista por rol que se reordene al cambiar. Eso
- * es lo que hace que alternar entre Recepción y Veterinario no mueva nada de su
- * lugar. Para que el orden se mantenga, el filtro por rol se aplica **sobre esta
- * lista** y nunca al revés.</p>
+ * para todos los roles: el filtro por rol se aplica **sobre esta lista** y nunca
+ * al revés, así alternar de rol no mueve nada de su lugar.</p>
  *
- * <p>Los siete módulos operativos van en el orden pedido, con <b>Historial
- * anteúltimo y Egreso último</b>. Balance es el octavo y el único que no ven ni
- * Recepción ni Veterinario: solo existe para el Dueño, así que cuando aparece lo
- * hace justo antes de Egreso y la lista sigue terminando en el egreso.</p>
+ * <ul>
+ *   <li><b>Operación</b>: el recorrido de un paciente en el día (llega, se
+ *       agenda, se atiende, se retira).</li>
+ *   <li><b>Clientes y caja</b>: el padrón, lo clínico pasado y el cobro.</li>
+ *   <li><b>Administración</b>: solo el Dueño (el backend responde 403 al resto).
+ *       Para los demás roles la sección entera desaparece.</li>
+ * </ul>
  *
- * <p>Recepción y Veterinario ven exactamente los mismos siete módulos en el mismo
- * orden. Antes el veterinarian no tenía Caja y Recepción no tenía Historial, y
- * los dos veían la misma lista en distinto orden (Agenda antes que Padrón).</p>
+ * <p>Recepción, Veterinario y Guardería ven los mismos siete módulos: el
+ * veterinario necesita el Padrón (de quién es el paciente) y Caja; Recepción
+ * necesita el Historial (cómo venía el animal antes de devolverlo).</p>
  */
 export const TABS: TabDef[] = [
-  { id: "mostrador", label: "Mostrador", icon: LayoutDashboard, roles: EMPLEADOS },
-  { id: "padron", label: "Padrón", icon: Users, roles: EMPLEADOS },
-  // El veterinario entra al Padron para consultar de quien es cada paciente antes
-  // de firmar una ficha clinica. Sin este rol la pestana le era invisible y se
-  // quedaba sin forma de resolver el DNI de una emergencia.
-  { id: "agenda", label: "Agenda", icon: CalendarDays, roles: EMPLEADOS },
-  { id: "consultas", label: "Ficha médica", icon: Stethoscope, roles: EMPLEADOS },
-  // El veterinario entra a Caja: cobra, ve quien debe y genera la comanda. Lo que
-  // no debe ver es el balance, y ese no esta en esta pestana (ver `balance`).
-  { id: "cobros", label: "Caja", icon: Wallet, roles: EMPLEADOS },
-  // Recepcion entra al Historial: es quien recibe al paciente de vuelta y necesita
-  // leerle al dueno como venia el animal antes de devolverlo.
-  { id: "fichas", label: "Historial", icon: FileText, roles: EMPLEADOS },
-  // Unico modulo que no ven ni Recepcion ni Veterinario.
-  { id: "balance", label: "Balance", icon: ClipboardList, roles: ["duenio"] },
-  // ABM de cuentas: solo el Dueño (el backend responde 403 al resto).
-  { id: "usuarios", label: "Usuarios", icon: UserCog, roles: ["duenio"] },
-  // Precios de consulta y guardería: solo el Dueño (el backend responde 403 al resto).
-  { id: "tarifas", label: "Tarifas", icon: BadgeDollarSign, roles: ["duenio"] },
-  { id: "egreso", label: "Egreso", icon: LogOut, roles: EMPLEADOS },
+  { id: "mostrador", label: "Mostrador", icon: LayoutDashboard, roles: EMPLEADOS, seccion: "operacion" },
+  { id: "agenda", label: "Agenda", icon: CalendarDays, roles: EMPLEADOS, seccion: "operacion" },
+  { id: "consultas", label: "Ficha médica", icon: Stethoscope, roles: EMPLEADOS, seccion: "operacion" },
+  { id: "egreso", label: "Egreso", icon: LogOut, roles: EMPLEADOS, seccion: "operacion" },
+  { id: "padron", label: "Padrón", icon: Users, roles: EMPLEADOS, seccion: "clientes" },
+  { id: "fichas", label: "Historial", icon: FileText, roles: EMPLEADOS, seccion: "clientes" },
+  { id: "cobros", label: "Caja", icon: Wallet, roles: EMPLEADOS, seccion: "clientes" },
+  { id: "balance", label: "Balance", icon: ClipboardList, roles: ["duenio"], seccion: "administracion" },
+  { id: "tarifas", label: "Tarifas", icon: BadgeDollarSign, roles: ["duenio"], seccion: "administracion" },
+  { id: "usuarios", label: "Usuarios", icon: UserCog, roles: ["duenio"], seccion: "administracion" },
 ]
 
 /** Módulos visibles en la barra inferior del móvil. */
@@ -123,9 +124,14 @@ export function Sidebar({
       {/* Lateral de escritorio */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
         <Marca />
-        <nav className="flex flex-1 flex-col gap-1 p-2">
-          {visible.map((t) => (
-            <BotonNav key={t.id} tab={t} activo={t.id === active} onClick={() => elegir(t.id)} />
+        <nav className="flex flex-1 flex-col gap-4 overflow-y-auto p-2">
+          {porSeccion(visible).map(({ seccion, tabs }) => (
+            <div key={seccion.id} className="flex flex-col gap-1">
+              <TituloSeccion texto={seccion.titulo} />
+              {tabs.map((t) => (
+                <BotonNav key={t.id} tab={t} activo={t.id === active} onClick={() => elegir(t.id)} />
+              ))}
+            </div>
           ))}
         </nav>
         <PieDeMarca />
@@ -189,20 +195,35 @@ export function Sidebar({
                 <X className="size-5" aria-hidden />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {visible.map((t) => (
-                <BotonNav
-                  key={t.id}
-                  tab={t}
-                  activo={t.id === active}
-                  onClick={() => elegir(t.id)}
-                />
+            <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
+              {porSeccion(visible).map(({ seccion, tabs }) => (
+                <div key={seccion.id} className="flex flex-col gap-1">
+                  <TituloSeccion texto={seccion.titulo} />
+                  <div className="grid grid-cols-2 gap-2">
+                    {tabs.map((t) => (
+                      <BotonNav key={t.id} tab={t} activo={t.id === active} onClick={() => elegir(t.id)} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         </div>
       )}
     </>
+  )
+}
+
+/** Secciones con al menos un módulo visible para el rol, en el orden de `SECCIONES`. */
+function porSeccion(visible: TabDef[]) {
+  return SECCIONES.map((seccion) => ({ seccion, tabs: visible.filter((t) => t.seccion === seccion.id) })).filter(
+    (grupo) => grupo.tabs.length > 0,
+  )
+}
+
+function TituloSeccion({ texto }: { texto: string }) {
+  return (
+    <p className="px-3 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{texto}</p>
   )
 }
 
