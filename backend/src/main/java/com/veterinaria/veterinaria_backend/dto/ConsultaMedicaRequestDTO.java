@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 import jakarta.validation.constraints.NotBlank;
@@ -74,6 +75,8 @@ public record ConsultaMedicaRequestDTO(
 			Long extraId,
 			@NotNull(message = "La cantidad es obligatoria")
 			@Min(value = 1, message = "La cantidad debe ser al menos 1")
+			// Mismo tope que la pantalla: evita una comanda desproporcionada por un error de tipeo o de la API.
+			@Max(value = 99, message = "La cantidad no puede superar 99")
 			Integer cantidad) {
 	}
 

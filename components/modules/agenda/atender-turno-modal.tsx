@@ -41,8 +41,9 @@ export function AtenderTurnoModal({
   async function guardar() {
     setGuardando(true)
     setError(null)
+    let ficha
     try {
-      const ficha = await apiConsultas.registrar({
+      ficha = await apiConsultas.registrar({
         turnoClinicoId: turno.id,
         mascotaId: turno.mascota.id,
         profesionalId: turno.profesional.id,
@@ -53,15 +54,22 @@ export function AtenderTurnoModal({
         conductaObservada: conducta,
         extras,
       })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la atención")
+      setGuardando(false)
+      return
+    }
+    // La atención ya quedó guardada: si falla releer la agenda, no se muestra
+    // como error del guardado (un reintento chocaría con "el turno ya tiene ficha").
+    try {
       await onGuardado(
         `Atención de ${turno.mascota.nombre} cerrada. Se emitió la comanda #${ficha.comandaId} para cobrar en el mostrador.`,
       )
-      onCerrar()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar la atención")
-    } finally {
-      setGuardando(false)
+    } catch {
+      // El padre muestra la agenda desactualizada con su propio estado de error.
     }
+    setGuardando(false)
+    onCerrar()
   }
 
   return (

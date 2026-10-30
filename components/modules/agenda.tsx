@@ -284,8 +284,8 @@ export function Agenda() {
           turno={atendiendo}
           onCerrar={() => setAtendiendo(null)}
           onGuardado={async (mensaje) => {
-            await turnosMes.recargar()
             setAviso(mensaje)
+            await turnosMes.recargar()
           }}
         />
       )}

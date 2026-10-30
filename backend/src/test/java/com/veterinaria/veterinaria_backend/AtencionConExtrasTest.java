@@ -160,6 +160,9 @@ class AtencionConExtrasTest {
 		ficha(null, "[{\"extraId\":%d,\"cantidad\":0}]".formatted(activo))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detalles", Matchers.hasItem("La cantidad debe ser al menos 1")));
+		ficha(null, "[{\"extraId\":%d,\"cantidad\":100}]".formatted(activo))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detalles", Matchers.hasItem("La cantidad no puede superar 99")));
 
 		mockMvc.perform(get("/api/v1/consultas/mascota/{id}", mascotaId))
 				.andExpect(jsonPath("$", Matchers.hasSize(0)));
