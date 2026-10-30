@@ -11,6 +11,7 @@ import com.veterinaria.veterinaria_backend.dto.TurnoClinicoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoConAltaRequestDTO;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
+import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
 import com.veterinaria.veterinaria_backend.service.MascotaService;
 import com.veterinaria.veterinaria_backend.service.TurnoClinicoService;
@@ -29,9 +30,12 @@ public class TurnoConAltaServiceImpl implements TurnoConAltaService {
 	private final MascotaService mascotaService;
 	private final TurnoClinicoService turnoService;
 	private final TutorRepository tutorRepository;
+	private final TutorMascotaRepository vinculoRepository;
 
 	public TurnoConAltaServiceImpl(TutorService tutorService, MascotaService mascotaService,
-			TurnoClinicoService turnoService, TutorRepository tutorRepository) {
+			TurnoClinicoService turnoService, TutorRepository tutorRepository,
+			TutorMascotaRepository vinculoRepository) {
+		this.vinculoRepository = vinculoRepository;
 		this.tutorService = tutorService;
 		this.mascotaService = mascotaService;
 		this.turnoService = turnoService;
@@ -44,6 +48,14 @@ public class TurnoConAltaServiceImpl implements TurnoConAltaService {
 		validarCombinacion(request);
 
 		Long mascotaId = request.mascotaId();
+		if (mascotaId != null && request.tutorId() != null) {
+			// El cliente indicado tiene que ser uno de los tutores de la mascota: si no,
+			// el pedido trae un dato inconsistente y se rechaza en vez de ignorarlo.
+			tutorExistente(request.tutorId());
+			if (vinculoRepository.findByTutorIdAndMascotaId(request.tutorId(), mascotaId).isEmpty()) {
+				throw new BadRequestException("La mascota elegida no pertenece al cliente indicado");
+			}
+		}
 		if (request.mascotaNueva() != null) {
 			Long tutorId = request.tutorNuevo() != null
 					? tutorService.crear(request.tutorNuevo()).id()

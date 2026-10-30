@@ -152,6 +152,36 @@ class TurnoConAltaTest {
 	}
 
 	@Test
+	@DisplayName("Cliente existente con una mascota que no es suya da 400 y no agenda nada")
+	void mascotaAjenaAlCliente() throws Exception {
+		long profesionalId = crearProfesional();
+		long tutorId = crearTutor("31000006");
+		long mascotaAjena = crearMascota("Ajena");
+
+		esperar400("""
+				{"tutorId":%d,"mascotaId":%d,%s}
+				""".formatted(tutorId, mascotaAjena, TURNO.formatted(profesionalId)),
+				"La mascota elegida no pertenece al cliente indicado");
+		Assertions.assertEquals(0, cantidadDeTurnos("2031-06-10"));
+	}
+
+	@Test
+	@DisplayName("Cliente existente con su propia mascota agenda el turno")
+	void mascotaPropiaDelCliente() throws Exception {
+		long profesionalId = crearProfesional();
+		long tutorId = crearTutor("31000007");
+		long mascotaId = crearMascota("Propia");
+		mockMvc.perform(post("/api/v1/tutores/{t}/mascotas/{m}?autorizadoRetiro=true", tutorId, mascotaId))
+				.andExpect(status().isCreated());
+
+		alta("""
+				{"tutorId":%d,"mascotaId":%d,%s}
+				""".formatted(tutorId, mascotaId, TURNO.formatted(profesionalId)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.mascota.id").value(mascotaId));
+	}
+
+	@Test
 	@DisplayName("Un cliente existente que no existe da 404")
 	void clienteInexistente() throws Exception {
 		long profesionalId = crearProfesional();
