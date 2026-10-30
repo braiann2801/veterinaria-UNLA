@@ -28,7 +28,13 @@ public record ComandaCobroResponseDTO(
 		String nombreMascota,
 		Long consultaMedicaId,
 		LocalDateTime fechaEmision,
-		List<PagoResponseDTO> pagos) {
+		List<PagoResponseDTO> pagos,
+		List<ItemDTO> items) {
+
+	/** Linea de detalle: la consulta o un extra, con el precio congelado al emitir. */
+	public record ItemDTO(String descripcion, int cantidad, BigDecimal precioUnitario, BigDecimal subtotal) {
+	}
+
 
 	/**
 	 * Total efectivamente cobrado.

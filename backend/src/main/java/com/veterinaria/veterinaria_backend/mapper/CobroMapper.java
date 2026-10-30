@@ -39,7 +39,11 @@ public class CobroMapper {
 				comanda.getMascota() != null ? comanda.getMascota().getNombre() : null,
 				comanda.getConsultaMedica() != null ? comanda.getConsultaMedica().getId() : null,
 				comanda.getFechaEmision(),
-				toPagoResponseList(comanda.getPagos()));
+				toPagoResponseList(comanda.getPagos()),
+				comanda.getItems() == null ? List.of() : comanda.getItems().stream()
+						.map(item -> new ComandaCobroResponseDTO.ItemDTO(item.getDescripcion(), item.getCantidad(),
+								item.getPrecioUnitario(), item.getSubtotal()))
+						.toList());
 	}
 
 	public List<ComandaCobroResponseDTO> toComandaResponseList(List<ComandaCobro> comandas) {
