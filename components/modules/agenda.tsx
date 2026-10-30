@@ -13,7 +13,7 @@
  */
 
 import { useMemo, useState } from "react"
-import { CalendarDays, Clock, Dog, Plus, Users } from "lucide-react"
+import { CalendarDays, Clock, Dog, Plus, Stethoscope, Users } from "lucide-react"
 
 import { guarderia as apiGuarderia, turnos as apiTurnos } from "@/lib/api"
 import type { AforoGuarderia, ReservaGuarderia, TurnoClinico } from "@/lib/api"
@@ -23,6 +23,7 @@ import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
 import { AgendarTurnoModal } from "@/components/modules/agendar-turno-modal"
 import { NuevaReservaGuarderia } from "@/components/modules/nueva-reserva"
 import { CalendarioMensual, aClave, deClave, diasVisibles } from "@/components/modules/agenda/calendario-mensual"
+import { AtenderTurnoModal } from "@/components/modules/agenda/atender-turno-modal"
 
 /** El tope lo expone el backend en cada respuesta; no se hardcodea aca. */
 function colorDeAforo(aforo: AforoGuarderia) {
@@ -42,6 +43,18 @@ function rangoHorario(reserva: ReservaGuarderia) {
   return `${reserva.horaEntrada.slice(0, 5)} – ${reserva.horaSalida.slice(0, 5)}`
 }
 
+const ETIQUETA_ESTADO: Record<TurnoClinico["estado"], string> = {
+  PENDIENTE: "Pendiente",
+  ATENDIDO: "Atendido",
+  CANCELADO: "Cancelado",
+}
+
+const TONO_ESTADO: Record<TurnoClinico["estado"], "verde" | "ambar" | "rojo"> = {
+  PENDIENTE: "ambar",
+  ATENDIDO: "verde",
+  CANCELADO: "rojo",
+}
+
 /** "martes 29 de octubre". */
 function fechaLegible(clave: string) {
   return new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long" }).format(deClave(clave))
@@ -53,6 +66,8 @@ export function Agenda() {
   const [vista, setVista] = useState(() => ({ anio: new Date().getFullYear(), mes: new Date().getMonth() }))
   const [turnoAbierto, setTurnoAbierto] = useState(false)
   const [reservaAbierta, setReservaAbierta] = useState(false)
+  const [atendiendo, setAtendiendo] = useState<TurnoClinico | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
 
   const dias = diasVisibles(vista.anio, vista.mes)
   const desde = aClave(dias[0])
@@ -74,6 +89,7 @@ export function Agenda() {
   /** Elegir un día de un mes vecino también mueve el calendario a ese mes. */
   function seleccionar(clave: string) {
     setFecha(clave)
+    setAviso(null)
     const dia = deClave(clave)
     if (dia.getMonth() !== vista.mes || dia.getFullYear() !== vista.anio) {
       setVista({ anio: dia.getFullYear(), mes: dia.getMonth() })
@@ -148,7 +164,7 @@ export function Agenda() {
                           <p className={`text-sm font-medium ${t.estado === "CANCELADO" ? "line-through opacity-60" : ""}`}>
                             {t.fechaHoraInicio.slice(11, 16)} · {t.mascota.nombre}
                           </p>
-                          <Semforo tono={t.estado === "CANCELADO" ? "ambar" : "verde"}>{t.estado}</Semforo>
+                          <Semforo tono={TONO_ESTADO[t.estado]}>{ETIQUETA_ESTADO[t.estado]}</Semforo>
                         </div>
                         <p className="text-xs text-muted-foreground">{t.motivo}</p>
                         <p className="text-xs text-muted-foreground">
@@ -156,12 +172,30 @@ export function Agenda() {
                           {t.profesional.matricula ? ` · ${t.profesional.matricula}` : ""} · bloque hasta{" "}
                           {t.fechaFinBloque.slice(11, 16)}
                         </p>
+                        {t.estado === "PENDIENTE" && (
+                          <button
+                            type="button"
+                            onClick={() => setAtendiendo(t)}
+                            className={`mt-1 inline-flex items-center justify-center gap-2 self-start rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+                          >
+                            <Stethoscope className="size-3.5" aria-hidden />
+                            Atender
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
                 )
               }}
             </Recurso>
+            {aviso && (
+              <p
+                className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-900 dark:text-emerald-300"
+                role="status"
+              >
+                {aviso}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               Se puede agendar en fechas pasadas para documentar atenciones ya ocurridas.
             </p>
@@ -242,6 +276,17 @@ export function Agenda() {
           fechaPorDefecto={fecha}
           onCerrar={() => setTurnoAbierto(false)}
           onGuardado={refrescar}
+        />
+      )}
+
+      {atendiendo && (
+        <AtenderTurnoModal
+          turno={atendiendo}
+          onCerrar={() => setAtendiendo(null)}
+          onGuardado={async (mensaje) => {
+            await turnosMes.recargar()
+            setAviso(mensaje)
+          }}
         />
       )}
 

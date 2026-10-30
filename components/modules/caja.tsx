@@ -269,6 +269,7 @@ export function Caja() {
                         #{c.id} · {c.fechaEmision.slice(11, 16)} · {c.nombreTutor}
                         {c.nombreMascota ? ` · ${c.nombreMascota}` : ""}
                       </p>
+                      <DetalleComanda comanda={c} />
                     </div>
                     <Semforo
                       tono={
@@ -434,6 +435,7 @@ function ModalCobro({
     <Modal open={abierto} onClose={onCerrar} title={`Cobrar comanda #${comanda.id}`}>
       <div className="flex flex-col gap-4 p-4">
         <div className="rounded-lg border border-border p-3 text-sm">
+          <DetalleComanda comanda={comanda} />
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Total</span>
             <span>{money(comanda.montoTotal)}</span>
@@ -558,5 +560,27 @@ function ModalCobro({
         </button>
       </div>
     </Modal>
+  )
+}
+
+/**
+ * Detalle de la comanda (consulta y extras usados) con el precio congelado al
+ * emitir. Las comandas de guardería y las anteriores al detalle no tienen
+ * líneas: ahí no se muestra nada y el total habla solo.
+ */
+function DetalleComanda({ comanda }: { comanda: ComandaCobro }) {
+  if (!comanda.items || comanda.items.length <= 1) return null
+  return (
+    <ul className="mt-1 mb-2 flex flex-col gap-0.5 text-xs text-muted-foreground">
+      {comanda.items.map((item, i) => (
+        <li key={i} className="flex justify-between gap-3">
+          <span className="min-w-0 truncate">
+            {item.cantidad > 1 ? `${item.cantidad} × ` : ""}
+            {item.descripcion}
+          </span>
+          <span className="shrink-0 tabular-nums">{money(item.subtotal)}</span>
+        </li>
+      ))}
+    </ul>
   )
 }

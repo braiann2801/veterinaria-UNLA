@@ -157,7 +157,7 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 
 		ComandaCobro comanda = new ComandaCobro();
 		// Una linea por la consulta y una por cada extra; el total es su suma.
-		comanda.agregarItem(item(null, "Consulta clinica", 1, precioConsultaClinica()));
+		comanda.agregarItem(item(null, "Consulta clínica", 1, precioConsultaClinica()));
 		for (ExtraUsado usado : extras) {
 			comanda.agregarItem(item(usado.extra(), usado.extra().getNombre(), usado.cantidad(),
 					usado.extra().getPrecio()));

@@ -73,7 +73,7 @@ class AtencionConExtrasTest {
 				.andExpect(jsonPath("$.montoTotal").value(21100.00))
 				.andExpect(jsonPath("$.saldoPendiente").value(21100.00))
 				.andExpect(jsonPath("$.items", Matchers.hasSize(3)))
-				.andExpect(jsonPath("$.items[0].descripcion").value("Consulta clinica"))
+				.andExpect(jsonPath("$.items[0].descripcion").value("Consulta clínica"))
 				.andExpect(jsonPath("$.items[0].subtotal").value(8000.00))
 				.andExpect(jsonPath("$.items[1].descripcion").value("Vacuna antirrabica"))
 				.andExpect(jsonPath("$.items[1].cantidad").value(1))
