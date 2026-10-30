@@ -1,6 +1,11 @@
 package com.veterinaria.veterinaria_backend.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 import jakarta.validation.constraints.NotBlank;
 import tools.jackson.databind.annotation.JsonDeserialize;
@@ -61,7 +66,20 @@ public record ConsultaMedicaRequestDTO(
 		 * este valor. Aceptarla por API permitiria mandarle {@code false} a un
 		 * animal agresivo y perder la advertencia en silencio.
 		 */
-		ConductaRequestDTO conductaObservada) {
+		ConductaRequestDTO conductaObservada,
+		/** Extras usados en la atencion (vacunas, urgencias). Sin precio: lo pone el catalogo. */
+		List<@Valid ExtraUsadoDTO> extras) {
+
+	public record ExtraUsadoDTO(
+			@NotNull(message = "El id del extra es obligatorio")
+			Long extraId,
+			@NotNull(message = "La cantidad es obligatoria")
+			@Min(value = 1, message = "La cantidad debe ser al menos 1")
+			// Mismo tope que la pantalla: evita una comanda desproporcionada por un error de tipeo o de la API.
+			@Max(value = 99, message = "La cantidad no puede superar 99")
+			Integer cantidad) {
+	}
+
 
 	public enum ConductaRequestDTO {
 		TRANQUILO,

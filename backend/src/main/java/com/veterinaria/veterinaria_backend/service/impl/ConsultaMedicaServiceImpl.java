@@ -17,6 +17,8 @@ import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.Profesional;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
+import com.veterinaria.veterinaria_backend.entity.ComandaItem;
+import com.veterinaria.veterinaria_backend.entity.Extra;
 import com.veterinaria.veterinaria_backend.entity.TurnoClinico;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
@@ -25,6 +27,7 @@ import com.veterinaria.veterinaria_backend.repository.ComandaCobroRepository;
 import com.veterinaria.veterinaria_backend.repository.ConsultaMedicaRepository;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.ProfesionalRepository;
+import com.veterinaria.veterinaria_backend.repository.ExtraRepository;
 import com.veterinaria.veterinaria_backend.repository.TarifaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TurnoClinicoRepository;
@@ -53,6 +56,7 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 	private final TutorMascotaRepository tutorMascotaRepository;
 	private final TarifaRepository tarifaRepository;
 	private final ComandaCobroRepository comandaRepository;
+	private final ExtraRepository extraRepository;
 	private final ConsultaMapper mapper;
 
 	public ConsultaMedicaServiceImpl(ConsultaMedicaRepository consultaRepository,
@@ -62,7 +66,9 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 			TutorMascotaRepository tutorMascotaRepository,
 			TarifaRepository tarifaRepository,
 			ComandaCobroRepository comandaRepository,
+			ExtraRepository extraRepository,
 			ConsultaMapper mapper) {
+		this.extraRepository = extraRepository;
 		this.consultaRepository = consultaRepository;
 		this.turnoRepository = turnoRepository;
 		this.mascotaRepository = mascotaRepository;
@@ -88,11 +94,17 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 					"El turno " + request.turnoClinicoId() + " ya tiene una ficha clinica registrada");
 		}
 
+		// Todo lo que puede rechazar el pedido se resuelve antes de escribir.
+		TurnoClinico turno = request.turnoClinicoId() == null ? null : turnoAtendible(request.turnoClinicoId(), mascota);
+		List<ExtraUsado> extras = resolverExtras(request.extras());
+
 		ConsultaMedica consulta = new ConsultaMedica();
 		consulta.setMascota(mascota);
 		consulta.setProfesional(profesional);
-		if (request.turnoClinicoId() != null) {
-			consulta.setTurnoClinico(obtenerTurno(request.turnoClinicoId()));
+		if (turno != null) {
+			consulta.setTurnoClinico(turno);
+			// Guardar la ficha es dar la atencion por terminada.
+			turno.setEstado(TurnoClinico.EstadoTurno.ATENDIDO);
 		}
 		consulta.setFechaAtencion(request.fechaAtencion() != null
 				? request.fechaAtencion()
@@ -106,7 +118,7 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 
 		// Ajeno al desconeccionado clinico: la ficha ya esta, ahora se emite el
 		// cobro al mostrador con el precio congelado de la tarifa vigente.
-		ComandaCobro comanda = emitirComanda(guardada, mascota);
+		ComandaCobro comanda = emitirComanda(guardada, mascota, extras);
 
 		return mapper.toResponse(guardada, comanda.getId());
 	}
@@ -140,12 +152,21 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 	 * cualquier vinculo sirve, porque un cotutor sin autorizacion de retiro no
 	 * es quien asume la deuda.</p>
 	 */
-	private ComandaCobro emitirComanda(ConsultaMedica consulta, Mascota mascota) {
+	private ComandaCobro emitirComanda(ConsultaMedica consulta, Mascota mascota, List<ExtraUsado> extras) {
 		Tutor tutor = tutorCobrador(mascota);
 
-		BigDecimal monto = precioConsultaClinica();
-
 		ComandaCobro comanda = new ComandaCobro();
+		// Una linea por la consulta y una por cada extra; el total es su suma.
+		comanda.agregarItem(item(null, "Consulta clínica", 1, precioConsultaClinica()));
+		for (ExtraUsado usado : extras) {
+			comanda.agregarItem(item(usado.extra(), usado.extra().getNombre(), usado.cantidad(),
+					usado.extra().getPrecio()));
+		}
+		BigDecimal monto = comanda.getItems().stream()
+				.map(ComandaItem::getSubtotal)
+				.reduce(BigDecimal.ZERO, BigDecimal::add)
+				.setScale(2, RoundingMode.HALF_UP);
+
 		comanda.setConcepto(ComandaCobro.Concepto.CONSULTA_CLINICA);
 		comanda.setMontoTotal(monto);
 		comanda.setSaldoPendiente(monto);
@@ -223,5 +244,46 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 	private TurnoClinico obtenerTurno(Long id) {
 		return turnoRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe un turno con id " + id));
+	}
+
+	/** El turno tiene que ser de esta mascota y no estar cancelado. */
+	private TurnoClinico turnoAtendible(Long turnoId, Mascota mascota) {
+		TurnoClinico turno = obtenerTurno(turnoId);
+		if (!Objects.equals(turno.getMascota().getId(), mascota.getId())) {
+			throw new BadRequestException("El turno " + turnoId + " es de otra mascota");
+		}
+		if (turno.getEstado() == TurnoClinico.EstadoTurno.CANCELADO) {
+			throw new BadRequestException("El turno " + turnoId + " esta cancelado: no se puede atender");
+		}
+		return turno;
+	}
+
+	/** Extras del pedido con su entidad: 404 si no existe, 400 si esta desactivado. */
+	private List<ExtraUsado> resolverExtras(List<ConsultaMedicaRequestDTO.ExtraUsadoDTO> pedidos) {
+		if (pedidos == null) {
+			return List.of();
+		}
+		return pedidos.stream().map(pedido -> {
+			Extra extra = extraRepository.findById(pedido.extraId())
+					.orElseThrow(() -> new ResourceNotFoundException("No existe el extra " + pedido.extraId()));
+			if (!extra.isActivo()) {
+				throw new BadRequestException("El extra " + extra.getNombre() + " esta desactivado");
+			}
+			return new ExtraUsado(extra, pedido.cantidad());
+		}).toList();
+	}
+
+	private static ComandaItem item(Extra extra, String descripcion, int cantidad, BigDecimal precio) {
+		BigDecimal unitario = precio.setScale(2, RoundingMode.HALF_UP);
+		ComandaItem item = new ComandaItem();
+		item.setExtra(extra);
+		item.setDescripcion(descripcion);
+		item.setCantidad(cantidad);
+		item.setPrecioUnitario(unitario);
+		item.setSubtotal(unitario.multiply(BigDecimal.valueOf(cantidad)).setScale(2, RoundingMode.HALF_UP));
+		return item;
+	}
+
+	private record ExtraUsado(Extra extra, int cantidad) {
 	}
 }

@@ -29,8 +29,9 @@ import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Recurso, Semforo, TOQUE_MINIMO, fechaCorta } from "@/lib/vista"
 import { Paginado } from "@/components/ui/paginado"
+import { SelectorExtras, type ExtraElegido } from "./ficha/selector-extras"
 
-const CONDUCTAS: { valor: ConductaObservada; etiqueta: string }[] = [
+export const CONDUCTAS: { valor: ConductaObservada; etiqueta: string }[] = [
   { valor: "TRANQUILO", etiqueta: "Tranquilo" },
   { valor: "NERVIOSO", etiqueta: "Nervioso" },
   { valor: "REACTIVO", etiqueta: "Reactivo" },
@@ -45,7 +46,7 @@ const CONDUCTAS: { valor: ConductaObservada; etiqueta: string }[] = [
  * encendiéndose y el badge solo dejaria de mostrarse. Es degradacion
  * cosmetica, no de logica.
  */
-const CONDUCTAS_CON_ALERTA = new Set<ConductaObservada>(["REACTIVO", "AGRESIVO"])
+export const CONDUCTAS_CON_ALERTA = new Set<ConductaObservada>(["REACTIVO", "AGRESIVO"])
 
 /**
  * Fecha local en `YYYY-MM-DD`.
@@ -98,6 +99,7 @@ export function FichaMedica() {
   const [diagnostico, setDiagnostico] = useState("")
   const [tratamiento, setTratamiento] = useState("")
   const [conducta, setConducta] = useState<ConductaObservada>("TRANQUILO")
+  const [extras, setExtras] = useState<ExtraElegido[]>([])
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -158,6 +160,7 @@ export function FichaMedica() {
         diagnostico: diagnostico.trim() || undefined,
         tratamiento: tratamiento.trim() || undefined,
         conductaObservada: conducta,
+        extras,
       })
       setExito(
         `Ficha #${ficha.id} guardada. Se emitió la comanda #${ficha.comandaId} para cobrar en recepción.`,
@@ -166,6 +169,7 @@ export function FichaMedica() {
       setDiagnostico("")
       setTratamiento("")
       setConducta("TRANQUILO")
+      setExtras([])
       setTurnoId(null)
       await historial.recargar()
     } catch (e) {
@@ -250,7 +254,7 @@ export function FichaMedica() {
           {mascotaId !== null && turnosDeLaMascota.length > 0 && (
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="text-xs font-medium text-muted-foreground">
-                Turno (opcional, evita cargas duplicadas)
+                Turno (al guardar queda como atendido)
               </span>
               <Select
                 value={turnoId ?? ""}
@@ -317,6 +321,8 @@ export function FichaMedica() {
               </p>
             )}
           </label>
+
+          <SelectorExtras valor={extras} onChange={setExtras} />
 
           {error && (
             <p className="text-sm text-destructive" role="alert">

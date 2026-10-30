@@ -6,17 +6,18 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** rama `feat/agenda-mensual-turno-rapido` (detalle en
-  `odd/tasks/agenda-mensual-turno-rapido.md`): Agenda como calendario mensual
-  y alta de turno con cliente/mascota nuevos en un solo paso. Implementada y
-  verificada; pendiente de push/PR.
+- **Fase en curso:** rama `feat/atencion-extras-menu` (detalle en
+  `odd/tasks/atencion-extras-menu.md`), apilada sobre
+  `feat/agenda-mensual-turno-rapido` (PR #3, abierto): atender turnos desde la
+  Agenda, catálogo de extras en Tarifas, detalle de comanda en Caja y barra
+  lateral en secciones. Implementada y verificada; pendiente de push/PR.
 - **Base Git:** `main` en `e2edc3b` (merge del PR #2, deuda por mascota y
   normalización).
 - **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 256 tests de Spring Boot en verde
+- **Harness:** tsc limpio, Next.js build OK, 271 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 
 ## Hitos completados
@@ -90,6 +91,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `POST /turnos/con-alta` agenda con cliente y/o mascota nuevos en una sola
       transacción. Un único modal de turno (`agendar-turno-modal.tsx`) para
       Agenda y Mostrador. 256 tests backend.
+- [x] **Atención con extras y menú** — `/api/v1/extras` (escritura solo
+      Dueño); la ficha recibe extras, pasa el turno a ATENDIDO y emite una
+      comanda con líneas (`comanda_item`, precio congelado). Botón "Atender" en
+      la Agenda, catálogo en Tarifas, detalle en Caja, barra lateral agrupada.
+      271 tests backend.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -156,8 +162,9 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   mascotas, profesionales, turnos, guarderia, egreso (`/egreso/validar`,
   `/egreso/pacientes-hoy`), caja (`/comandas/dia`, `/caja/pagos/{id}`,
   `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
-  consultas, `/turnos?desde=&hasta=` (vista mensual) y `/turnos/con-alta`.
-- **Tests backend:** 256 en verde. Cobertura clave: aforo concurrente (lock
+  consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta` y
+  `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`).
+- **Tests backend:** 271 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`).

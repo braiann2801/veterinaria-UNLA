@@ -140,8 +140,11 @@ export function CalendarioMensual({
                     {activos.slice(0, TURNOS_POR_CELDA).map((t) => (
                       <li
                         key={t.id}
-                        className="truncate rounded bg-primary/15 px-1 text-[11px] leading-5 text-foreground"
-                        title={`${t.fechaHoraInicio.slice(11, 16)} ${t.mascota.nombre} · ${t.motivo}`}
+                        className={cn(
+                          "truncate rounded px-1 text-[11px] leading-5 text-foreground",
+                          t.estado === "ATENDIDO" ? "bg-emerald-500/20" : "bg-primary/15",
+                        )}
+                        title={`${t.fechaHoraInicio.slice(11, 16)} ${t.mascota.nombre} · ${t.motivo}${t.estado === "ATENDIDO" ? " · atendido" : ""}`}
                       >
                         <span className="font-medium">{t.fechaHoraInicio.slice(11, 16)}</span> {t.mascota.nombre}
                       </li>

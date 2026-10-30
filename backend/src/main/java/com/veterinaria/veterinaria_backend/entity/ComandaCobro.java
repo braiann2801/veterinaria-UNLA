@@ -18,6 +18,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -101,6 +102,20 @@ public class ComandaCobro {
 	 */
 	@OneToMany(mappedBy = "comanda", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Pago> pagos = new ArrayList<>();
+
+	/**
+	 * Detalle de la comanda (consulta y extras). Las comandas anteriores al
+	 * detalle, y las de guarderia u OTRO, no tienen lineas: su monto es uno solo.
+	 */
+	@OneToMany(mappedBy = "comanda", cascade = CascadeType.ALL, orphanRemoval = true)
+	@OrderBy("id ASC")
+	private List<ComandaItem> items = new ArrayList<>();
+
+	/** Suma una linea de detalle. El total de la comanda lo fija quien la emite. */
+	public void agregarItem(ComandaItem item) {
+		item.setComanda(this);
+		this.items.add(item);
+	}
 
 	public enum Concepto {
 		CONSULTA_CLINICA,
