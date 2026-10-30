@@ -1,56 +1,34 @@
 "use client"
 
 /**
- * TASK-006/TASK-008: agenda de turnos y guardería con semáforo de aforo.
+ * Agenda: calendario del mes con los turnos de cada día y, al elegir un día, el
+ * detalle de sus turnos al costado (debajo en celular).
  *
- * El aforo lo calcula el backend (regla 2.1 de AGENTS.md: tope de 10 perros
- * por día). El semáforo es presentación; la regla vive en `ReservaGuarderiaService`.
+ * <p>El mes se pide en una sola llamada (`GET /turnos?desde=&hasta=`) con todas
+ * las semanas visibles, incluidos los días de los meses vecinos que completan la
+ * grilla. El aforo y las reservas de guardería siguen siendo del día elegido.</p>
  *
- * <p>TASK-008 cambió el cableado de tres formas:</p>
- * <ul>
- *   <li>La fecha viaja como <b>clave</b> de los tres hooks. `useApi` guarda la
- *       fn en un ref y no la tiene en las dependencias del efecto, asi que
- *       cambiar la fecha re-renderizaba la pantalla sin volver a pedir nada: la
- *       grilla seguía mostrando los turnos del primer día cargado. Ahora la fecha
- *       se pasa como tercer argumento del hook.</li>
- *   <li>El modal de alta de turno <b>acepta fechas pasadas</b>. El backend nunca
- *       las prohibió, pero la UI no tenía forma de cargarlas; una atención del
- *       martes que se documenta el jueves quedaba sin registrar.</li>
- *   <li>La lista de guardería muestra el horario de entrada y salida de cada
- *       reserva, para que el mostrador ordene la jornada.</li>
- * </ul>
+ * <p>Las fechas viajan como `YYYY-MM-DD` armadas en hora local: `toISOString()`
+ * convierte a UTC y entre las 21:00 y las 24:00 de Argentina devolvería mañana.</p>
  */
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { CalendarDays, Clock, Dog, Plus, Users } from "lucide-react"
 
 import { guarderia as apiGuarderia, turnos as apiTurnos } from "@/lib/api"
 import type { AforoGuarderia, ReservaGuarderia, TurnoClinico } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
-import { DatePicker } from "@/components/ui/date-picker"
 import { Panel } from "@/components/ui/field"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
-import { NuevoTurnoModal } from "@/components/modules/nuevo-turno"
+import { AgendarTurnoModal } from "@/components/modules/agendar-turno-modal"
 import { NuevaReservaGuarderia } from "@/components/modules/nueva-reserva"
+import { CalendarioMensual, aClave, deClave, diasVisibles } from "@/components/modules/agenda/calendario-mensual"
 
 /** El tope lo expone el backend en cada respuesta; no se hardcodea aca. */
 function colorDeAforo(aforo: AforoGuarderia) {
   if (aforo.completo) return "rojo" as const
   if (aforo.cuposDisponibles <= 2) return "ambar" as const
   return "verde" as const
-}
-
-/**
- * Fecha local en `YYYY-MM-DD`, sin pasar por `toISOString()`.
- *
- * Ese helper convierte a UTC, asi que entre las 21:00 y las 24:00 de Argentina
- * devuelve mañana: la agenda arrancaría en un día que todavía no llegó.
- */
-function hoy(): string {
-  const d = new Date()
-  const mes = String(d.getMonth() + 1).padStart(2, "0")
-  const dia = String(d.getDate()).padStart(2, "0")
-  return `${d.getFullYear()}-${mes}-${dia}`
 }
 
 /**
@@ -64,155 +42,206 @@ function rangoHorario(reserva: ReservaGuarderia) {
   return `${reserva.horaEntrada.slice(0, 5)} – ${reserva.horaSalida.slice(0, 5)}`
 }
 
+/** "martes 29 de octubre". */
+function fechaLegible(clave: string) {
+  return new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long" }).format(deClave(clave))
+}
+
 export function Agenda() {
-  const [fecha, setFecha] = useState(hoy())
+  const hoy = aClave(new Date())
+  const [fecha, setFecha] = useState(hoy)
+  const [vista, setVista] = useState(() => ({ anio: new Date().getFullYear(), mes: new Date().getMonth() }))
   const [turnoAbierto, setTurnoAbierto] = useState(false)
   const [reservaAbierta, setReservaAbierta] = useState(false)
 
-  const turnos = useApi<TurnoClinico[]>(() => apiTurnos.listar(fecha), true, fecha)
+  const dias = diasVisibles(vista.anio, vista.mes)
+  const desde = aClave(dias[0])
+  const hasta = aClave(dias[dias.length - 1])
+
+  const turnosMes = useApi<TurnoClinico[]>(() => apiTurnos.listarRango(desde, hasta), true, `${desde}_${hasta}`)
   const aforo = useApi<AforoGuarderia>(() => apiGuarderia.aforo(fecha), true, fecha)
   const reservas = useApi<ReservaGuarderia[]>(() => apiGuarderia.listar(fecha), true, fecha)
 
-  /** Tras agendar, los tres listados quedaron desactualizados. */
+  const turnosPorDia = useMemo(() => {
+    const mapa = new Map<string, TurnoClinico[]>()
+    for (const t of turnosMes.datos ?? []) {
+      const clave = t.fechaHoraInicio.slice(0, 10)
+      mapa.set(clave, [...(mapa.get(clave) ?? []), t])
+    }
+    return mapa
+  }, [turnosMes.datos])
+
+  /** Elegir un día de un mes vecino también mueve el calendario a ese mes. */
+  function seleccionar(clave: string) {
+    setFecha(clave)
+    const dia = deClave(clave)
+    if (dia.getMonth() !== vista.mes || dia.getFullYear() !== vista.anio) {
+      setVista({ anio: dia.getFullYear(), mes: dia.getMonth() })
+    }
+  }
+
+  function cambiarMes(delta: number) {
+    const destino = new Date(vista.anio, vista.mes + delta, 1)
+    setVista({ anio: destino.getFullYear(), mes: destino.getMonth() })
+  }
+
+  function irAHoy() {
+    seleccionar(hoy)
+  }
+
+  /** Tras agendar, el mes y los listados del día quedaron desactualizados. */
   async function refrescar() {
-    await Promise.all([turnos.recargar(), aforo.recargar(), reservas.recargar()])
+    await Promise.all([turnosMes.recargar(), aforo.recargar(), reservas.recargar()])
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <Panel title="Agenda y guardería">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <DatePicker
-            className="w-full sm:max-w-xs"
-            label="Fecha"
-            value={fecha}
-            onChange={(nueva) => setFecha(nueva)}
-          />
-          <button
-            onClick={() => setTurnoAbierto(true)}
-            className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-          >
-            <Plus className="size-4" aria-hidden />
-            Agendar turno
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Se puede agendar en fechas pasadas para documentar atenciones ya
-          ocurridas.
-        </p>
-      </Panel>
-
-      <Panel title="Aforo de guardería">
-        <Recurso estado={aforo} textoCarga="Consultando aforo">
-          {(a) => (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <Semforo tono={colorDeAforo(a)}>
-                  <Users className="size-3.5" aria-hidden />
-                  {a.cuposOcupados} de {a.aforoMaximo} cupos
-                </Semforo>
-                {a.completo && <span className="text-xs text-red-700 dark:text-red-300">Aforo completo</span>}
-              </div>
-              <MeterAforo aforo={a} />
-            </div>
-          )}
-        </Recurso>
-      </Panel>
-
-      <Panel title="Turnos clínicos">
-        <Recurso
-          estado={turnos}
-          textoCarga="Cargando turnos"
-          textoVacio="No hay turnos para esta fecha"
-          onReintentar={turnos.recargar}
-        >
-          {(lista) => (
-            <ul className="flex flex-col divide-y divide-border">
-              {lista.map((t) => (
-                <li key={t.id} className="flex flex-col gap-1 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">
-                      {t.fechaHoraInicio.slice(11, 16)} · {t.mascota.nombre}
-                    </p>
-                    <Semforo
-                      tono={
-                        t.estado === "ATENDIDO"
-                          ? "verde"
-                          : t.estado === "CANCELADO"
-                            ? "ambar"
-                            : "verde"
-                      }
-                    >
-                      {t.estado}
-                    </Semforo>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{t.motivo}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t.profesional.nombreCompleto}
-                    {t.profesional.matricula ? ` · ${t.profesional.matricula}` : ""} ·{" "}
-                    bloque hasta {t.fechaFinBloque.slice(11, 16)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Recurso>
-      </Panel>
-
       <Panel
-        title="Reservas de guardería"
+        title="Agenda"
         action={
-          <button
-            onClick={() => setReservaAbierta(true)}
-            className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-          >
-            <Plus className="size-3.5" aria-hidden />
-            Nueva reserva
-          </button>
+          <div className="flex items-center gap-2">
+            {fecha !== hoy && (
+              <button
+                type="button"
+                onClick={irAHoy}
+                className={`inline-flex items-center rounded-md border border-input px-3 text-xs font-medium hover:bg-muted ${TOQUE_MINIMO}`}
+              >
+                Hoy
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setTurnoAbierto(true)}
+              className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+            >
+              <Plus className="size-3.5" aria-hidden />
+              Agendar turno
+            </button>
+          </div>
         }
       >
-        <Recurso
-          estado={reservas}
-          textoCarga="Cargando reservas"
-          textoVacio="No hay reservas para esta fecha"
-          onReintentar={reservas.recargar}
-        >
-          {(lista) => (
-            <ul className="flex flex-col divide-y divide-border">
-              {lista.map((r) => {
-                const horario = rangoHorario(r)
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+          <CalendarioMensual
+            anio={vista.anio}
+            mes={vista.mes}
+            turnosPorDia={turnosPorDia}
+            seleccionado={fecha}
+            hoy={hoy}
+            cargando={turnosMes.cargando}
+            onSeleccionar={seleccionar}
+            onCambiarMes={cambiarMes}
+          />
+
+          <section className="flex min-w-0 flex-col gap-2 lg:border-l lg:border-border lg:pl-4" aria-live="polite">
+            <h3 className="text-sm font-semibold first-letter:uppercase">Turnos del {fechaLegible(fecha)}</h3>
+            <Recurso estado={turnosMes} textoCarga="Cargando turnos" onReintentar={turnosMes.recargar}>
+              {() => {
+                const delDia = turnosPorDia.get(fecha) ?? []
+                if (delDia.length === 0) {
+                  return <p className="py-6 text-center text-sm text-muted-foreground">No hay turnos este día.</p>
+                }
                 return (
-                  <li key={r.id} className="flex items-center justify-between gap-2 py-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Dog className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{r.nombreMascota}</p>
-                        <p className="text-xs text-muted-foreground">
-                          <CalendarDays className="mr-1 inline size-3" aria-hidden />
-                          {r.tipoEstadia.replace("_", " ")} · {r.estado}
-                        </p>
-                        {horario && (
-                          <p className="text-xs text-muted-foreground">
-                            <Clock className="mr-1 inline size-3" aria-hidden />
-                            {horario}
+                  <ul className="flex flex-col divide-y divide-border">
+                    {delDia.map((t) => (
+                      <li key={t.id} className="flex flex-col gap-1 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-sm font-medium ${t.estado === "CANCELADO" ? "line-through opacity-60" : ""}`}>
+                            {t.fechaHoraInicio.slice(11, 16)} · {t.mascota.nombre}
                           </p>
-                        )}
-                      </div>
-                    </div>
-                    <Semforo tono={r.estado === "CANCELADO" ? "ambar" : "verde"}>{r.estado}</Semforo>
-                  </li>
+                          <Semforo tono={t.estado === "CANCELADO" ? "ambar" : "verde"}>{t.estado}</Semforo>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{t.motivo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t.profesional.nombreCompleto}
+                          {t.profesional.matricula ? ` · ${t.profesional.matricula}` : ""} · bloque hasta{" "}
+                          {t.fechaFinBloque.slice(11, 16)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
                 )
-              })}
-            </ul>
-          )}
-        </Recurso>
+              }}
+            </Recurso>
+            <p className="text-xs text-muted-foreground">
+              Se puede agendar en fechas pasadas para documentar atenciones ya ocurridas.
+            </p>
+          </section>
+        </div>
       </Panel>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Aforo de guardería">
+          <Recurso estado={aforo} textoCarga="Consultando aforo">
+            {(a) => (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Semforo tono={colorDeAforo(a)}>
+                    <Users className="size-3.5" aria-hidden />
+                    {a.cuposOcupados} de {a.aforoMaximo} cupos
+                  </Semforo>
+                  {a.completo && <span className="text-xs text-red-700 dark:text-red-300">Aforo completo</span>}
+                </div>
+                <MeterAforo aforo={a} />
+              </div>
+            )}
+          </Recurso>
+        </Panel>
+
+        <Panel
+          title="Reservas de guardería"
+          action={
+            <button
+              onClick={() => setReservaAbierta(true)}
+              className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+            >
+              <Plus className="size-3.5" aria-hidden />
+              Nueva reserva
+            </button>
+          }
+        >
+          <Recurso
+            estado={reservas}
+            textoCarga="Cargando reservas"
+            textoVacio="No hay reservas para esta fecha"
+            onReintentar={reservas.recargar}
+          >
+            {(lista) => (
+              <ul className="flex flex-col divide-y divide-border">
+                {lista.map((r) => {
+                  const horario = rangoHorario(r)
+                  return (
+                    <li key={r.id} className="flex items-center justify-between gap-2 py-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Dog className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{r.nombreMascota}</p>
+                          <p className="text-xs text-muted-foreground">
+                            <CalendarDays className="mr-1 inline size-3" aria-hidden />
+                            {r.tipoEstadia.replace("_", " ")} · {r.estado}
+                          </p>
+                          {horario && (
+                            <p className="text-xs text-muted-foreground">
+                              <Clock className="mr-1 inline size-3" aria-hidden />
+                              {horario}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Semforo tono={r.estado === "CANCELADO" ? "ambar" : "verde"}>{r.estado}</Semforo>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Recurso>
+        </Panel>
+      </div>
+
       {turnoAbierto && (
-        <NuevoTurnoModal
+        <AgendarTurnoModal
           fechaPorDefecto={fecha}
           onCerrar={() => setTurnoAbierto(false)}
-          onCreado={refrescar}
+          onGuardado={refrescar}
         />
       )}
 

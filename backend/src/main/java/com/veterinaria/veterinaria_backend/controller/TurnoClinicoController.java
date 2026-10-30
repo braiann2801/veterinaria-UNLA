@@ -18,14 +18,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.TurnoConAltaRequestDTO;
 import com.veterinaria.veterinaria_backend.service.TurnoClinicoService;
+import com.veterinaria.veterinaria_backend.service.TurnoConAltaService;
 
 import jakarta.validation.Valid;
 
 /**
  * API REST de turnos clinicos.
  *
- * <p>Consume unicamente {@link TurnoClinicoService}. El solapamiento de bloques
+ * <p>Consume {@link TurnoClinicoService} y, para el alta combinada,
+ * {@link TurnoConAltaService}. El solapamiento de bloques
  * se traduce a 409 via {@code BusinessConflictException}.</p>
  */
 @RestController
@@ -33,15 +36,25 @@ import jakarta.validation.Valid;
 public class TurnoClinicoController {
 
 	private final TurnoClinicoService turnoService;
+	private final TurnoConAltaService turnoConAltaService;
 
-	public TurnoClinicoController(TurnoClinicoService turnoService) {
+	public TurnoClinicoController(TurnoClinicoService turnoService, TurnoConAltaService turnoConAltaService) {
 		this.turnoService = turnoService;
+		this.turnoConAltaService = turnoConAltaService;
 	}
 
-	/** GET /api/v1/turnos?fecha=2026-10-01 */
+	/**
+	 * GET /api/v1/turnos?fecha=2026-10-01, o GET /api/v1/turnos?desde=2026-10-01&hasta=2026-10-31
+	 * para la vista mensual. Con {@code desde} o {@code hasta} manda el rango.
+	 */
 	@GetMapping
 	public ResponseEntity<List<TurnoClinicoResponseDTO>> listarPorFecha(
-			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+		if (desde != null || hasta != null) {
+			return ResponseEntity.ok(turnoService.listarEntre(desde, hasta));
+		}
 		return ResponseEntity.ok(turnoService.listarPorFecha(fecha));
 	}
 
@@ -69,6 +82,16 @@ public class TurnoClinicoController {
 	@PostMapping
 	public ResponseEntity<TurnoClinicoResponseDTO> crear(@Valid @RequestBody TurnoClinicoRequestDTO request) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(turnoService.crear(request));
+	}
+
+	/**
+	 * POST /api/v1/turnos/con-alta -> 201. Cliente y mascota nuevos (o mascota
+	 * nueva de un cliente existente) y el turno, todo o nada: 400 por datos o
+	 * combinacion invalida, 404 si el cliente no existe, 409 si el turno se solapa.
+	 */
+	@PostMapping("/con-alta")
+	public ResponseEntity<TurnoClinicoResponseDTO> crearConAlta(@Valid @RequestBody TurnoConAltaRequestDTO request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(turnoConAltaService.agendar(request));
 	}
 
 	/** PUT /api/v1/turnos/{id} -> 200, o 409 si al reprogramar se solapa */

@@ -17,6 +17,13 @@ public interface TurnoClinicoService {
 
 	List<TurnoClinicoResponseDTO> listarPorFecha(LocalDate fecha);
 
+	/**
+	 * Turnos de un rango de dias, ambos inclusive, en orden cronologico. Lo usa la
+	 * vista mensual de la Agenda. 400 si falta uno de los extremos, si hasta es
+	 * anterior a desde o si el rango supera los 62 dias.
+	 */
+	List<TurnoClinicoResponseDTO> listarEntre(LocalDate desde, LocalDate hasta);
+
 	List<TurnoClinicoResponseDTO> listarPorProfesional(Long profesionalId, LocalDate fecha);
 
 	/**

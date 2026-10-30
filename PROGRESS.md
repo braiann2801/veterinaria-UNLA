@@ -6,16 +6,17 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** rama `feat/deuda-mascota-normalizacion` (detalle en
-  `odd/tasks/deuda-mascota-normalizacion.md`): tickets Kaban 1, 2, 3 y 5,
-  deuda atada a la mascota y normalización argentina de datos personales.
-  Implementada y verificada; pendiente de push/PR (decisión del usuario).
-- **Base Git:** `main` en `3d35a49` (merge del PR #1, autenticación).
+- **Fase en curso:** rama `feat/agenda-mensual-turno-rapido` (detalle en
+  `odd/tasks/agenda-mensual-turno-rapido.md`): Agenda como calendario mensual
+  y alta de turno con cliente/mascota nuevos en un solo paso. Implementada y
+  verificada; pendiente de push/PR.
+- **Base Git:** `main` en `e2edc3b` (merge del PR #2, deuda por mascota y
+  normalización).
 - **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 244 tests de Spring Boot en verde
+- **Harness:** tsc limpio, Next.js build OK, 256 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 
 ## Hitos completados
@@ -84,6 +85,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `NormalizadorAr` normaliza nombres, DNI (7-8 dígitos), teléfono (10
       dígitos nacionales), matrícula y email en los DTO de entrada. README
       completo. 244 tests backend.
+- [x] **Agenda mensual y turno rápido** — `GET /turnos?desde=&hasta=` (máx. 62
+      días) alimenta un calendario del mes con panel del día;
+      `POST /turnos/con-alta` agenda con cliente y/o mascota nuevos en una sola
+      transacción. Un único modal de turno (`agendar-turno-modal.tsx`) para
+      Agenda y Mostrador. 256 tests backend.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -150,8 +156,8 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   mascotas, profesionales, turnos, guarderia, egreso (`/egreso/validar`,
   `/egreso/pacientes-hoy`), caja (`/comandas/dia`, `/caja/pagos/{id}`,
   `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
-  consultas.
-- **Tests backend:** 244 en verde. Cobertura clave: aforo concurrente (lock
+  consultas, `/turnos?desde=&hasta=` (vista mensual) y `/turnos/con-alta`.
+- **Tests backend:** 256 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`).
