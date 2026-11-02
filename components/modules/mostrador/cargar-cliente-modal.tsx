@@ -223,7 +223,7 @@ export function CargarClienteModal({
   }
 
   // El tutor que se está cargando no puede ser su propio cotutor.
-  const candidatosCotutor = padron.filter((t) => t.dni !== limpiarDni(tutor.dni))
+  const candidatosCotutor = padron.filter((t) => t.activo && t.dni !== limpiarDni(tutor.dni))
 
   const listo =
     tutor.nombre.trim().length > 0 &&

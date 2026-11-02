@@ -15,7 +15,7 @@
  */
 
 import { useState } from "react"
-import { Pencil, Stethoscope, Trash2, UserPlus } from "lucide-react"
+import { Pencil, PowerOff, RotateCcw, Stethoscope, UserPlus } from "lucide-react"
 
 import { profesionales as apiProfesionales } from "@/lib/api"
 import type { Profesional } from "@/lib/api"
@@ -24,6 +24,7 @@ import { Panel, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, TOQUE_MINIMO, filtrarPorModo, formatearDni } from "@/lib/vista"
 import { Paginado } from "@/components/ui/paginado"
+import { ToggleInactivos } from "@/components/ui/toggle-inactivos"
 
 /** Botón de acción de fila (editar/eliminar): cuadrado táctil de 44 px, igual que en el Padrón. */
 const BOTON_ACCION =
@@ -34,6 +35,18 @@ export function Profesionales() {
   const [abierto, setAbierto] = useState(false)
   const [editando, setEditando] = useState<Profesional | null>(null)
   const [eliminando, setEliminando] = useState<Profesional | null>(null)
+  const [verInactivos, setVerInactivos] = useState(false)
+  const [errorReactivar, setErrorReactivar] = useState<string | null>(null)
+
+  async function reactivar(p: Profesional) {
+    setErrorReactivar(null)
+    try {
+      await apiProfesionales.reactivar(p.id)
+      await lista.recargar()
+    } catch (e) {
+      setErrorReactivar(e instanceof Error ? e.message : "No se pudo reactivar")
+    }
+  }
 
   return (
     <Panel
@@ -54,18 +67,33 @@ export function Profesionales() {
         textoVacio="Todavía no hay profesionales cargados"
         onReintentar={lista.recargar}
       >
-        {(datos) => (
-          <Paginado items={datos} clave="profesionales">
+        {(todos) => {
+          const datos = verInactivos ? todos : todos.filter((p) => p.activo)
+          return (
+          <div className="flex flex-col gap-2">
+          <div className="flex justify-end">
+            <ToggleInactivos
+              valor={verInactivos}
+              onChange={setVerInactivos}
+              cantidad={todos.filter((p) => !p.activo).length}
+            />
+          </div>
+          {errorReactivar && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+              {errorReactivar}
+            </p>
+          )}
+          <Paginado items={datos} clave="profesionales" reiniciarCon={verInactivos ? 1 : 0}>
           {(pagina) => (
           <ul className="flex flex-col divide-y divide-border">
             {pagina.map((p) => (
-              <li key={p.id} className="flex flex-col gap-1 py-3">
+              <li key={p.id} className={`flex flex-col gap-1 py-3 ${p.activo ? "" : "opacity-60"}`}>
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm font-medium">{p.nombreCompleto}</p>
                   <div className="flex shrink-0 items-center gap-1">
                     {!p.activo && (
                       <span className="mr-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        Inactivo
+                        Desactivado
                       </span>
                     )}
                     <button
@@ -76,14 +104,25 @@ export function Profesionales() {
                     >
                       <Pencil className="size-4" aria-hidden />
                     </button>
-                    <button
-                      onClick={() => setEliminando(p)}
-                      aria-label={`Eliminar ${p.nombreCompleto}`}
-                      title="Eliminar profesional"
-                      className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                    </button>
+                    {p.activo ? (
+                      <button
+                        onClick={() => setEliminando(p)}
+                        aria-label={`Desactivar ${p.nombreCompleto}`}
+                        title="Desactivar profesional"
+                        className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
+                      >
+                        <PowerOff className="size-4" aria-hidden />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => reactivar(p)}
+                        aria-label={`Reactivar ${p.nombreCompleto}`}
+                        title="Reactivar profesional"
+                        className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300`}
+                      >
+                        <RotateCcw className="size-4" aria-hidden />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -100,7 +139,9 @@ export function Profesionales() {
           </ul>
           )}
           </Paginado>
-        )}
+          </div>
+          )
+        }}
       </Recurso>
 
       {abierto && (
@@ -290,21 +331,20 @@ function ModalEliminarProfesional({
       await apiProfesionales.eliminar(profesional.id)
       await onEliminado()
     } catch (e) {
-      // 409: tiene turnos o consultas. El motivo viene del backend.
-      setError(e instanceof Error ? e.message : "No se pudo eliminar el profesional")
+      setError(e instanceof Error ? e.message : "No se pudo desactivar el profesional")
       setBorrando(false)
     }
   }
 
   return (
-    <Modal open onClose={borrando ? () => {} : onCerrar} title={`Eliminar a ${profesional.nombreCompleto}`}>
+    <Modal open onClose={borrando ? () => {} : onCerrar} title={`Desactivar a ${profesional.nombreCompleto}`}>
       <div className="flex flex-col gap-3 p-4 text-sm">
         <p>
-          ¿Seguro que querés eliminar a <strong>{profesional.nombreCompleto}</strong>?
+          ¿Desactivar a <strong>{profesional.nombreCompleto}</strong>?
         </p>
         <p className="text-muted-foreground">
-          Si ya tiene turnos o consultas registrados, el sistema no va a permitir eliminarlo. Esta acción no se
-          puede deshacer.
+          No se borra nada: sus turnos y fichas quedan registrados. No va a poder tomar turnos nuevos hasta que se lo
+          reactive.
         </p>
         {error && (
           <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive" role="alert">
@@ -324,8 +364,8 @@ function ModalEliminarProfesional({
             disabled={borrando}
             className={`inline-flex items-center justify-center gap-2 rounded-md bg-destructive px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60 ${TOQUE_MINIMO}`}
           >
-            <Trash2 className="size-4" aria-hidden />
-            {borrando ? "Eliminando…" : "Eliminar"}
+            <PowerOff className="size-4" aria-hidden />
+            {borrando ? "Desactivando…" : "Desactivar"}
           </button>
         </div>
       </div>

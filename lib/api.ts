@@ -526,7 +526,9 @@ export const tutores = {
   buscarPorId: (id: number) => get<Tutor>(`/tutores/${id}`),
   crear: (body: TutorInput) => post<Tutor>("/tutores", body),
   actualizar: (id: number, body: Partial<TutorInput>) => put<Tutor>(`/tutores/${id}`, body),
+  /** No borra: lo deja inactivo con su historial (y a sus mascotas sin otro tutor activo, en el caso del tutor). */
   eliminar: (id: number) => del<void>(`/tutores/${id}`),
+  reactivar: (id: number) => put<Tutor>(`/tutores/${id}/reactivar`),
   listarMascotas: (tutorId: number) => get<Mascota[]>(`/tutores/${tutorId}/mascotas`),
   /**
    * Vincula (o re-vincula) una mascota. El flag es obligatorio por regla 2.4:
@@ -578,7 +580,9 @@ export const mascotas = {
   buscarPorId: (id: number) => get<Mascota>(`/mascotas/${id}`),
   crear: (body: MascotaInput) => post<Mascota>("/mascotas", body),
   actualizar: (id: number, body: MascotaInput) => put<Mascota>(`/mascotas/${id}`, body),
+  /** No borra: lo deja inactivo con su historial (y a sus mascotas sin otro tutor activo, en el caso del tutor). */
   eliminar: (id: number) => del<void>(`/mascotas/${id}`),
+  reactivar: (id: number) => put<Mascota>(`/mascotas/${id}/reactivar`),
   tutores: (mascotaId: number) =>
     get<{ tutorId: number; mascotaId: number; autorizadoRetiro: boolean }[]>(
       `/mascotas/${mascotaId}/tutores`,
@@ -607,7 +611,9 @@ export const profesionales = {
   crear: (body: ProfesionalInput) => post<Profesional>("/profesionales", body),
   actualizar: (id: number, body: ProfesionalInput) => put<Profesional>(`/profesionales/${id}`, body),
   /** 409 si el profesional tiene turnos o consultas registrados. */
+  /** No borra: lo deja inactivo con su historial (y a sus mascotas sin otro tutor activo, en el caso del tutor). */
   eliminar: (id: number) => del<void>(`/profesionales/${id}`),
+  reactivar: (id: number) => put<Profesional>(`/profesionales/${id}/reactivar`),
 }
 
 // ----------------------------------------------------------------- turnos

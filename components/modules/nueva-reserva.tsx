@@ -170,7 +170,7 @@ export function NuevaReservaGuarderia({
             className={TOQUE_MINIMO}
           >
             <option value="">Elegí una mascota…</option>
-            {(mascotas.datos ?? []).map((m) => (
+            {(mascotas.datos ?? []).filter((m) => m.activo).map((m) => (
               <option key={m.id} value={m.id}>
                 {etiquetaMascota(m)}
               </option>

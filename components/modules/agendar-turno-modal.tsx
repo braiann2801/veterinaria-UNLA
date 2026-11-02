@@ -179,7 +179,7 @@ export function AgendarTurnoModal({
           <Field label="Mascota">
             <Select value={mascotaId} onChange={(e) => setMascotaId(e.target.value)} className={TOQUE_MINIMO}>
               <option value="">Elegí una mascota…</option>
-              {(mascotas.datos ?? []).map((m) => (
+              {(mascotas.datos ?? []).filter((m) => m.activo).map((m) => (
                 <option key={m.id} value={m.id}>
                   {etiquetaMascota(m)}
                 </option>
@@ -245,7 +245,7 @@ export function AgendarTurnoModal({
                 <Field label="Cliente">
                   <Select value={tutorId} onChange={(e) => cambiarTutor(e.target.value)} className={TOQUE_MINIMO}>
                     <option value="">Elegí un cliente…</option>
-                    {(tutores.datos ?? []).map((t) => (
+                    {(tutores.datos ?? []).filter((t) => t.activo).map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.nombreCompleto} · DNI {formatearDni(t.dni)}
                       </option>
@@ -273,7 +273,7 @@ export function AgendarTurnoModal({
                       className={TOQUE_MINIMO}
                     >
                       <option value="">{tutorElegido ? "Elegí una mascota…" : "Primero elegí el cliente"}</option>
-                      {(tutorElegido?.mascotas ?? []).map((m) => (
+                      {(tutorElegido?.mascotas ?? []).filter((m) => m.activo).map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.nombre}
                         </option>
