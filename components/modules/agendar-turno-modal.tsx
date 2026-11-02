@@ -26,6 +26,7 @@ import {
   profesionales as apiProfesionales,
   turnos as apiTurnos,
   tutores as apiTutores,
+  hoyLocal,
 } from "@/lib/api"
 import type { EspecieMascota, Mascota, Profesional, Tutor } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
@@ -74,6 +75,7 @@ export function AgendarTurnoModal({
     especie: "CANINO" as EspecieMascota,
     sexo: "" as "" | "Macho" | "Hembra",
     raza: "",
+    fechaNacimiento: "",
   })
 
   const [profesionalId, setProfesionalId] = useState("")
@@ -139,6 +141,8 @@ export function AgendarTurnoModal({
             especie: mascotaNueva.especie,
             sexo: mascotaNueva.sexo || undefined,
             raza: mascotaNueva.raza.trim() || undefined,
+            // "" no es "sin fecha": el backend rechaza lo que no sea una fecha pasada.
+            fechaNacimiento: mascotaNueva.fechaNacimiento || undefined,
           },
         })
       }
@@ -332,6 +336,13 @@ export function AgendarTurnoModal({
                     className={TOQUE_MINIMO}
                   />
                 </Field>
+                <DatePicker
+                  label="Fecha de nacimiento (opcional)"
+                  value={mascotaNueva.fechaNacimiento}
+                  max={hoyLocal()}
+                  onChange={(nueva) => setMascotaNueva((m) => ({ ...m, fechaNacimiento: nueva }))}
+                  limpiable
+                />
               </div>
             )}
           </div>
