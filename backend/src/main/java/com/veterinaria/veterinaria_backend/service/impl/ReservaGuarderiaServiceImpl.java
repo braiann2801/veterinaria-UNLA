@@ -89,6 +89,9 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	@Transactional(isolation = Isolation.READ_COMMITTED)
 	public ReservaGuarderiaResponseDTO crear(ReservaGuarderiaRequestDTO request) {
 		Mascota mascota = obtenerMascota(request.mascotaId());
+		if (!mascota.isActivo()) {
+			throw new BadRequestException("La mascota " + mascota.getNombre() + " esta desactivada");
+		}
 
 		// Se arma y valida la reserva antes de tomar locks: un rango invalido no
 		// tiene por que esperar el semaforo de nadie.

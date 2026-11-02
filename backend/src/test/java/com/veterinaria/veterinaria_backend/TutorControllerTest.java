@@ -136,12 +136,13 @@ class TutorControllerTest {
 		mockMvc.perform(delete("/api/v1/tutores/{t}/mascotas/{m}", tutorId, mascotaId))
 				.andExpect(status().isNotFound());
 
-		// 204 al eliminar el tutor
+		// 204 al dar de baja el tutor: queda inactivo, no se borra
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorId))
 				.andExpect(status().isNoContent());
 
 		mockMvc.perform(get("/api/v1/tutores/{id}", tutorId))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.activo").value(false));
 
 		mockMvc.perform(delete("/api/v1/mascotas/{id}", mascotaId))
 				.andExpect(status().isNoContent());
@@ -208,10 +209,12 @@ class TutorControllerTest {
 				.andExpect(status().isBadRequest());
 
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorA)).andExpect(status().isNoContent());
-		// Al borrar el ultimo tutor, la mascota queda sin tutor y se elimina en
-		// cascada (regla inviolable del padron).
+		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId)).andExpect(jsonPath("$.activo").value(true));
+		// Al dar de baja al ultimo tutor activo, la mascota se desactiva con el.
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorB)).andExpect(status().isNoContent());
-		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId)).andExpect(status().isNotFound());
+		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.activo").value(false));
 	}
 
 	@Test

@@ -9,6 +9,7 @@ import com.veterinaria.veterinaria_backend.dto.MascotaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoConAltaRequestDTO;
+import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
@@ -92,8 +93,10 @@ public class TurnoConAltaServiceImpl implements TurnoConAltaService {
 	}
 
 	private Long tutorExistente(Long tutorId) {
-		if (!tutorRepository.existsById(tutorId)) {
-			throw ResourceNotFoundException.tutor(tutorId);
+		Tutor tutor = tutorRepository.findById(tutorId)
+				.orElseThrow(() -> ResourceNotFoundException.tutor(tutorId));
+		if (!tutor.isActivo()) {
+			throw new BadRequestException("El cliente " + tutor.getNombreCompleto() + " esta desactivado");
 		}
 		return tutorId;
 	}

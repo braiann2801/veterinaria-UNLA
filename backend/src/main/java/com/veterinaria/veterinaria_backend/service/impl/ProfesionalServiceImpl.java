@@ -9,13 +9,10 @@ import com.veterinaria.veterinaria_backend.dto.ProfesionalRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ProfesionalResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.Profesional;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
-import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
 import com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr;
-import com.veterinaria.veterinaria_backend.repository.ConsultaMedicaRepository;
 import com.veterinaria.veterinaria_backend.repository.ProfesionalRepository;
-import com.veterinaria.veterinaria_backend.repository.TurnoClinicoRepository;
 import com.veterinaria.veterinaria_backend.service.ProfesionalService;
 
 /**
@@ -33,15 +30,10 @@ public class ProfesionalServiceImpl implements ProfesionalService {
 
 	private final ProfesionalRepository profesionalRepository;
 	private final EntityMapper mapper;
-	private final TurnoClinicoRepository turnoRepository;
-	private final ConsultaMedicaRepository consultaRepository;
 
-	public ProfesionalServiceImpl(ProfesionalRepository profesionalRepository, EntityMapper mapper,
-			TurnoClinicoRepository turnoRepository, ConsultaMedicaRepository consultaRepository) {
+	public ProfesionalServiceImpl(ProfesionalRepository profesionalRepository, EntityMapper mapper) {
 		this.profesionalRepository = profesionalRepository;
 		this.mapper = mapper;
-		this.turnoRepository = turnoRepository;
-		this.consultaRepository = consultaRepository;
 	}
 
 	@Override
@@ -91,17 +83,19 @@ public class ProfesionalServiceImpl implements ProfesionalService {
 		return mapper.toResponse(profesionalRepository.save(profesional));
 	}
 
+	/** Da de baja al profesional sin borrar sus turnos ni sus fichas. */
 	@Override
 	@Transactional
 	public void eliminar(Long id) {
+		obtener(id).setActivo(false);
+	}
+
+	@Override
+	@Transactional
+	public ProfesionalResponseDTO reactivar(Long id) {
 		Profesional profesional = obtener(id);
-		// Igual que con las mascotas: la FK impediria el borrado con un 500 opaco.
-		// Se rechaza con 409 y un motivo legible.
-		if (turnoRepository.existsByProfesionalId(id) || consultaRepository.existsByProfesionalId(id)) {
-			throw new BusinessConflictException("No se puede eliminar a " + profesional.getNombreCompleto()
-					+ ": tiene turnos o consultas registrados.");
-		}
-		profesionalRepository.delete(profesional);
+		profesional.setActivo(true);
+		return mapper.toResponse(profesional);
 	}
 
 	// ------------------------------------------------------------- internos

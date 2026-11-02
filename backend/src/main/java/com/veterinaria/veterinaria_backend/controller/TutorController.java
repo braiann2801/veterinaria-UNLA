@@ -70,11 +70,17 @@ public class TutorController {
 		return ResponseEntity.ok(tutorService.actualizar(id, request));
 	}
 
-	/** DELETE /api/v1/tutores/{id} -> 204 */
+	/** DELETE /api/v1/tutores/{id} -> 204: desactiva al tutor y a sus mascotas sin otro tutor activo. */
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> eliminar(@PathVariable Long id) {
 		tutorService.eliminar(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	/** PUT .../{id}/reactivar -> 200 con el registro activo de nuevo. */
+	@PutMapping("/{id}/reactivar")
+	public ResponseEntity<TutorResponseDTO> reactivar(@PathVariable Long id) {
+		return ResponseEntity.ok(tutorService.reactivar(id));
 	}
 
 	/** GET /api/v1/tutores/{tutorId}/mascotas */

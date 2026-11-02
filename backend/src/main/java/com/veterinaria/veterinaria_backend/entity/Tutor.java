@@ -54,6 +54,14 @@ public class Tutor {
 	private String direccion;
 
 	/**
+	 * Los registros no se borran: un tutor dado de baja queda inactivo y conserva su
+	 * historial. {@code columnDefinition} con default 1 para que, al agregar la
+	 * columna a una base existente, las filas viejas queden activas.
+	 */
+	@Column(name = "activo", nullable = false, columnDefinition = "bit(1) default 1")
+	private boolean activo = true;
+
+	/**
 	 * Lados de la relacion N:M. Sin {@code orphanRemoval}: la tupla tiene dos
 	 * propietario (Tutor y Mascota) y el borrado en cascada desde ambos lados
 	 * provoca {@code DuplicateKeyException} cuando el servicio recrea la misma

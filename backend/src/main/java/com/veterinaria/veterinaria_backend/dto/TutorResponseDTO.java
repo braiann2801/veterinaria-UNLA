@@ -16,7 +16,8 @@ public record TutorResponseDTO(
 		String email,
 		String direccion,
 		String nombreCompleto,
-		List<MascotaVinculadaDTO> mascotas) {
+		List<MascotaVinculadaDTO> mascotas,
+		boolean activo) {
 
 	/**
 	 * Mascota resumida dentro del tutor, con el flag de retiro de este tutor
@@ -27,6 +28,7 @@ public record TutorResponseDTO(
 			String nombre,
 			MascotaResumenDTO.Especie especie,
 			String raza,
-			boolean autorizadoRetiro) {
+			boolean autorizadoRetiro,
+			boolean activo) {
 	}
 }

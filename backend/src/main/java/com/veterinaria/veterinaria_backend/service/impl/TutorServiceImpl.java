@@ -19,15 +19,11 @@ import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
-import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
-import com.veterinaria.veterinaria_backend.repository.ComandaCobroRepository;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
-import com.veterinaria.veterinaria_backend.repository.PagoRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
-import com.veterinaria.veterinaria_backend.service.HistorialMascota;
 import com.veterinaria.veterinaria_backend.service.TutorService;
 
 /**
@@ -44,21 +40,14 @@ public class TutorServiceImpl implements TutorService {
 	private final TutorRepository tutorRepository;
 	private final MascotaRepository mascotaRepository;
 	private final TutorMascotaRepository tutorMascotaRepository;
-	private final ComandaCobroRepository comandaCobroRepository;
-	private final PagoRepository pagoRepository;
 	private final EntityMapper mapper;
-	private final HistorialMascota historialMascota;
 
 	public TutorServiceImpl(TutorRepository tutorRepository, MascotaRepository mascotaRepository,
-			TutorMascotaRepository tutorMascotaRepository, ComandaCobroRepository comandaCobroRepository,
-			PagoRepository pagoRepository, EntityMapper mapper, HistorialMascota historialMascota) {
+			TutorMascotaRepository tutorMascotaRepository, EntityMapper mapper) {
 		this.tutorRepository = tutorRepository;
 		this.mascotaRepository = mascotaRepository;
 		this.tutorMascotaRepository = tutorMascotaRepository;
-		this.comandaCobroRepository = comandaCobroRepository;
-		this.pagoRepository = pagoRepository;
 		this.mapper = mapper;
-		this.historialMascota = historialMascota;
 	}
 
 	@Override
@@ -109,60 +98,34 @@ public class TutorServiceImpl implements TutorService {
 		return mapper.toResponse(tutor);
 	}
 
+	/**
+	 * Da de baja al tutor sin borrar nada: sus fichas, comandas y pagos quedan.
+	 * Las mascotas que no tengan otro tutor activo se desactivan con el, para que
+	 * ninguna mascota activa quede sin alguien que la retire.
+	 */
 	@Override
 	@Transactional
 	public void eliminar(Long id) {
 		Tutor tutor = obtenerEntidad(id);
-
-		// Un tutor con movimientos contables no se borra: las comandas y los
-		// pagos lo referencian y quedarian sin titular.
-		if (comandaCobroRepository.existsByTutorId(id)
-				|| pagoRepository.existsByTutorPagadorId(id)) {
-			throw new BusinessConflictException("No se puede eliminar el tutor " + tutor.getNombreCompleto()
-					+ ": tiene movimientos contables asociados (comandas o pagos).");
-		}
-
-		List<TutorMascota> vinculos = tutor.getVinculos().stream().filter(Objects::nonNull).toList();
-
-		// Regla inviolable: una mascota no puede quedar sin ningun tutor. Las que
-		// solo estan vinculadas a este tutor quedan huerfanas y se eliminan con el.
-		List<Mascota> huerfanas = vinculos.stream()
+		tutor.setActivo(false);
+		tutor.getVinculos().stream()
+				.filter(Objects::nonNull)
 				.map(TutorMascota::getMascota)
 				.filter(Objects::nonNull)
 				.filter(mascota -> tutorMascotaRepository.findByMascotaId(mascota.getId()).stream()
 						.filter(Objects::nonNull)
-						.allMatch(vinculo -> vinculo.getTutor() != null
-								&& Objects.equals(vinculo.getTutor().getId(), id)))
-				.toList();
+						.map(TutorMascota::getTutor)
+						.filter(Objects::nonNull)
+						.noneMatch(otro -> !Objects.equals(otro.getId(), id) && otro.isActivo()))
+				.forEach(mascota -> mascota.setActivo(false));
+	}
 
-		// Si una huerfana tiene historial no se puede borrar, y tampoco puede
-		// quedar sin tutor: se aborta el borrado completo (transaccion atomica).
-		for (Mascota mascota : huerfanas) {
-			if (historialMascota.tieneHistorial(mascota.getId())) {
-				throw new BusinessConflictException("No se puede eliminar el tutor " + tutor.getNombreCompleto()
-						+ ": la mascota " + mascota.getNombre()
-						+ " quedaria sin tutor y tiene historial clinico o contable.");
-			}
-		}
-
-		// Se cortan los vinculos de forma explicita antes de borrar. El cascade
-		// no basta porque la tupla tiene dos propietarios y un DELETE pendiente
-		// colisiona al recrear el mismo id compuesto.
-		for (TutorMascota vinculo : vinculos) {
-			Mascota mascota = vinculo.getMascota();
-			tutor.getVinculos().remove(vinculo);
-			if (mascota != null && mascota.getVinculos() != null) {
-				mascota.getVinculos().remove(vinculo);
-			}
-			tutorMascotaRepository.delete(vinculo);
-		}
-		tutorMascotaRepository.flush();
-
-		for (Mascota mascota : huerfanas) {
-			mascotaRepository.delete(mascota);
-		}
-
-		tutorRepository.delete(tutor);
+	@Override
+	@Transactional
+	public TutorResponseDTO reactivar(Long id) {
+		Tutor tutor = obtenerEntidad(id);
+		tutor.setActivo(true);
+		return mapper.toResponse(tutor);
 	}
 
 	@Override

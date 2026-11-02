@@ -66,6 +66,14 @@ public class Mascota {
 	@Column(name = "observaciones", length = 500)
 	private String observaciones;
 
+	/**
+	 * Los registros no se borran: un mascota dado de baja queda inactivo y conserva su
+	 * historial. {@code columnDefinition} con default 1 para que, al agregar la
+	 * columna a una base existente, las filas viejas queden activas.
+	 */
+	@Column(name = "activo", nullable = false, columnDefinition = "bit(1) default 1")
+	private boolean activo = true;
+
 	/** Ver nota en {@link Tutor#vinculos}: sin orphanRemoval. */
 	@OneToMany(mappedBy = "mascota", cascade = CascadeType.ALL)
 	private List<TutorMascota> vinculos = new ArrayList<>();
