@@ -41,6 +41,7 @@ public class ConsultaMapper {
 				consulta.getAnamnesis(),
 				consulta.getDiagnostico(),
 				consulta.getTratamiento(),
+				consulta.getPesoKg() != null ? java.math.BigDecimal.valueOf(consulta.getPesoKg()) : null,
 				consulta.getConductaObservada() != null ? consulta.getConductaObservada().name() : null,
 				consulta.isAlertaConducta(),
 				mascotaDto,

@@ -112,6 +112,11 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 		consulta.setAnamnesis(request.anamnesis());
 		consulta.setDiagnostico(request.diagnostico());
 		consulta.setTratamiento(request.tratamiento());
+		if (request.pesoKg() != null) {
+			// El peso se toma al atender: queda en la ficha y pasa a ser el peso actual.
+			consulta.setPesoKg(request.pesoKg().doubleValue());
+			mascota.setPesoKg(request.pesoKg());
+		}
 		consulta.setConductaObservada(traducirConducta(request.conductaObservada()));
 
 		ConsultaMedica guardada = consultaRepository.save(consulta);

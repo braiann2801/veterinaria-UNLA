@@ -330,6 +330,8 @@ export interface ConsultaMedicaInput {
   diagnostico?: string
   tratamiento?: string
   conductaObservada?: ConductaObservada
+  /** Peso medido en la atención (kg). Actualiza el peso actual de la mascota. */
+  pesoKg?: number
   /** Extras usados en la atención. Sin precio: lo pone el catálogo del Dueño. */
   extras?: { extraId: number; cantidad: number }[]
 }

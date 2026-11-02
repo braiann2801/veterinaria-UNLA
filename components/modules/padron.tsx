@@ -541,7 +541,6 @@ function ModalEditarMascota({
     mascota.sexo === "Macho" || mascota.sexo === "Hembra" ? mascota.sexo : "",
   )
   const [fechaNacimiento, setFechaNacimiento] = useState(mascota.fechaNacimiento ?? "")
-  const [peso, setPeso] = useState(mascota.pesoKg != null ? String(mascota.pesoKg) : "")
   const [conducta, setConducta] = useState<"" | ConductaMascota>(mascota.conducta ?? "")
   const [chip, setChip] = useState(mascota.chip ?? "")
   const [observaciones, setObservaciones] = useState(mascota.observaciones ?? "")
@@ -549,11 +548,6 @@ function ModalEditarMascota({
   const [guardando, setGuardando] = useState(false)
 
   async function guardar() {
-    const pesoNum = peso.trim() === "" ? undefined : Number(peso)
-    if (pesoNum !== undefined && (Number.isNaN(pesoNum) || pesoNum <= 0)) {
-      setError("El peso tiene que ser un número mayor a 0.")
-      return
-    }
     setGuardando(true)
     setError(null)
     try {
@@ -563,7 +557,6 @@ function ModalEditarMascota({
         raza: raza.trim() || undefined,
         sexo: sexo || undefined,
         fechaNacimiento: fechaNacimiento || undefined,
-        pesoKg: pesoNum,
         conducta: conducta || undefined,
         chip: chip.trim() || undefined,
         observaciones: observaciones.trim() || undefined,
@@ -624,13 +617,6 @@ function ModalEditarMascota({
             max={hoyLocal()}
             onChange={setFechaNacimiento}
             limpiable
-          />
-          <Campo
-            etiqueta="Peso (kg)"
-            valor={peso}
-            onChange={setPeso}
-            inputMode="decimal"
-            placeholder="Ej: 12.5"
           />
         </div>
 

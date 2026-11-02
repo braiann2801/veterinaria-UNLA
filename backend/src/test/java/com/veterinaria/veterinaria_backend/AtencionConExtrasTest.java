@@ -168,6 +168,40 @@ class AtencionConExtrasTest {
 				.andExpect(jsonPath("$", Matchers.hasSize(0)));
 	}
 
+	@Test
+	@DisplayName("El peso se registra en la ficha y actualiza el peso actual de la mascota")
+	void pesoEnLaAtencion() throws Exception {
+		mockMvc.perform(post("/api/v1/consultas")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"mascotaId":%d,"profesionalId":%d,"anamnesis":"Control","pesoKg":12.5}
+								""".formatted(mascotaId, profesionalId)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.pesoKg").value(12.5));
+		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId))
+				.andExpect(jsonPath("$.pesoKg").value(12.5));
+
+		// Sin peso, la ficha no pisa el ultimo registrado.
+		ficha(null, null).andExpect(status().isCreated());
+		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId))
+				.andExpect(jsonPath("$.pesoKg").value(12.5));
+
+		// Editar la mascota sin mandar el peso (el formulario ya no lo pide) lo conserva.
+		mockMvc.perform(put("/api/v1/mascotas/{id}", mascotaId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"nombre\":\"Rex\",\"especie\":\"CANINO\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.pesoKg").value(12.5));
+
+		mockMvc.perform(post("/api/v1/consultas")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"mascotaId":%d,"profesionalId":%d,"anamnesis":"Control","pesoKg":-1}
+								""".formatted(mascotaId, profesionalId)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detalles", Matchers.hasItem("El peso debe ser mayor a 0")));
+	}
+
 	// ------------------------------------------------------------- helpers
 
 	private ResultActions ficha(Long turnoId, String extras) throws Exception {

@@ -23,6 +23,7 @@ public record ConsultaMedicaResponseDTO(
 		String anamnesis,
 		String diagnostico,
 		String tratamiento,
+		java.math.BigDecimal pesoKg,
 		String conductaObservada,
 		boolean alertaConducta,
 		MascotaFichaResumenDTO mascota,

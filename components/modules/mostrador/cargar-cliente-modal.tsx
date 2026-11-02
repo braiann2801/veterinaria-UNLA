@@ -8,7 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { mascotas as apiMascotas, tutores as apiTutores, hoyLocal } from "@/lib/api"
 import type { EspecieMascota, Tutor } from "@/lib/api"
-import { ESPECIES, TOQUE_MINIMO, formatearDni, limpiarDni, soloDecimal, soloDni, soloTelefono } from "@/lib/vista"
+import { ESPECIES, TOQUE_MINIMO, formatearDni, limpiarDni, soloDni, soloTelefono } from "@/lib/vista"
 
 
 /**
@@ -81,7 +81,6 @@ export function CargarClienteModal({
     raza: "",
     sexo: "" as "" | "Macho" | "Hembra",
     fechaNacimiento: "",
-    peso: "",
     conducta: "" as "" | "normal" | "gruñe" | "muerde" | "miedoso",
     observaciones: "",
   })
@@ -135,7 +134,6 @@ export function CargarClienteModal({
       raza: "",
       sexo: "",
       fechaNacimiento: "",
-      peso: "",
       conducta: "",
       observaciones: "",
     })
@@ -154,12 +152,6 @@ export function CargarClienteModal({
     const dni = limpiarDni(tutor.dni)
     if (!/^\d{7,8}$/.test(dni)) {
       setError("El DNI debe tener 7 u 8 dígitos (ej.: 30.123.456).")
-      setGuardando(false)
-      return
-    }
-    const pesoNum = mascota.peso.trim() === "" ? undefined : Number(mascota.peso)
-    if (pesoNum !== undefined && (Number.isNaN(pesoNum) || pesoNum <= 0)) {
-      setError("El peso tiene que ser un número mayor a 0.")
       setGuardando(false)
       return
     }
@@ -188,7 +180,6 @@ export function CargarClienteModal({
         // El backend rechaza fechas futuras con @Past: mandar "" no es "sin
         // fecha", es una fecha inválida.
         fechaNacimiento: mascota.fechaNacimiento || undefined,
-        pesoKg: pesoNum,
         conducta: mascota.conducta || undefined,
         observaciones: mascota.observaciones.trim() || undefined,
       })
@@ -357,15 +348,6 @@ export function CargarClienteModal({
               onChange={(nueva) => setMascota((f) => ({ ...f, fechaNacimiento: nueva }))}
               limpiable
             />
-            <Field label="Peso (kg)">
-              <TextInput
-                value={mascota.peso}
-                onChange={(e) => setMascota((f) => ({ ...f, peso: soloDecimal(e.target.value) }))}
-                inputMode="decimal"
-                placeholder="Ej: 12.5"
-                className={TOQUE_MINIMO}
-              />
-            </Field>
           </div>
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-xs font-medium text-muted-foreground">Conducta</span>
