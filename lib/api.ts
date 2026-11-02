@@ -181,6 +181,8 @@ export interface MascotaVinculada {
   especie: string
   raza: string | null
   autorizadoRetiro: boolean
+  /** Las mascotas no se borran: una dada de baja queda inactiva con su historial. */
+  activo: boolean
 }
 
 export interface Tutor {
@@ -193,6 +195,8 @@ export interface Tutor {
   direccion: string | null
   nombreCompleto: string
   mascotas: MascotaVinculada[]
+  /** Los tutores no se borran: uno dado de baja queda inactivo con su historial. */
+  activo: boolean
 }
 
 export interface Mascota {
@@ -208,6 +212,8 @@ export interface Mascota {
   chip: string | null
   observaciones: string | null
   tutores: TutorResumen[]
+  /** Las mascotas no se borran: una dada de baja queda inactiva con su historial. */
+  activo: boolean
 }
 
 export interface Profesional {

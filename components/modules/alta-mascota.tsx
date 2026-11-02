@@ -50,9 +50,12 @@ export const CONDUCTAS = [
 export function AltaMascota({
   tutores,
   onCreada,
+  sinPanel = false,
 }: {
   tutores: Tutor[]
   onCreada: (mascotaId: number) => void | Promise<void>
+  /** Para usarlo dentro de un modal, que ya tiene su propio título. */
+  sinPanel?: boolean
 }) {
   const [nombre, setNombre] = useState("")
   const [especie, setEspecie] = useState<EspecieMascota>("CANINO")
@@ -123,16 +126,7 @@ export function AltaMascota({
 
   const listo = nombre.trim().length > 0
 
-  return (
-    <Panel
-      title="Nueva mascota"
-      action={
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <PawPrint className="size-3.5" aria-hidden />
-          Se guarda en la base
-        </span>
-      }
-    >
+  const formulario = (
       <div className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Campo etiqueta="Nombre" valor={nombre} onChange={setNombre} placeholder="Ej: Firulais" />
@@ -279,6 +273,20 @@ export function AltaMascota({
           {guardando ? "Guardando…" : "Guardar mascota"}
         </button>
       </div>
+  )
+
+  if (sinPanel) return formulario
+  return (
+    <Panel
+      title="Nueva mascota"
+      action={
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <PawPrint className="size-3.5" aria-hidden />
+          Se guarda en la base
+        </span>
+      }
+    >
+      {formulario}
     </Panel>
   )
 }
