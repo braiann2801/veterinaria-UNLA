@@ -24,7 +24,6 @@ import { Agenda } from "@/components/modules/agenda"
 import { Balance } from "@/components/modules/balance"
 import { Caja } from "@/components/modules/caja"
 import { Egreso } from "@/components/modules/egreso"
-import { FichaMedica } from "@/components/modules/ficha"
 import { Fichas } from "@/components/modules/fichas"
 import { Mostrador } from "@/components/modules/mostrador"
 import { Padron } from "@/components/modules/padron"
@@ -71,7 +70,6 @@ function Shell({ role }: { role: Role }) {
             )}
             {active === "agenda" && <Agenda />}
             {active === "padron" && <Padron />}
-            {active === "consultas" && <FichaMedica />}
             {active === "cobros" && <Caja />}
             {active === "egreso" && <Egreso />}
             {active === "fichas" && (

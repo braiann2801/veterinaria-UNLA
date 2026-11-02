@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Field, Select, TextArea, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { TOQUE_MINIMO, soloDecimal } from "@/lib/vista"
-import { CONDUCTAS, CONDUCTAS_CON_ALERTA } from "@/components/modules/ficha"
+import { CONDUCTAS, CONDUCTAS_CON_ALERTA } from "@/components/modules/ficha/conductas"
 import { SelectorExtras, type ExtraElegido } from "@/components/modules/ficha/selector-extras"
 
 export function AtenderTurnoModal({

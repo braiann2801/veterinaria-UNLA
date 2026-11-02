@@ -202,7 +202,7 @@ export function CargarClienteModal({
       // sigue mostrando la jornada anterior.
       await onGuardado()
       setExito(
-        `${mascotaCreada.nombre} quedó cargada con ${creado.nombreCompleto}. Ya está en Ficha médica, Agenda e Historial.`,
+        `${mascotaCreada.nombre} quedó cargada con ${creado.nombreCompleto}. Ya está en el Padrón, la Agenda y el Historial.`,
       )
       limpiar()
     } catch (e) {
