@@ -20,6 +20,13 @@ public interface ReservaGuarderiaService {
 	List<ReservaGuarderiaResponseDTO> listarPorFecha(LocalDate fecha);
 
 	/**
+	 * Estadias que ocupan algun dia de [desde, hasta] (ambos inclusive). Lo usa la
+	 * agenda mensual de guarderia. 400 si falta un extremo, si hasta es anterior
+	 * a desde o si el rango supera los 62 dias.
+	 */
+	List<ReservaGuarderiaResponseDTO> listarEntre(LocalDate desde, LocalDate hasta);
+
+	/**
 	 * Crea una reserva respetando el aforo.
 	 *
 	 * @throws com.veterinaria.veterinaria_backend.exception.BusinessConflictException si el dia ya tiene 10 cupos ocupados

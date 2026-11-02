@@ -75,6 +75,26 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 				.toList();
 	}
 
+	@Override
+	public List<ReservaGuarderiaResponseDTO> listarEntre(LocalDate desde, LocalDate hasta) {
+		if (desde == null || hasta == null) {
+			throw new BadRequestException("Hay que indicar desde y hasta juntos");
+		}
+		if (hasta.isBefore(desde)) {
+			throw new BadRequestException("La fecha hasta no puede ser anterior a desde");
+		}
+		if (java.time.temporal.ChronoUnit.DAYS.between(desde, hasta) + 1 > 62) {
+			throw new BadRequestException("El rango no puede superar los 62 dias");
+		}
+		// El aforo de cada item es el de su primer dia: en la vista mensual el
+		// numero de cupos de cada dia lo da el endpoint de aforo, no este.
+		java.util.Map<LocalDate, Long> ocupadosPorDia = new java.util.HashMap<>();
+		return reservaRepository.findQueSePisanCon(desde, hasta).stream()
+				.map(reserva -> toResponse(reserva, ocupadosPorDia.computeIfAbsent(reserva.getFecha(),
+						reservaRepository::contarCuposOcupados)))
+				.toList();
+	}
+
 	/**
 	 * Reserva un cupo bajo lock pesimista de escritura.
 	 *
