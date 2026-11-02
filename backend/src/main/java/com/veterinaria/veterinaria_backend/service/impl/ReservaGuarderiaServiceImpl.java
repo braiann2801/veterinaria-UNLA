@@ -1,5 +1,7 @@
 package com.veterinaria.veterinaria_backend.service.impl;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -109,6 +111,7 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 		}
 		reserva.setSena(request.sena());
 		reserva.setObservaciones(request.observaciones());
+		validarSena(reserva);
 
 		// A partir de aqui corre bajo SELECT ... FOR UPDATE sobre el semaforo de
 		// CADA dia de la estadia. Toda la seccion check-then-act queda
@@ -288,6 +291,24 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	 * Momento de entrada para cotizar. Las reservas de un dia sin horario (las
 	 * de siempre) entran a las 08:00.
 	 */
+	/**
+	 * La seña se descuenta del total como parte de pago (ver
+	 * {@code ComandaCobroService.emitirParaReserva}). Se valida antes de escribir
+	 * nada: una seña mayor al total es un error de carga, no una reserva.
+	 */
+	private void validarSena(ReservaGuarderia reserva) {
+		BigDecimal sena = reserva.getSena();
+		if (sena == null || sena.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		BigDecimal total = tarifaService.cotizar(inicio(reserva), fin(reserva)).total().setScale(2, RoundingMode.HALF_UP);
+		BigDecimal monto = sena.setScale(2, RoundingMode.HALF_UP);
+		if (monto.compareTo(total) > 0) {
+			throw new BadRequestException("La seña ($" + monto + ") no puede superar el total de la estadia ($"
+					+ total + ")");
+		}
+	}
+
 	static LocalDateTime inicio(ReservaGuarderia reserva) {
 		LocalTime hora = reserva.getHoraEntrada() != null ? reserva.getHoraEntrada() : LocalTime.of(8, 0);
 		return reserva.getFecha().atTime(hora);

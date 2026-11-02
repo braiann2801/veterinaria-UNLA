@@ -222,7 +222,7 @@ export function NuevaReservaGuarderia({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">Seña</span>
+            <span className="text-xs font-medium text-muted-foreground">Seña (se descuenta del total)</span>
             <TextInput
               value={sena}
               onChange={(e) => setSena(soloDecimal(e.target.value))}

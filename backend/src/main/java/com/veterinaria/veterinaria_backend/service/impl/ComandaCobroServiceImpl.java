@@ -21,6 +21,7 @@ import com.veterinaria.veterinaria_backend.dto.DeudaMascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ComandaCobro;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
+import com.veterinaria.veterinaria_backend.entity.Pago;
 import com.veterinaria.veterinaria_backend.entity.ReservaGuarderia;
 import com.veterinaria.veterinaria_backend.entity.Tarifa;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
@@ -287,7 +288,31 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 		comanda.setTutor(titular);
 		comanda.setMascota(mascota);
 		comanda.setReservaGuarderia(reserva);
+		aplicarSena(comanda, reserva.getSena(), titular);
 		return comandaRepository.save(comanda).getId();
+	}
+
+	/**
+	 * La seña es parte de pago: se registra como un pago SENA en la comanda, asi
+	 * el saldo que ve la caja ya la descuenta. Una seña mayor al total es un error
+	 * de carga y se rechaza (la reserva entera se deshace en la misma transaccion).
+	 */
+	private static void aplicarSena(ComandaCobro comanda, BigDecimal sena, Tutor titular) {
+		if (sena == null || sena.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		BigDecimal monto = sena.setScale(2, RoundingMode.HALF_UP);
+		if (monto.compareTo(comanda.getMontoTotal()) > 0) {
+			throw new BadRequestException("La seña ($" + monto + ") no puede superar el total de la estadia ($"
+					+ comanda.getMontoTotal() + ")");
+		}
+		Pago pago = new Pago();
+		pago.setComanda(comanda);
+		pago.setMetodoPago(Pago.MetodoPago.SENA);
+		pago.setMonto(monto);
+		pago.setFechaHora(java.time.LocalDateTime.now());
+		pago.setTutorPagador(titular);
+		comanda.registrarPago(pago);
 	}
 
 	@Override
