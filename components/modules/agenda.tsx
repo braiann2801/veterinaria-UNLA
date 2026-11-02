@@ -6,42 +6,29 @@
  *
  * <p>El mes se pide en una sola llamada (`GET /turnos?desde=&hasta=`) con todas
  * las semanas visibles, incluidos los días de los meses vecinos que completan la
- * grilla. El aforo y las reservas de guardería siguen siendo del día elegido.</p>
+ * grilla. La guardería tiene su propia agenda (`agenda-guarderia.tsx`).</p>
  *
  * <p>Las fechas viajan como `YYYY-MM-DD` armadas en hora local: `toISOString()`
  * convierte a UTC y entre las 21:00 y las 24:00 de Argentina devolvería mañana.</p>
  */
 
 import { useMemo, useState } from "react"
-import { CalendarDays, Clock, Dog, Plus, Stethoscope, Users } from "lucide-react"
+import { Plus, Stethoscope } from "lucide-react"
 
-import { guarderia as apiGuarderia, turnos as apiTurnos } from "@/lib/api"
-import type { AforoGuarderia, ReservaGuarderia, TurnoClinico } from "@/lib/api"
+import { turnos as apiTurnos } from "@/lib/api"
+import type { TurnoClinico } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Panel } from "@/components/ui/field"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
 import { AgendarTurnoModal } from "@/components/modules/agendar-turno-modal"
-import { NuevaReservaGuarderia } from "@/components/modules/nueva-reserva"
-import { CalendarioMensual, aClave, deClave, diasVisibles } from "@/components/modules/agenda/calendario-mensual"
+import {
+  CalendarioMensual,
+  aClave,
+  deClave,
+  diasVisibles,
+  type EventoCalendario,
+} from "@/components/modules/agenda/calendario-mensual"
 import { AtenderTurnoModal } from "@/components/modules/agenda/atender-turno-modal"
-
-/** El tope lo expone el backend en cada respuesta; no se hardcodea aca. */
-function colorDeAforo(aforo: AforoGuarderia) {
-  if (aforo.completo) return "rojo" as const
-  if (aforo.cuposDisponibles <= 2) return "ambar" as const
-  return "verde" as const
-}
-
-/**
- * `09:00 – 18:00`, o `null` si la reserva no tiene horario.
- *
- * <p>Se recorta a cinco caracteres porque Jackson emite el `LocalTime` completo
- * ("08:00:00"): sin el `slice` la columna de la agenda mostraría segundos.</p>
- */
-function rangoHorario(reserva: ReservaGuarderia) {
-  if (!reserva.horaEntrada || !reserva.horaSalida) return null
-  return `${reserva.horaEntrada.slice(0, 5)} – ${reserva.horaSalida.slice(0, 5)}`
-}
 
 const ETIQUETA_ESTADO: Record<TurnoClinico["estado"], string> = {
   PENDIENTE: "Pendiente",
@@ -65,7 +52,6 @@ export function Agenda() {
   const [fecha, setFecha] = useState(hoy)
   const [vista, setVista] = useState(() => ({ anio: new Date().getFullYear(), mes: new Date().getMonth() }))
   const [turnoAbierto, setTurnoAbierto] = useState(false)
-  const [reservaAbierta, setReservaAbierta] = useState(false)
   const [atendiendo, setAtendiendo] = useState<TurnoClinico | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
 
@@ -74,8 +60,6 @@ export function Agenda() {
   const hasta = aClave(dias[dias.length - 1])
 
   const turnosMes = useApi<TurnoClinico[]>(() => apiTurnos.listarRango(desde, hasta), true, `${desde}_${hasta}`)
-  const aforo = useApi<AforoGuarderia>(() => apiGuarderia.aforo(fecha), true, fecha)
-  const reservas = useApi<ReservaGuarderia[]>(() => apiGuarderia.listar(fecha), true, fecha)
 
   const turnosPorDia = useMemo(() => {
     const mapa = new Map<string, TurnoClinico[]>()
@@ -85,6 +69,26 @@ export function Agenda() {
     }
     return mapa
   }, [turnosMes.datos])
+
+  /** Lo que se ve en cada celda: los turnos no cancelados, en verde los atendidos. */
+  const eventosPorDia = useMemo(() => {
+    const mapa = new Map<string, EventoCalendario[]>()
+    for (const [clave, turnos] of turnosPorDia) {
+      mapa.set(
+        clave,
+        turnos
+          .filter((t) => t.estado !== "CANCELADO")
+          .map((t) => ({
+            id: t.id,
+            hora: t.fechaHoraInicio.slice(11, 16),
+            texto: t.mascota.nombre,
+            titulo: `${t.fechaHoraInicio.slice(11, 16)} ${t.mascota.nombre} · ${t.motivo}${t.estado === "ATENDIDO" ? " · atendido" : ""}`,
+            clase: t.estado === "ATENDIDO" ? "bg-emerald-500/20" : "bg-primary/15",
+          })),
+      )
+    }
+    return mapa
+  }, [turnosPorDia])
 
   /** Elegir un día de un mes vecino también mueve el calendario a ese mes. */
   function seleccionar(clave: string) {
@@ -107,13 +111,13 @@ export function Agenda() {
 
   /** Tras agendar, el mes y los listados del día quedaron desactualizados. */
   async function refrescar() {
-    await Promise.all([turnosMes.recargar(), aforo.recargar(), reservas.recargar()])
+    await turnosMes.recargar()
   }
 
   return (
     <div className="flex flex-col gap-4">
       <Panel
-        title="Agenda"
+        title="Agenda clínica"
         action={
           <div className="flex items-center gap-2">
             {fecha !== hoy && (
@@ -140,7 +144,7 @@ export function Agenda() {
           <CalendarioMensual
             anio={vista.anio}
             mes={vista.mes}
-            turnosPorDia={turnosPorDia}
+            eventosPorDia={eventosPorDia}
             seleccionado={fecha}
             hoy={hoy}
             cargando={turnosMes.cargando}
@@ -203,82 +207,6 @@ export function Agenda() {
         </div>
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Aforo de guardería">
-          <Recurso estado={aforo} textoCarga="Consultando aforo">
-            {(a) => (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Semforo tono={colorDeAforo(a)}>
-                    <Users className="size-3.5" aria-hidden />
-                    {a.cuposOcupados} de {a.aforoMaximo} cupos
-                  </Semforo>
-                  {a.completo && <span className="text-xs text-red-700 dark:text-red-300">Aforo completo</span>}
-                </div>
-                <MeterAforo aforo={a} />
-              </div>
-            )}
-          </Recurso>
-        </Panel>
-
-        <Panel
-          title="Reservas de guardería"
-          action={
-            <button
-              onClick={() => setReservaAbierta(true)}
-              className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-            >
-              <Plus className="size-3.5" aria-hidden />
-              Nueva reserva
-            </button>
-          }
-        >
-          <Recurso
-            estado={reservas}
-            textoCarga="Cargando reservas"
-            textoVacio="No hay reservas para esta fecha"
-            onReintentar={reservas.recargar}
-          >
-            {(lista) => (
-              <ul className="flex flex-col divide-y divide-border">
-                {lista.map((r) => {
-                  const horario = rangoHorario(r)
-                  return (
-                    <li key={r.id} className="flex items-center justify-between gap-2 py-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Dog className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{r.nombreMascota}</p>
-                          <p className="text-xs text-muted-foreground">
-                            <CalendarDays className="mr-1 inline size-3" aria-hidden />
-                            {r.tipoEstadia.replace("_", " ")} · {r.estado}
-                          </p>
-                          {horario && (
-                            <p className="text-xs text-muted-foreground">
-                              <Clock className="mr-1 inline size-3" aria-hidden />
-                              {horario}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <Semforo tono={r.estado === "CANCELADO" ? "ambar" : "verde"}>{r.estado}</Semforo>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </Recurso>
-        </Panel>
-      </div>
-
-      {turnoAbierto && (
-        <AgendarTurnoModal
-          fechaPorDefecto={fecha}
-          onCerrar={() => setTurnoAbierto(false)}
-          onGuardado={refrescar}
-        />
-      )}
-
       {atendiendo && (
         <AtenderTurnoModal
           turno={atendiendo}
@@ -290,44 +218,6 @@ export function Agenda() {
         />
       )}
 
-      {reservaAbierta && (
-        <NuevaReservaGuarderia
-          fechaPorDefecto={fecha}
-          onCerrar={() => setReservaAbierta(false)}
-          onCreada={refrescar}
-        />
-      )}
-    </div>
-  )
-}
-
-/**
- * Barra de ocupación.
- *
- * Se construye con divs en vez de `<progress>` para poder poner el color del
- * semáforo: el elemento nativo no acepta color por estado de forma portable.
- */
-function MeterAforo({ aforo }: { aforo: AforoGuarderia }) {
-  const pct =
-    aforo.aforoMaximo > 0 ? Math.min(100, (aforo.cuposOcupados / aforo.aforoMaximo) * 100) : 0
-  const color =
-    aforo.completo ? "bg-red-500" : aforo.cuposDisponibles <= 2 ? "bg-amber-500" : "bg-emerald-500"
-
-  return (
-    <div className="flex flex-col gap-1">
-      <div
-        className="h-2 w-full overflow-hidden rounded-full bg-muted"
-        role="progressbar"
-        aria-valuenow={aforo.cuposOcupados}
-        aria-valuemin={0}
-        aria-valuemax={aforo.aforoMaximo}
-        aria-label="Ocupación de guardería"
-      >
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Quedan {aforo.cuposDisponibles} cupos disponibles.
-      </p>
     </div>
   )
 }

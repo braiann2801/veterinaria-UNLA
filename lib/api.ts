@@ -642,6 +642,9 @@ export const turnos = {
 export const guarderia = {
   listar: (fecha?: string) =>
     get<ReservaGuarderia[]>(`/guarderia${fecha ? `?fecha=${fecha}` : ""}`),
+  /** Estadías que ocupan algún día de `desde` a `hasta` (máximo 62 días): la agenda mensual. */
+  listarRango: (desde: string, hasta: string) =>
+    get<ReservaGuarderia[]>(`/guarderia?desde=${desde}&hasta=${hasta}`),
   aforo: (fecha: string) => get<AforoGuarderia>(`/guarderia/aforo?fecha=${fecha}`),
   crear: (body: ReservaGuarderiaInput) => post<ReservaGuarderia>("/guarderia", body),
   actualizar: (id: number, body: Partial<ReservaGuarderiaInput>) =>

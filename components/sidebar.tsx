@@ -37,6 +37,7 @@ import { type Role } from "@/lib/store"
 export type TabId =
   | "mostrador"
   | "agenda"
+  | "guarderia"
   | "padron"
   | "cobros"
   | "balance"
@@ -86,7 +87,8 @@ const SECCIONES: { id: Seccion; titulo: string }[] = [
  */
 export const TABS: TabDef[] = [
   { id: "mostrador", label: "Mostrador", icon: LayoutDashboard, roles: EMPLEADOS, seccion: "operacion" },
-  { id: "agenda", label: "Agenda", icon: CalendarDays, roles: EMPLEADOS, seccion: "operacion" },
+  { id: "agenda", label: "Agenda clínica", icon: CalendarDays, roles: EMPLEADOS, seccion: "operacion" },
+  { id: "guarderia", label: "Agenda guardería", icon: Dog, roles: EMPLEADOS, seccion: "operacion" },
   { id: "egreso", label: "Egreso", icon: LogOut, roles: EMPLEADOS, seccion: "operacion" },
   { id: "padron", label: "Padrón", icon: Users, roles: EMPLEADOS, seccion: "clientes" },
   { id: "fichas", label: "Historial", icon: FileText, roles: EMPLEADOS, seccion: "clientes" },

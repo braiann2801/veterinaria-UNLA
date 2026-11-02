@@ -21,6 +21,7 @@ import { CambiarPassword } from "@/components/cambiar-password"
 import { Sidebar, TABS, type TabId } from "@/components/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Agenda } from "@/components/modules/agenda"
+import { AgendaGuarderia } from "@/components/modules/agenda-guarderia"
 import { Balance } from "@/components/modules/balance"
 import { Caja } from "@/components/modules/caja"
 import { Egreso } from "@/components/modules/egreso"
@@ -69,6 +70,7 @@ function Shell({ role }: { role: Role }) {
               </div>
             )}
             {active === "agenda" && <Agenda />}
+            {active === "guarderia" && <AgendaGuarderia />}
             {active === "padron" && <Padron />}
             {active === "cobros" && <Caja />}
             {active === "egreso" && <Egreso />}

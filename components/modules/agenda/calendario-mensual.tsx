@@ -1,9 +1,10 @@
 "use client"
 
 /**
- * Grilla del mes con los turnos de cada día en forma reducida.
+ * Grilla del mes con los eventos de cada día en forma reducida (turnos clínicos
+ * o estadías de guardería).
  *
- * <p>Es presentacional: recibe los turnos ya agrupados por día y avisa qué día
+ * <p>Es presentacional: recibe los eventos ya agrupados por día y avisa qué día
  * se eligió. La semana arranca el lunes, como se usa en Argentina. En celular
  * cada celda muestra solo la cantidad de turnos (no entra más en 1/7 del
  * ancho); desde `md` muestra hasta tres ("09:00 Firulais") y un "+N" con el resto.</p>
@@ -11,14 +12,24 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-import type { TurnoClinico } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { TOQUE_MINIMO } from "@/lib/vista"
 
 const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 /** "15 de octubre de 2026": la etiqueta de cada celda, con su propio mes (no el que se está viendo). */
 const FECHA_CELDA = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" })
-const TURNOS_POR_CELDA = 3
+const EVENTOS_POR_CELDA = 3
+
+/** Un elemento de la celda: "09:00 Firulais". `color` pinta el fondo (p. ej. un color por mascota). */
+export type EventoCalendario = {
+  id: string | number
+  hora?: string
+  texto: string
+  titulo?: string
+  /** Clase de Tailwind para el fondo, o `color` inline cuando el color es dinámico. */
+  clase?: string
+  color?: string
+}
 
 /** `YYYY-MM-DD` en hora local, sin pasar por UTC. */
 export function aClave(fecha: Date): string {
@@ -50,7 +61,8 @@ export function diasVisibles(anio: number, mes: number): Date[] {
 export function CalendarioMensual({
   anio,
   mes,
-  turnosPorDia,
+  eventosPorDia,
+  unidad = { singular: "turno", plural: "turnos" },
   seleccionado,
   hoy,
   cargando,
@@ -60,7 +72,9 @@ export function CalendarioMensual({
   anio: number
   /** 0 = enero, como `Date`. */
   mes: number
-  turnosPorDia: Map<string, TurnoClinico[]>
+  eventosPorDia: Map<string, EventoCalendario[]>
+  /** Cómo se nombran los eventos en la etiqueta accesible de cada día. */
+  unidad?: { singular: string; plural: string }
   seleccionado: string
   hoy: string
   cargando: boolean
@@ -103,8 +117,7 @@ export function CalendarioMensual({
         {diasVisibles(anio, mes).map((dia) => {
           const clave = aClave(dia)
           const delMes = dia.getMonth() === mes
-          const turnos = turnosPorDia.get(clave) ?? []
-          const activos = turnos.filter((t) => t.estado !== "CANCELADO")
+          const activos = eventosPorDia.get(clave) ?? []
           const elegido = clave === seleccionado
           return (
             <button
@@ -112,7 +125,7 @@ export function CalendarioMensual({
               type="button"
               role="gridcell"
               aria-selected={elegido}
-              aria-label={`${FECHA_CELDA.format(dia)}: ${activos.length} turno${activos.length === 1 ? "" : "s"}`}
+              aria-label={`${FECHA_CELDA.format(dia)}: ${activos.length} ${activos.length === 1 ? unidad.singular : unidad.plural}`}
               onClick={() => onSeleccionar(clave)}
               className={cn(
                 "flex min-h-12 min-w-0 flex-col items-stretch gap-0.5 p-1 text-left transition-colors md:min-h-24 md:p-1.5",
@@ -137,21 +150,22 @@ export function CalendarioMensual({
                   </span>
                   {/* Desde md: los primeros turnos y cuántos quedan. */}
                   <ul className="hidden min-w-0 flex-col gap-0.5 md:flex">
-                    {activos.slice(0, TURNOS_POR_CELDA).map((t) => (
+                    {activos.slice(0, EVENTOS_POR_CELDA).map((e) => (
                       <li
-                        key={t.id}
+                        key={e.id}
                         className={cn(
                           "truncate rounded px-1 text-[11px] leading-5 text-foreground",
-                          t.estado === "ATENDIDO" ? "bg-emerald-500/20" : "bg-primary/15",
+                          e.color ? undefined : (e.clase ?? "bg-primary/15"),
                         )}
-                        title={`${t.fechaHoraInicio.slice(11, 16)} ${t.mascota.nombre} · ${t.motivo}${t.estado === "ATENDIDO" ? " · atendido" : ""}`}
+                        style={e.color ? { backgroundColor: e.color } : undefined}
+                        title={e.titulo ?? `${e.hora ?? ""} ${e.texto}`.trim()}
                       >
-                        <span className="font-medium">{t.fechaHoraInicio.slice(11, 16)}</span> {t.mascota.nombre}
+                        {e.hora && <span className="font-medium">{e.hora}</span>} {e.texto}
                       </li>
                     ))}
-                    {activos.length > TURNOS_POR_CELDA && (
+                    {activos.length > EVENTOS_POR_CELDA && (
                       <li className="px-1 text-[11px] text-muted-foreground">
-                        +{activos.length - TURNOS_POR_CELDA} más
+                        +{activos.length - EVENTOS_POR_CELDA} más
                       </li>
                     )}
                   </ul>
