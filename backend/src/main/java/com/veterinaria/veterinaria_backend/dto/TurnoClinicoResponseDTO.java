@@ -17,7 +17,8 @@ public record TurnoClinicoResponseDTO(
 		String motivo,
 		String estado,
 		MascotaTurnoResumenDTO mascota,
-		ProfesionalResumenDTO profesional) {
+		ProfesionalResumenDTO profesional,
+		boolean urgencia) {
 
 	/** Mascota en version plana, sin tutores. */
 	public record MascotaTurnoResumenDTO(Long id, String nombre) {

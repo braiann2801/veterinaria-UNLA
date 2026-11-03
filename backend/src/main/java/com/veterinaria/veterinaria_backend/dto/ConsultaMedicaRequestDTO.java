@@ -34,7 +34,7 @@ public record ConsultaMedicaRequestDTO(
 		/** Opcional: las consultas de urgencia no pasan por turno. */
 		Long turnoClinicoId,
 
-		@NotNull(message = "El id de la mascota es obligatorio")
+		/** Obligatoria salvo en la urgencia todavia sin datos (lo valida el servicio). */
 		Long mascotaId,
 
 		@NotNull(message = "El id del profesional es obligatorio")

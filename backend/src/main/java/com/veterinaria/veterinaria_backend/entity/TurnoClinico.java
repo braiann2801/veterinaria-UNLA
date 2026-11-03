@@ -63,14 +63,24 @@ public class TurnoClinico {
 	@Column(name = "estado", nullable = false, length = 20)
 	private EstadoTurno estado = EstadoTurno.PENDIENTE;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "mascota_id", nullable = false)
+	/** Nula solo en una urgencia cuyos datos todavia no se cargaron. */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "mascota_id")
 	private Mascota mascota;
 
 	/** Profesional responsable. El solapamiento se valida por este campo. */
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "profesional_id", nullable = false)
+	/** Nulo solo en una urgencia que todavia nadie atendio: se asigna al atender. */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "profesional_id")
 	private Profesional profesional;
+
+	/**
+	 * Turno de urgencia: se registra sin datos a la hora actual y puede pisar
+	 * turnos agendados (excepcion de la regla 2 de AGENTS.md). Default 0 para que
+	 * las filas existentes queden como turnos normales.
+	 */
+	@Column(name = "urgencia", nullable = false, columnDefinition = "bit(1) default 0")
+	private boolean urgencia = false;
 
 	/**
 	 * Deriva fin y fin de bloque a partir del inicio.
