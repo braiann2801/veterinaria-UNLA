@@ -52,6 +52,8 @@ Necesitás Docker con Compose.
    - Cada cuenta nueva recibe una clave temporal que se muestra una sola vez.
    - Desactivar una cuenta, resetear su clave o cambiarle el rol cierra al instante las sesiones abiertas de esa persona.
 
+**Límite de intentos:** tras 5 contraseñas incorrectas para el mismo usuario desde la misma IP, el login queda bloqueado 15 minutos para ese par (responde 429, aun con la clave correcta). Un ingreso exitoso reinicia el contador. Se ajusta con `LOGIN_INTENTOS_MAXIMOS` y `LOGIN_BLOQUEO_MINUTOS`. El bloqueo vive en memoria: reiniciar el backend lo limpia.
+
 Balance, Usuarios, cierre de caja y tarifas son solo para el Dueño, y el backend responde 403 al resto. La matriz de permisos vive en `backend/src/main/java/com/veterinaria/veterinaria_backend/security/SecurityConfig.java`.
 
 ## Desarrollo local sin Docker
