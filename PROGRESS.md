@@ -6,18 +6,18 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** rama `feat/atencion-extras-menu` (detalle en
-  `odd/tasks/atencion-extras-menu.md`), apilada sobre
-  `feat/agenda-mensual-turno-rapido` (PR #3, abierto): atender turnos desde la
-  Agenda, catálogo de extras en Tarifas, detalle de comanda en Caja y barra
-  lateral en secciones. Implementada y verificada; pendiente de push/PR.
+- **Fase en curso:** rama `fix/correcciones-flujo-registros` (detalle en
+  `odd/tasks/correcciones-flujo-registros.md`): seña como pago, desactivar en
+  lugar de borrar, agenda de guardería propia, peso en la atención, Cargar
+  mascota en Mostrador, sin pestaña Ficha médica y confirmaciones en modal.
+  Implementada y verificada; pendiente de push/PR.
 - **Base Git:** `main` en `e2edc3b` (merge del PR #2, deuda por mascota y
   normalización).
 - **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 271 tests de Spring Boot en verde
+- **Harness:** tsc limpio, Next.js build OK, 287 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 
 ## Hitos completados
@@ -96,6 +96,12 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       comanda con líneas (`comanda_item`, precio congelado). Botón "Atender" en
       la Agenda, catálogo en Tarifas, detalle en Caja, barra lateral agrupada.
       271 tests backend.
+- [x] **Correcciones de flujo y registros** — seña como pago SENA en la
+      comanda; DELETE desactiva (tutor/mascota/profesional) con reactivar y
+      toggle de desactivados; Agenda guardería con calendario y color por
+      mascota (`GET /guarderia?desde=&hasta=`); peso en la ficha; Cargar
+      mascota en Mostrador; sin pestaña Ficha médica; confirmaciones en modal.
+      287 tests backend.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -140,9 +146,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 4. **Colisión VS Code/Maven:** el Language Server genera clases rotas en
    `backend/target/classes`; si aparecen `BeanCreationException` anómalos,
    compilar siempre con `mvnw clean`.
-5. **Regla del huérfano (nueva, inviolable):** al borrar un tutor, una mascota
-   sin otros tutores se elimina con él; si tiene historial clínico/contable, el
-   borrado completo aborta con 409 (única transacción).
+5. **Nada se borra (reemplaza a la regla del huérfano):** DELETE de tutor,
+   mascota y profesional desactiva (`activo=false`). Al desactivar un tutor se
+   desactivan sus mascotas sin otro tutor activo. Los inactivos no toman turnos
+   ni reservas (400). `PUT .../{id}/reactivar` los vuelve a dar de alta; una
+   mascota necesita un tutor activo.
 6. **`docker compose up` sin verificar end-to-end:** el YAML quedó validado
    estáticamente. En macOS ya se probó un MySQL 8 en contenedor (puerto 3307)
    con backend y frontend locales, pero falta el `compose up --build`
@@ -164,7 +172,7 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta` y
   `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`).
-- **Tests backend:** 271 en verde. Cobertura clave: aforo concurrente (lock
+- **Tests backend:** 287 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`).
