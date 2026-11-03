@@ -55,10 +55,16 @@ public class ProfesionalController {
 		return ResponseEntity.ok(profesionalService.actualizar(id, request));
 	}
 
-	/** DELETE /api/v1/profesionales/{id} -> 204; 409 si tiene turnos o consultas */
+	/** DELETE /api/v1/profesionales/{id} -> 204: desactiva (no borra; turnos y fichas quedan). */
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> eliminar(@PathVariable Long id) {
 		profesionalService.eliminar(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	/** PUT .../{id}/reactivar -> 200 con el registro activo de nuevo. */
+	@PutMapping("/{id}/reactivar")
+	public ResponseEntity<ProfesionalResponseDTO> reactivar(@PathVariable Long id) {
+		return ResponseEntity.ok(profesionalService.reactivar(id));
 	}
 }

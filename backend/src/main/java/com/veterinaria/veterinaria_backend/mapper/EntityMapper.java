@@ -51,7 +51,8 @@ public class EntityMapper {
 				tutor.getEmail(),
 				tutor.getDireccion(),
 				tutor.getNombreCompleto(),
-				toMascotasVinculadas(tutor));
+				toMascotasVinculadas(tutor),
+				tutor.isActivo());
 	}
 
 	/**
@@ -79,7 +80,8 @@ public class EntityMapper {
 						vinculo.getMascota().getNombre(),
 						toEspecieResumen(vinculo.getMascota().getEspecie()),
 						vinculo.getMascota().getRaza(),
-						vinculo.isAutorizadoRetiro()))
+						vinculo.isAutorizadoRetiro(),
+						vinculo.getMascota().isActivo()))
 				.toList();
 	}
 
@@ -116,7 +118,8 @@ public class EntityMapper {
 				conductaToApi(mascota.getConducta()),
 				mascota.getChip(),
 				mascota.getObservaciones(),
-				toTutoresResumen(mascota));
+				toTutoresResumen(mascota),
+				mascota.isActivo());
 	}
 
 	public List<MascotaResponseDTO> toMascotaResponseList(List<Mascota> mascotas) {
@@ -162,7 +165,11 @@ public class EntityMapper {
 		mascota.setRaza(request.raza());
 		mascota.setSexo(request.sexo());
 		mascota.setFechaNacimiento(request.fechaNacimiento());
-		mascota.setPesoKg(request.pesoKg());
+		// El peso se toma al atender (ficha clinica); el alta y la edicion ya no lo
+		// piden, asi que un pedido sin peso conserva el ultimo registrado.
+		if (request.pesoKg() != null) {
+			mascota.setPesoKg(request.pesoKg());
+		}
 		mascota.setConducta(toConducta(request.conducta()));
 		mascota.setChip(request.chip());
 		mascota.setObservaciones(request.observaciones());

@@ -17,6 +17,9 @@ public interface ProfesionalService {
 	/** Edita con las mismas reglas que el alta (normalizacion y unicidad de DNI y matricula). */
 	ProfesionalResponseDTO actualizar(Long id, ProfesionalRequestDTO request);
 
-	/** Borra un profesional sin turnos ni consultas; con actividad responde 409. */
+	/** Da de baja al profesional sin borrarlo: queda inactivo y conserva su historial. */
 	void eliminar(Long id);
+
+	/** Vuelve a dar de alta a un profesional inactivo. */
+	ProfesionalResponseDTO reactivar(Long id);
 }

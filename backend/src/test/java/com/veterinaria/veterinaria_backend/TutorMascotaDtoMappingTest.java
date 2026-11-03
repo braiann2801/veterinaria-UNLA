@@ -90,7 +90,7 @@ class TutorMascotaDtoMappingTest {
 	@Test
 	@DisplayName("Las listas nulas se normalizan a vacias para no propagar nulls al frontend")
 	void listasNulasSeNormalizan() {
-		Tutor tutor = new Tutor(null, "Solo", "Nombre", "11111111", null, null, null, null);
+		Tutor tutor = new Tutor(null, "Solo", "Nombre", "11111111", null, null, null, true, null);
 		tutor.setVinculos(null);
 
 		TutorResponseDTO dto = mapper.toResponse(tutor);

@@ -444,6 +444,12 @@ function ModalCobro({
             <span className="text-muted-foreground">Pagado</span>
             <span>{money(comanda.totalPagado)}</span>
           </div>
+          {senaAplicada(comanda) > 0 && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Incluye seña</span>
+              <span>{money(senaAplicada(comanda))}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between font-medium">
             <span>Saldo pendiente</span>
             <span>{money(comanda.saldoPendiente)}</span>
@@ -583,4 +589,9 @@ function DetalleComanda({ comanda }: { comanda: ComandaCobro }) {
       ))}
     </ul>
   )
+}
+
+/** Seña ya imputada a la comanda (se registra como pago SENA al reservar). */
+function senaAplicada(comanda: ComandaCobro): number {
+  return (comanda.pagos ?? []).filter((p) => p.metodoPago === "SENA").reduce((total, p) => total + p.monto, 0)
 }

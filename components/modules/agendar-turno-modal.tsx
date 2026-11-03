@@ -26,6 +26,7 @@ import {
   profesionales as apiProfesionales,
   turnos as apiTurnos,
   tutores as apiTutores,
+  hoyLocal,
 } from "@/lib/api"
 import type { EspecieMascota, Mascota, Profesional, Tutor } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
@@ -74,6 +75,7 @@ export function AgendarTurnoModal({
     especie: "CANINO" as EspecieMascota,
     sexo: "" as "" | "Macho" | "Hembra",
     raza: "",
+    fechaNacimiento: "",
   })
 
   const [profesionalId, setProfesionalId] = useState("")
@@ -139,6 +141,8 @@ export function AgendarTurnoModal({
             especie: mascotaNueva.especie,
             sexo: mascotaNueva.sexo || undefined,
             raza: mascotaNueva.raza.trim() || undefined,
+            // "" no es "sin fecha": el backend rechaza lo que no sea una fecha pasada.
+            fechaNacimiento: mascotaNueva.fechaNacimiento || undefined,
           },
         })
       }
@@ -175,7 +179,7 @@ export function AgendarTurnoModal({
           <Field label="Mascota">
             <Select value={mascotaId} onChange={(e) => setMascotaId(e.target.value)} className={TOQUE_MINIMO}>
               <option value="">Elegí una mascota…</option>
-              {(mascotas.datos ?? []).map((m) => (
+              {(mascotas.datos ?? []).filter((m) => m.activo).map((m) => (
                 <option key={m.id} value={m.id}>
                   {etiquetaMascota(m)}
                 </option>
@@ -241,7 +245,7 @@ export function AgendarTurnoModal({
                 <Field label="Cliente">
                   <Select value={tutorId} onChange={(e) => cambiarTutor(e.target.value)} className={TOQUE_MINIMO}>
                     <option value="">Elegí un cliente…</option>
-                    {(tutores.datos ?? []).map((t) => (
+                    {(tutores.datos ?? []).filter((t) => t.activo).map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.nombreCompleto} · DNI {formatearDni(t.dni)}
                       </option>
@@ -269,7 +273,7 @@ export function AgendarTurnoModal({
                       className={TOQUE_MINIMO}
                     >
                       <option value="">{tutorElegido ? "Elegí una mascota…" : "Primero elegí el cliente"}</option>
-                      {(tutorElegido?.mascotas ?? []).map((m) => (
+                      {(tutorElegido?.mascotas ?? []).filter((m) => m.activo).map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.nombre}
                         </option>
@@ -332,6 +336,13 @@ export function AgendarTurnoModal({
                     className={TOQUE_MINIMO}
                   />
                 </Field>
+                <DatePicker
+                  label="Fecha de nacimiento (opcional)"
+                  value={mascotaNueva.fechaNacimiento}
+                  max={hoyLocal()}
+                  onChange={(nueva) => setMascotaNueva((m) => ({ ...m, fechaNacimiento: nueva }))}
+                  limpiable
+                />
               </div>
             )}
           </div>

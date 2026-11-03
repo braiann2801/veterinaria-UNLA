@@ -41,7 +41,7 @@
  */
 
 import { useCallback, useState } from "react"
-import { UserPlus, CalendarPlus, CalendarDays } from "lucide-react"
+import { UserPlus, CalendarPlus, CalendarDays, PawPrint } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
@@ -62,6 +62,7 @@ import { TOQUE_MINIMO } from "@/lib/vista"
 import { AgendarTurnoModal } from "./agendar-turno-modal"
 import { AvisosImportantes } from "./mostrador/avisos-importantes"
 import { CargarClienteModal } from "./mostrador/cargar-cliente-modal"
+import { CargarMascotaModal } from "./mostrador/cargar-mascota-modal"
 import { TableroJornada } from "./mostrador/tablero-jornada"
 import { WidgetAforo } from "./mostrador/widget-aforo"
 import { useDeudasDelDia } from "./mostrador/use-deudas-del-dia"
@@ -77,6 +78,7 @@ export function Mostrador() {
    */
   const [fecha, setFecha] = useState(hoyLocal())
   const [openCliente, setOpenCliente] = useState(false)
+  const [openMascota, setOpenMascota] = useState(false)
   const [openTurno, setOpenTurno] = useState(false)
 
   // Las cuatro llamadas llevan la fecha como `clave` y no solo como closure:
@@ -131,6 +133,9 @@ export function Mostrador() {
           <Button variant="outline" onClick={() => setOpenCliente(true)} className={TOQUE_MINIMO}>
             <UserPlus className="h-4 w-4" /> Cargar cliente
           </Button>
+          <Button variant="outline" onClick={() => setOpenMascota(true)} className={TOQUE_MINIMO}>
+            <PawPrint className="h-4 w-4" /> Cargar mascota
+          </Button>
           <Button onClick={() => setOpenTurno(true)} className={TOQUE_MINIMO}>
             <CalendarPlus className="h-4 w-4" /> Agregar turno
           </Button>
@@ -145,6 +150,7 @@ export function Mostrador() {
       <TableroJornada turnos={turnos} reservas={reservas} fecha={fecha} onReintentar={refrescar} />
 
       <CargarClienteModal open={openCliente} onClose={() => setOpenCliente(false)} onGuardado={refrescar} />
+      {openMascota && <CargarMascotaModal onCerrar={() => setOpenMascota(false)} onGuardado={refrescar} />}
       {openTurno && (
         <AgendarTurnoModal fechaPorDefecto={fecha} onCerrar={() => setOpenTurno(false)} onGuardado={refrescar} />
       )}

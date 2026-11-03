@@ -101,6 +101,13 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 	public TurnoClinicoResponseDTO crear(TurnoClinicoRequestDTO request) {
 		Mascota mascota = obtenerMascota(request.mascotaId());
 		Profesional profesional = obtenerProfesional(request.profesionalId());
+		// Un registro dado de baja conserva su historial, pero no toma turnos nuevos.
+		if (!mascota.isActivo()) {
+			throw new BadRequestException("La mascota " + mascota.getNombre() + " esta desactivada");
+		}
+		if (!profesional.isActivo()) {
+			throw new BadRequestException("El profesional " + profesional.getNombreCompleto() + " esta desactivado");
+		}
 
 		TurnoClinico turno = new TurnoClinico();
 		turno.setMascota(mascota);

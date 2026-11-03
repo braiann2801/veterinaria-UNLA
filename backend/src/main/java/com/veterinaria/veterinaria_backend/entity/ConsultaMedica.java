@@ -72,6 +72,14 @@ public class ConsultaMedica {
 	@Column(name = "tratamiento", length = 2000)
 	private String tratamiento;
 
+	/**
+	 * Peso medido en esta atencion: el historial de peso de la mascota sale de aca.
+	 * Double y no BigDecimal a proposito: en la ficha clinica BigDecimal queda
+	 * reservado al dinero, que no puede estar aca (regla 2.3, FichaClinicaDesacopleTest).
+	 */
+	@Column(name = "peso_kg")
+	private Double pesoKg;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "conducta_observada", length = 20)
 	private ConductaObservada conductaObservada = ConductaObservada.TRANQUILO;

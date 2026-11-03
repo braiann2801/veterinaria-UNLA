@@ -50,16 +50,18 @@ export const CONDUCTAS = [
 export function AltaMascota({
   tutores,
   onCreada,
+  sinPanel = false,
 }: {
   tutores: Tutor[]
   onCreada: (mascotaId: number) => void | Promise<void>
+  /** Para usarlo dentro de un modal, que ya tiene su propio título. */
+  sinPanel?: boolean
 }) {
   const [nombre, setNombre] = useState("")
   const [especie, setEspecie] = useState<EspecieMascota>("CANINO")
   const [raza, setRaza] = useState("")
   const [sexo, setSexo] = useState<"" | "Macho" | "Hembra">("")
   const [fechaNacimiento, setFechaNacimiento] = useState("")
-  const [peso, setPeso] = useState("")
   const [conducta, setConducta] = useState<"" | (typeof CONDUCTAS)[number]["valor"]>("")
   const [chip, setChip] = useState("")
   const [observaciones, setObservaciones] = useState("")
@@ -75,7 +77,6 @@ export function AltaMascota({
     setRaza("")
     setSexo("")
     setFechaNacimiento("")
-    setPeso("")
     setConducta("")
     setChip("")
     setObservaciones("")
@@ -89,11 +90,6 @@ export function AltaMascota({
     setError(null)
     setExito(null)
     try {
-      const pesoNum = peso.trim() === "" ? undefined : Number(peso)
-      if (pesoNum !== undefined && (Number.isNaN(pesoNum) || pesoNum <= 0)) {
-        setError("El peso tiene que ser un número mayor a 0.")
-        return
-      }
 
       const creada = await apiMascotas.crear({
         nombre: nombre.trim(),
@@ -103,7 +99,6 @@ export function AltaMascota({
         // El backend rechaza fechas futuras con @Past, asi que se manda solo si
         // hay valor: mandar "" no es "sin fecha", es una fecha inválida.
         fechaNacimiento: fechaNacimiento || undefined,
-        pesoKg: pesoNum,
         conducta: conducta || undefined,
         chip: chip.trim() || undefined,
         observaciones: observaciones.trim() || undefined,
@@ -131,16 +126,7 @@ export function AltaMascota({
 
   const listo = nombre.trim().length > 0
 
-  return (
-    <Panel
-      title="Nueva mascota"
-      action={
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <PawPrint className="size-3.5" aria-hidden />
-          Se guarda en la base
-        </span>
-      }
-    >
+  const formulario = (
       <div className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Campo etiqueta="Nombre" valor={nombre} onChange={setNombre} placeholder="Ej: Firulais" />
@@ -188,13 +174,6 @@ export function AltaMascota({
             max={hoyLocal()}
             onChange={setFechaNacimiento}
             limpiable
-          />
-          <Campo
-            etiqueta="Peso (kg)"
-            valor={peso}
-            onChange={setPeso}
-            inputMode="decimal"
-            placeholder="Ej: 12.5"
           />
         </div>
 
@@ -294,6 +273,20 @@ export function AltaMascota({
           {guardando ? "Guardando…" : "Guardar mascota"}
         </button>
       </div>
+  )
+
+  if (sinPanel) return formulario
+  return (
+    <Panel
+      title="Nueva mascota"
+      action={
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <PawPrint className="size-3.5" aria-hidden />
+          Se guarda en la base
+        </span>
+      }
+    >
+      {formulario}
     </Panel>
   )
 }

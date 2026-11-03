@@ -58,11 +58,17 @@ public class MascotaController {
 		return ResponseEntity.ok(mascotaService.actualizar(id, request));
 	}
 
-	/** DELETE /api/v1/mascotas/{id} -> 204 */
+	/** DELETE /api/v1/mascotas/{id} -> 204: desactiva (no borra; el historial queda). */
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> eliminar(@PathVariable Long id) {
 		mascotaService.eliminar(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	/** PUT .../{id}/reactivar -> 200 con el registro activo de nuevo. */
+	@PutMapping("/{id}/reactivar")
+	public ResponseEntity<MascotaResponseDTO> reactivar(@PathVariable Long id) {
+		return ResponseEntity.ok(mascotaService.reactivar(id));
 	}
 
 	/** GET /api/v1/mascotas/{mascotaId}/tutores */

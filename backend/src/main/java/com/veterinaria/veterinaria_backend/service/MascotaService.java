@@ -24,8 +24,11 @@ public interface MascotaService {
 	/** Actualiza los datos de una mascota y sincroniza sus tutores. */
 	MascotaResponseDTO actualizar(Long id, MascotaRequestDTO request);
 
-	/** Elimina una mascota y sus vinculos. Lanza 404 si no existe. */
+	/** Da de baja a la mascota sin borrarla: queda inactiva y conserva su historial. */
 	void eliminar(Long id);
+
+	/** Vuelve a dar de alta a una mascota inactiva. */
+	MascotaResponseDTO reactivar(Long id);
 
 	/** Tutores vinculados a la mascota, cada uno con su flag de retiro. */
 	List<TutorResumenDTO> listarTutores(Long mascotaId);

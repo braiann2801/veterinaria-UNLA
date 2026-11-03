@@ -33,6 +33,14 @@ public interface ReservaGuarderiaRepository extends JpaRepository<ReservaGuarder
 			""")
 	List<ReservaGuarderia> findByFechaOrdenadasPorHorario(@Param("fecha") LocalDate fecha);
 
+	/** Estadias que ocupan al menos un dia de [desde, hasta], en orden de ingreso. Alimenta la agenda mensual. */
+	@Query("""
+			SELECT r FROM ReservaGuarderia r
+			WHERE r.fecha <= :hasta AND COALESCE(r.fechaSalida, r.fecha) >= :desde
+			ORDER BY r.fecha, r.horaEntrada, r.id
+			""")
+	List<ReservaGuarderia> findQueSePisanCon(@Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta);
+
 	/**
 	 * Estadias en esos estados que cubren el dia: las de un solo dia de esa fecha
 	 * y las de varias noches cuyo rango lo incluye.

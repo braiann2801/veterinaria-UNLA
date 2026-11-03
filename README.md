@@ -89,16 +89,22 @@ El frontend todavía no tiene test runner.
 ## Reglas de negocio
 
 - **Guardería:** hay un máximo de 10 perros por día. Las reservas por rango se validan día por día.
+  - La **Agenda guardería** tiene el mismo calendario mensual que la clínica. Cada mascota tiene su propio color, así una estadía de varios días se sigue a lo largo del mes.
+  - La **seña** es parte de pago: al reservar se registra como un pago "Seña" en la comanda y se descuenta del total. No puede superar el total de la estadía.
 - **Turnos clínicos:** cada turno dura 45 minutos de atención y le siguen 15 minutos de desinfección.
-  - La Agenda muestra el mes como calendario, con los turnos de cada día. Al elegir un día, sus turnos aparecen al costado (debajo en celular).
+  - La **Agenda clínica** muestra el mes como calendario, con los turnos de cada día. Al elegir un día, sus turnos aparecen al costado (debajo en celular).
   - Para un cliente que llega por primera vez, el modal "Agendar turno" tiene un botón "Cliente o mascota nuevos": permite cargar el cliente y su mascota en el mismo paso. Todo se guarda junto: si el horario choca con otro turno, no queda nada creado a medias.
 - **Ficha clínica sin dinero:**
-  - La consulta registra anamnesis, diagnóstico, tratamiento y conducta.
+  - La consulta registra anamnesis, diagnóstico, tratamiento, conducta y el **peso** del día (que pasa a ser el peso actual de la mascota). El alta de la mascota ya no pide el peso.
   - El cobro se genera como comanda para el mostrador.
-  - En la Agenda, cada turno pendiente tiene el botón **Atender**: abre la ficha ya vinculada al turno. Al finalizar, el turno queda como **Atendido**.
+  - La atención se registra solo desde la Agenda clínica: cada turno pendiente tiene el botón **Atender**, que abre la ficha ya vinculada al turno. Al finalizar, el turno queda como **Atendido**.
   - El profesional puede sumar **extras** (vacunas, urgencias, insumos) del catálogo que arma el Dueño en **Tarifas**. No ve precios: la comanda suma la consulta más los extras, y Caja muestra el detalle de cada línea.
   - Cambiar el precio de un extra rige para las atenciones nuevas; las comandas ya emitidas conservan su precio. Un extra no se borra, se desactiva.
 - **Tutores y mascotas:** la relación es N:M. Cada vínculo indica si ese tutor está autorizado a retirar a la mascota.
+- **Los registros no se borran:**
+  - Tutores, mascotas y profesionales se **desactivan**: sus fichas, turnos, cobros y deudas quedan guardados.
+  - Al desactivar un tutor, se desactivan también sus mascotas que no tengan otro tutor activo.
+  - Un registro desactivado no puede tomar turnos ni reservas nuevas. Se puede reactivar desde el Padrón o la lista de Profesionales, con el interruptor "Mostrar desactivados". Una mascota solo vuelve si tiene al menos un tutor activo.
 - **Deuda por mascota:**
   - Se puede retirar una mascota cuando sus propias comandas están saldadas.
   - Si un tutor tiene dos mascotas y paga la deuda de una, esa sale aunque la otra siga debiendo.

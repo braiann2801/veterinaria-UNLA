@@ -97,17 +97,17 @@ class ProfesionalAbmTest {
 	}
 
 	@Test
-	@DisplayName("Eliminar un profesional sin actividad lo borra (204)")
+	@DisplayName("Dar de baja un profesional sin actividad lo desactiva (204) y sigue en la lista")
 	void eliminarSinActividad() throws Exception {
 		long id = crear("Dario", "MP-ABM-5", "45000005");
 		mockMvc.perform(delete("/api/v1/profesionales/{id}", id)).andExpect(status().isNoContent());
 		mockMvc.perform(get("/api/v1/profesionales"))
-				.andExpect(jsonPath("$[?(@.id == " + id + ")]").isEmpty());
-		mockMvc.perform(delete("/api/v1/profesionales/{id}", id)).andExpect(status().isNotFound());
+				.andExpect(jsonPath("$[?(@.id == " + id + ")].activo").value(false));
+		mockMvc.perform(delete("/api/v1/profesionales/{id}", 99999999)).andExpect(status().isNotFound());
 	}
 
 	@Test
-	@DisplayName("Un profesional con turnos no se elimina: 409 con el motivo y sigue en la lista")
+	@DisplayName("Un profesional con turnos se desactiva y sigue en la lista")
 	void eliminarConTurnos() throws Exception {
 		long id = crear("Eva", "MP-ABM-6", "45000006");
 		long mascota = objectMapper.readTree(mockMvc.perform(post("/api/v1/mascotas").contentType(MediaType.APPLICATION_JSON)
@@ -119,9 +119,9 @@ class ProfesionalAbmTest {
 				.andExpect(status().isCreated());
 
 		mockMvc.perform(delete("/api/v1/profesionales/{id}", id))
-				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.mensaje", Matchers.containsString("turnos o consultas")));
+				.andExpect(status().isNoContent());
 		mockMvc.perform(get("/api/v1/profesionales"))
-				.andExpect(jsonPath("$[?(@.id == " + id + ")].nombre").value("Eva"));
+				.andExpect(jsonPath("$[?(@.id == " + id + ")].nombre").value("Eva"))
+				.andExpect(jsonPath("$[?(@.id == " + id + ")].activo").value(false));
 	}
 }

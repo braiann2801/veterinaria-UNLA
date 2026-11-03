@@ -6,6 +6,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 
 import jakarta.validation.constraints.NotBlank;
 import tools.jackson.databind.annotation.JsonDeserialize;
@@ -67,6 +68,9 @@ public record ConsultaMedicaRequestDTO(
 		 * animal agresivo y perder la advertencia en silencio.
 		 */
 		ConductaRequestDTO conductaObservada,
+		/** Peso medido en la atencion (opcional). Actualiza el peso actual de la mascota. */
+		@Positive(message = "El peso debe ser mayor a 0")
+		java.math.BigDecimal pesoKg,
 		/** Extras usados en la atencion (vacunas, urgencias). Sin precio: lo pone el catalogo. */
 		List<@Valid ExtraUsadoDTO> extras) {
 

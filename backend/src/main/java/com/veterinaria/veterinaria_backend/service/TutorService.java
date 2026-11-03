@@ -28,8 +28,11 @@ public interface TutorService {
 	/** Actualiza los datos de un tutor y sincroniza sus vinculos. */
 	TutorResponseDTO actualizar(Long id, TutorRequestDTO request);
 
-	/** Elimina un tutor y sus vinculos. Lanza 404 si no existe. */
+	/** Da de baja al tutor sin borrarlo: queda inactivo y conserva su historial. */
 	void eliminar(Long id);
+
+	/** Vuelve a dar de alta a un tutor inactivo. */
+	TutorResponseDTO reactivar(Long id);
 
 	/** Mascotas vinculadas al tutor, con el flag de retiro de ese tutor. */
 	List<MascotaResponseDTO> listarMascotas(Long tutorId);

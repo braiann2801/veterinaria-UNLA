@@ -8,7 +8,7 @@
  * pertenece a la tupla Tutor-Mascota y una misma mascota puede tener un tutor
  * que retira y un cotutor que no.
  *
- * <p>Incluye el ABM: editar y eliminar tutores y mascotas. La edición de la
+ * <p>Incluye el ABM: editar, desactivar y reactivar tutores y mascotas (no se borran). La edición de la
  * mascota manda sólo sus datos propios y reenvía los vínculos tal como estaban,
  * porque el backend sincroniza la lista completa del N:M: omitirla borraría
  * todos los tutores. El borrado de un tutor puede arrastrar a las mascotas que
@@ -17,7 +17,7 @@
  */
 
 import { useRef, useState } from "react"
-import { Link2, PawPrint, Pencil, ShieldCheck, ShieldOff, Trash2, UserPlus } from "lucide-react"
+import { Link2, PawPrint, Pencil, PowerOff, RotateCcw, ShieldCheck, ShieldOff, UserPlus } from "lucide-react"
 
 import { hoyLocal, mascotas as apiMascotas, tutores as apiTutores } from "@/lib/api"
 import type { ConductaMascota, EspecieMascota, Mascota, Tutor } from "@/lib/api"
@@ -27,6 +27,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
 import { Recurso, TOQUE_MINIMO, filtrarPorModo, formatearDni } from "@/lib/vista"
 import { Paginado } from "@/components/ui/paginado"
+import { ToggleInactivos } from "@/components/ui/toggle-inactivos"
 import { AltaMascota, CONDUCTAS, ESPECIES } from "@/components/modules/alta-mascota"
 
 /** Botón de acción de fila (editar/eliminar): cuadrado táctil de 44 px (regla 3.4). */
@@ -43,6 +44,8 @@ export function Padron() {
   const [editandoMascota, setEditandoMascota] = useState<Mascota | null>(null)
   const [eliminandoMascota, setEliminandoMascota] = useState<Mascota | null>(null)
   const [agregandoCotutor, setAgregandoCotutor] = useState<Mascota | null>(null)
+  const [verInactivos, setVerInactivos] = useState(false)
+  const [errorReactivar, setErrorReactivar] = useState<string | null>(null)
   const refAltaMascota = useRef<HTMLDivElement | null>(null)
 
   /**
@@ -59,8 +62,35 @@ export function Padron() {
     }
   }
 
+  /** Reactivar es reversible y no necesita confirmación; el 400 (mascota sin tutor activo) se muestra arriba. */
+  async function reactivar(accion: () => Promise<unknown>) {
+    setErrorReactivar(null)
+    try {
+      await accion()
+      await refrescar()
+    } catch (e) {
+      setErrorReactivar(e instanceof Error ? e.message : "No se pudo reactivar")
+    }
+  }
+
+  const tutoresInactivos = (tutores.datos ?? []).filter((t) => !t.activo).length
+  const mascotasInactivas = (mascotas.datos ?? []).filter((m) => !m.activo).length
+  const tutoresActivos = (tutores.datos ?? []).filter((t) => t.activo)
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <ToggleInactivos
+          valor={verInactivos}
+          onChange={setVerInactivos}
+          cantidad={tutoresInactivos + mascotasInactivas}
+        />
+      </div>
+      {errorReactivar && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+          {errorReactivar}
+        </p>
+      )}
       <Panel
         title="Tutores"
         action={
@@ -89,17 +119,22 @@ export function Padron() {
           textoCarga="Cargando tutores"
           textoVacio="Todavía no hay tutores cargados"
         >
-          {(lista) => (
-            <Paginado items={lista} clave="padron-tutores">
+          {(todos) => {
+            const lista = verInactivos ? todos : todos.filter((t) => t.activo)
+            return (
+            <Paginado items={lista} clave="padron-tutores" reiniciarCon={verInactivos ? 1 : 0}>
             {(pagina) => (
             <ul className="flex flex-col divide-y divide-border">
               {pagina.map((t) => (
-                <li key={t.id} className="flex items-center gap-2 py-2">
+                <li key={t.id} className={`flex items-center gap-2 py-2 ${t.activo ? "" : "opacity-60"}`}>
                   <button
                     onClick={() => setSeleccion(t)}
                     className="flex min-w-0 flex-1 flex-col gap-1 rounded-md py-1 text-left transition-colors hover:bg-muted/50"
                   >
-                    <span className="truncate text-sm font-medium">{t.nombreCompleto}</span>
+                    <span className="truncate text-sm font-medium">
+                      {t.nombreCompleto}
+                      {!t.activo && <EtiquetaInactivo />}
+                    </span>
                     <span className="truncate text-xs text-muted-foreground">
                       DNI {formatearDni(t.dni)}
                       {t.telefono ? ` · ${t.telefono}` : ""} · {t.mascotas.length} mascota
@@ -115,21 +150,33 @@ export function Padron() {
                     >
                       <Pencil className="size-4" aria-hidden />
                     </button>
-                    <button
-                      onClick={() => setEliminandoTutor(t)}
-                      aria-label={`Eliminar ${t.nombreCompleto}`}
-                      title="Eliminar tutor"
-                      className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                    </button>
+                    {t.activo ? (
+                      <button
+                        onClick={() => setEliminandoTutor(t)}
+                        aria-label={`Desactivar ${t.nombreCompleto}`}
+                        title="Desactivar tutor"
+                        className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
+                      >
+                        <PowerOff className="size-4" aria-hidden />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => reactivar(() => apiTutores.reactivar(t.id))}
+                        aria-label={`Reactivar ${t.nombreCompleto}`}
+                        title="Reactivar tutor"
+                        className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300`}
+                      >
+                        <RotateCcw className="size-4" aria-hidden />
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
             </ul>
             )}
             </Paginado>
-          )}
+            )
+          }}
         </Recurso>
       </Panel>
 
@@ -139,15 +186,20 @@ export function Padron() {
           textoCarga="Cargando mascotas"
           textoVacio="Todavía no hay mascotas cargadas"
         >
-          {(lista) => (
-            <Paginado items={lista} clave="padron-mascotas">
+          {(todas) => {
+            const lista = verInactivos ? todas : todas.filter((m) => m.activo)
+            return (
+            <Paginado items={lista} clave="padron-mascotas" reiniciarCon={verInactivos ? 1 : 0}>
             {(pagina) => (
             <ul className="flex flex-col divide-y divide-border">
               {pagina.map((m) => (
-                <li key={m.id} className="flex flex-col gap-2 py-3">
+                <li key={m.id} className={`flex flex-col gap-2 py-3 ${m.activo ? "" : "opacity-60"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{m.nombre}</p>
+                      <p className="truncate text-sm font-medium">
+                        {m.nombre}
+                        {!m.activo && <EtiquetaInactivo />}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {[m.especie, m.raza].filter(Boolean).join(" · ")}
                       </p>
@@ -166,14 +218,25 @@ export function Padron() {
                       >
                         <Pencil className="size-4" aria-hidden />
                       </button>
-                      <button
-                        onClick={() => setEliminandoMascota(m)}
-                        aria-label={`Eliminar ${m.nombre}`}
-                        title="Eliminar mascota"
-                        className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </button>
+                      {m.activo ? (
+                        <button
+                          onClick={() => setEliminandoMascota(m)}
+                          aria-label={`Desactivar ${m.nombre}`}
+                          title="Desactivar mascota"
+                          className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
+                        >
+                          <PowerOff className="size-4" aria-hidden />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => reactivar(() => apiMascotas.reactivar(m.id))}
+                          aria-label={`Reactivar ${m.nombre}`}
+                          title="Reactivar mascota"
+                          className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300`}
+                        >
+                          <RotateCcw className="size-4" aria-hidden />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <ul className="flex flex-wrap gap-1.5">
@@ -210,7 +273,8 @@ export function Padron() {
             </ul>
             )}
             </Paginado>
-          )}
+            )
+          }}
         </Recurso>
       </Panel>
 
@@ -218,7 +282,7 @@ export function Padron() {
           que si todavia no hay tutores el formulario ofrece guardarla sin vinculo
           en lugar de fallar. */}
       <div ref={refAltaMascota}>
-        <AltaMascota tutores={tutores.datos ?? []} onCreada={() => refrescar()} />
+        <AltaMascota tutores={tutoresActivos} onCreada={() => refrescar()} />
       </div>
 
       {seleccion && (
@@ -252,17 +316,16 @@ export function Padron() {
 
       {eliminandoTutor && (
         <ModalEliminar
-          titulo={`Eliminar a ${eliminandoTutor.nombreCompleto}`}
+          titulo={`Desactivar a ${eliminandoTutor.nombreCompleto}`}
           advertencia={
             <>
               <p>
-                ¿Seguro que querés eliminar a <strong>{eliminandoTutor.nombreCompleto}</strong> del
-                padrón?
+                ¿Desactivar a <strong>{eliminandoTutor.nombreCompleto}</strong>?
               </p>
               <p className="text-muted-foreground">
-                Si alguna de sus mascotas queda sin ningún otro tutor, también se elimina. Si esa
-                mascota tiene historial clínico o contable, el sistema bloquea el borrado. Esta
-                acción no se puede deshacer.
+                No se borra nada: sus fichas, cobros y deudas quedan registrados. Las mascotas que no
+                tengan otro tutor activo también se desactivan. Se puede reactivar desde acá,
+                activando "Mostrar desactivados".
               </p>
             </>
           }
@@ -289,7 +352,7 @@ export function Padron() {
       {agregandoCotutor && (
         <ModalAgregarCotutor
           mascota={agregandoCotutor}
-          tutores={tutores.datos ?? []}
+          tutores={tutoresActivos}
           onCerrar={() => setAgregandoCotutor(null)}
           onVinculado={async () => {
             setAgregandoCotutor(null)
@@ -300,15 +363,15 @@ export function Padron() {
 
       {eliminandoMascota && (
         <ModalEliminar
-          titulo={`Eliminar a ${eliminandoMascota.nombre}`}
+          titulo={`Desactivar a ${eliminandoMascota.nombre}`}
           advertencia={
             <>
               <p>
-                ¿Seguro que querés eliminar a <strong>{eliminandoMascota.nombre}</strong> del padrón?
+                ¿Desactivar a <strong>{eliminandoMascota.nombre}</strong>?
               </p>
               <p className="text-muted-foreground">
-                Se borran también sus vínculos con los tutores. Si la mascota tiene historial clínico
-                o contable, el sistema no permitirá eliminarla. Esta acción no se puede deshacer.
+                No se borra nada: su historial clínico, sus turnos y sus cobros quedan registrados. No
+                va a poder tomar turnos ni reservas nuevas hasta que se la reactive.
               </p>
             </>
           }
@@ -541,7 +604,6 @@ function ModalEditarMascota({
     mascota.sexo === "Macho" || mascota.sexo === "Hembra" ? mascota.sexo : "",
   )
   const [fechaNacimiento, setFechaNacimiento] = useState(mascota.fechaNacimiento ?? "")
-  const [peso, setPeso] = useState(mascota.pesoKg != null ? String(mascota.pesoKg) : "")
   const [conducta, setConducta] = useState<"" | ConductaMascota>(mascota.conducta ?? "")
   const [chip, setChip] = useState(mascota.chip ?? "")
   const [observaciones, setObservaciones] = useState(mascota.observaciones ?? "")
@@ -549,11 +611,6 @@ function ModalEditarMascota({
   const [guardando, setGuardando] = useState(false)
 
   async function guardar() {
-    const pesoNum = peso.trim() === "" ? undefined : Number(peso)
-    if (pesoNum !== undefined && (Number.isNaN(pesoNum) || pesoNum <= 0)) {
-      setError("El peso tiene que ser un número mayor a 0.")
-      return
-    }
     setGuardando(true)
     setError(null)
     try {
@@ -563,7 +620,6 @@ function ModalEditarMascota({
         raza: raza.trim() || undefined,
         sexo: sexo || undefined,
         fechaNacimiento: fechaNacimiento || undefined,
-        pesoKg: pesoNum,
         conducta: conducta || undefined,
         chip: chip.trim() || undefined,
         observaciones: observaciones.trim() || undefined,
@@ -625,13 +681,6 @@ function ModalEditarMascota({
             onChange={setFechaNacimiento}
             limpiable
           />
-          <Campo
-            etiqueta="Peso (kg)"
-            valor={peso}
-            onChange={setPeso}
-            inputMode="decimal"
-            placeholder="Ej: 12.5"
-          />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -684,7 +733,7 @@ function ModalEditarMascota({
   )
 }
 
-/** Confirmación de borrado. Muestra el 409 del backend si la regla lo bloquea. */
+/** Confirmación de baja (desactivación). Muestra el error del backend si algo falla. */
 function ModalEliminar({
   titulo,
   advertencia,
@@ -705,7 +754,7 @@ function ModalEliminar({
     try {
       await onConfirmar()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar")
+      setError(e instanceof Error ? e.message : "No se pudo desactivar")
     } finally {
       setBorrando(false)
     }
@@ -736,7 +785,7 @@ function ModalEliminar({
             disabled={borrando}
             className={`rounded-md border border-destructive/40 bg-destructive/10 px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-60 ${TOQUE_MINIMO}`}
           >
-            {borrando ? "Eliminando…" : "Eliminar"}
+            {borrando ? "Desactivando…" : "Desactivar"}
           </button>
         </div>
       </div>
@@ -877,7 +926,7 @@ function ModalAltaTutor({
           >
             <option value="">Elegí una mascota…</option>
             {(mascotas.datos ?? [])
-              .filter((m) => !tutor.mascotas.some((v) => v.id === m.id))
+              .filter((m) => m.activo && !tutor.mascotas.some((v) => v.id === m.id))
               .map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.nombre}
@@ -1054,5 +1103,13 @@ function Campo({
         className={TOQUE_MINIMO}
       />
     </label>
+  )
+}
+
+function EtiquetaInactivo() {
+  return (
+    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground">
+      Desactivado
+    </span>
   )
 }

@@ -23,6 +23,7 @@ import { roleLabels } from "@/lib/store"
 import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Field, Panel, Select, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
+import { ConfirmarModal, type Confirmacion } from "@/components/ui/confirmar"
 import { Recurso, TOQUE_MINIMO } from "@/lib/vista"
 import { Paginado } from "@/components/ui/paginado"
 import { cn } from "@/lib/utils"
@@ -46,10 +47,41 @@ export function Usuarios() {
   const [clave, setClave] = useState<UsuarioConClaveTemporal | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<number | null>(null)
+  const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null)
+
+  function pedirAlternarActivo(u: UsuarioSesion) {
+    const accion = u.activo ? "desactivar" : "reactivar"
+    setConfirmacion({
+      titulo: u.activo ? "Desactivar cuenta" : "Reactivar cuenta",
+      mensaje: `¿Seguro que querés ${accion} la cuenta de ${u.nombreCompleto}?`,
+      textoConfirmar: u.activo ? "Desactivar" : "Reactivar",
+      peligrosa: u.activo,
+      alConfirmar: () => alternarActivo(u),
+    })
+  }
+
+  function pedirReseteo(u: UsuarioSesion) {
+    setConfirmacion({
+      titulo: "Resetear contraseña",
+      mensaje: `Se va a generar una contraseña temporal para ${u.nombreCompleto} y se cerrará su sesión.`,
+      textoConfirmar: "Resetear contraseña",
+      peligrosa: true,
+      alConfirmar: () => resetear(u),
+    })
+  }
+
+  function pedirEliminacion(u: UsuarioSesion) {
+    setConfirmacion({
+      titulo: "Eliminar cuenta",
+      mensaje: `¿Eliminar definitivamente la cuenta de ${u.nombreCompleto} (${u.username})? No se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      peligrosa: true,
+      alConfirmar: () => eliminar(u),
+    })
+  }
 
   async function alternarActivo(u: UsuarioSesion) {
     const accion = u.activo ? "desactivar" : "reactivar"
-    if (!window.confirm(`¿Seguro que querés ${accion} la cuenta de ${u.nombreCompleto}?`)) return
     setOcupado(u.id)
     setError(null)
     try {
@@ -63,7 +95,6 @@ export function Usuarios() {
   }
 
   async function resetear(u: UsuarioSesion) {
-    if (!window.confirm(`Se va a generar una contraseña temporal para ${u.nombreCompleto} y se cerrará su sesión. ¿Continuar?`)) return
     setOcupado(u.id)
     setError(null)
     try {
@@ -82,7 +113,6 @@ export function Usuarios() {
   }
 
   async function eliminar(u: UsuarioSesion) {
-    if (!window.confirm(`¿Eliminar definitivamente la cuenta de ${u.nombreCompleto} (${u.username})? No se puede deshacer.`)) return
     setOcupado(u.id)
     setError(null)
     try {
@@ -153,13 +183,13 @@ export function Usuarios() {
                     {/* Resetear la propia cuenta cerraría esta sesión antes de poder leer la
                         clave temporal: para el Dueño logueado no se ofrece. */}
                     {!soyYo && (
-                      <button className={BOTON_FILA} onClick={() => resetear(u)} disabled={ocupado === u.id}>
+                      <button className={BOTON_FILA} onClick={() => pedirReseteo(u)} disabled={ocupado === u.id}>
                         <KeyRound className="size-3.5" aria-hidden />
                         Resetear clave
                       </button>
                     )}
                     {!soyYo && (
-                      <button className={BOTON_FILA} onClick={() => alternarActivo(u)} disabled={ocupado === u.id}>
+                      <button className={BOTON_FILA} onClick={() => pedirAlternarActivo(u)} disabled={ocupado === u.id}>
                         <Power className="size-3.5" aria-hidden />
                         {u.activo ? "Desactivar" : "Reactivar"}
                       </button>
@@ -167,7 +197,7 @@ export function Usuarios() {
                     {!soyYo && (
                       <button
                         className={cn(BOTON_FILA, "border-destructive/40 text-destructive hover:bg-destructive/10")}
-                        onClick={() => eliminar(u)}
+                        onClick={() => pedirEliminacion(u)}
                         disabled={ocupado === u.id}
                       >
                         <Trash2 className="size-3.5" aria-hidden />
@@ -205,6 +235,7 @@ export function Usuarios() {
         />
       )}
       {clave && <ModalClaveTemporal datos={clave} onCerrar={() => setClave(null)} />}
+      <ConfirmarModal confirmacion={confirmacion} onCerrar={() => setConfirmacion(null)} />
     </Panel>
   )
 }

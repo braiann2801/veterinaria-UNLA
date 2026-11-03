@@ -20,5 +20,6 @@ public record MascotaResponseDTO(
 		String conducta,
 		String chip,
 		String observaciones,
-		List<TutorResumenDTO> tutores) {
+		List<TutorResumenDTO> tutores,
+		boolean activo) {
 }

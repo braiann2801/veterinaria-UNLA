@@ -21,10 +21,10 @@ import { CambiarPassword } from "@/components/cambiar-password"
 import { Sidebar, TABS, type TabId } from "@/components/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Agenda } from "@/components/modules/agenda"
+import { AgendaGuarderia } from "@/components/modules/agenda-guarderia"
 import { Balance } from "@/components/modules/balance"
 import { Caja } from "@/components/modules/caja"
 import { Egreso } from "@/components/modules/egreso"
-import { FichaMedica } from "@/components/modules/ficha"
 import { Fichas } from "@/components/modules/fichas"
 import { Mostrador } from "@/components/modules/mostrador"
 import { Padron } from "@/components/modules/padron"
@@ -70,8 +70,8 @@ function Shell({ role }: { role: Role }) {
               </div>
             )}
             {active === "agenda" && <Agenda />}
+            {active === "guarderia" && <AgendaGuarderia />}
             {active === "padron" && <Padron />}
-            {active === "consultas" && <FichaMedica />}
             {active === "cobros" && <Caja />}
             {active === "egreso" && <Egreso />}
             {active === "fichas" && (

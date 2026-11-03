@@ -17,8 +17,8 @@ import { consultas as apiConsultas, type ConductaObservada, type TurnoClinico } 
 import { Button } from "@/components/ui/button"
 import { Field, Select, TextArea, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
-import { TOQUE_MINIMO } from "@/lib/vista"
-import { CONDUCTAS, CONDUCTAS_CON_ALERTA } from "@/components/modules/ficha"
+import { TOQUE_MINIMO, soloDecimal } from "@/lib/vista"
+import { CONDUCTAS, CONDUCTAS_CON_ALERTA } from "@/components/modules/ficha/conductas"
 import { SelectorExtras, type ExtraElegido } from "@/components/modules/ficha/selector-extras"
 
 export function AtenderTurnoModal({
@@ -33,6 +33,7 @@ export function AtenderTurnoModal({
   const [anamnesis, setAnamnesis] = useState("")
   const [diagnostico, setDiagnostico] = useState("")
   const [tratamiento, setTratamiento] = useState("")
+  const [peso, setPeso] = useState("")
   const [conducta, setConducta] = useState<ConductaObservada>("TRANQUILO")
   const [extras, setExtras] = useState<ExtraElegido[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +53,7 @@ export function AtenderTurnoModal({
         diagnostico: diagnostico.trim() || undefined,
         tratamiento: tratamiento.trim() || undefined,
         conductaObservada: conducta,
+        pesoKg: peso.trim() === "" ? undefined : Number(peso),
         extras,
       })
     } catch (e) {
@@ -81,6 +83,15 @@ export function AtenderTurnoModal({
 
         <Field label="Anamnesis">
           <TextArea value={anamnesis} onChange={(e) => setAnamnesis(e.target.value)} rows={3} maxLength={2000} />
+        </Field>
+        <Field label="Peso (kg)">
+          <TextInput
+            value={peso}
+            onChange={(e) => setPeso(soloDecimal(e.target.value))}
+            inputMode="decimal"
+            placeholder="Ej: 12.5"
+            className={TOQUE_MINIMO}
+          />
         </Field>
         <Field label="Diagnóstico (opcional)">
           <TextInput
@@ -132,7 +143,7 @@ export function AtenderTurnoModal({
           </Button>
           <Button
             onClick={guardar}
-            disabled={guardando || anamnesis.trim() === ""}
+            disabled={guardando || anamnesis.trim() === "" || (peso !== "" && !(Number(peso) > 0))}
             type="button"
             className={TOQUE_MINIMO}
           >

@@ -6,7 +6,7 @@
  * <p>Guardería: precio por hora (estadías que entran y salen el mismo día) y por
  * noche (si pasa al menos una). Con esos dos valores se calcula el monto de cada
  * reserva y su comanda. Consulta clínica: el precio de la comanda que emite la
- * Ficha médica. Extras: el catálogo de vacunas, urgencias e insumos que el
+ * atención desde la Agenda. Extras: el catálogo de vacunas, urgencias e insumos que el
  * profesional suma a la atención.</p>
  *
  * <p>Un cambio rige para lo que se emita desde ahora: las comandas ya emitidas
@@ -170,7 +170,7 @@ function TarifaConsulta() {
         {() => (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              Monto de la comanda que se emite al guardar una ficha en Ficha médica.
+              Monto de la comanda que se emite al finalizar una atención desde la Agenda.
             </p>
             <Field label="Precio de la consulta">
               <TextInput inputMode="decimal" value={consulta} onChange={(e) => setConsulta(soloDecimal(e.target.value))} className={TOQUE_MINIMO} />

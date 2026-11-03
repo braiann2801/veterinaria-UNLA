@@ -42,12 +42,17 @@ public class ReservaGuarderiaController {
 	}
 
 	/**
-	 * GET /api/v1/guarderia?fecha=2026-10-01
-	 * Devuelve reservas de esa fecha y el aforo ocupado en cada item.
+	 * GET /api/v1/guarderia?fecha=2026-10-01: reservas de esa fecha y el aforo ocupado en cada item.
+	 * GET /api/v1/guarderia?desde=2026-10-01&hasta=2026-10-31: estadias del rango (agenda mensual).
 	 */
 	@GetMapping
 	public ResponseEntity<List<ReservaGuarderiaResponseDTO>> listarPorFecha(
-			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+		if (desde != null || hasta != null) {
+			return ResponseEntity.ok(guarderiaService.listarEntre(desde, hasta));
+		}
 		return ResponseEntity.ok(guarderiaService.listarPorFecha(fecha));
 	}
 

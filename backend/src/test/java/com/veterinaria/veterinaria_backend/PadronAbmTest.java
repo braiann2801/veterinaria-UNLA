@@ -47,8 +47,11 @@ class PadronAbmTest {
 	@Autowired
 	private ObjectMapper objectMapper;
 
+	// Los registros no se borran: DELETE desactiva y conserva vinculos e historial
+	// (S8 de odd/tasks/correcciones-flujo-registros.md).
+
 	@Test
-	@DisplayName("Borrar un tutor deja viva a la mascota que tiene otro tutor")
+	@DisplayName("Dar de baja a un tutor deja activa a la mascota que tiene otro tutor activo")
 	void borrarTutorConMascotaCompartidaMantieneLaMascota() throws Exception {
 		long tutorA = crearTutor("51000001");
 		long tutorB = crearTutor("51000002");
@@ -60,15 +63,17 @@ class PadronAbmTest {
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorA))
 				.andExpect(status().isNoContent());
 
-		// La mascota sigue viva porque le queda el tutor B.
+		// El vinculo con el tutor dado de baja queda como registro historico.
 		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.tutores", Matchers.hasSize(1)))
-				.andExpect(jsonPath("$.tutores[0].id").value((int) tutorB));
+				.andExpect(jsonPath("$.activo").value(true))
+				.andExpect(jsonPath("$.tutores", Matchers.hasSize(2)));
+		mockMvc.perform(get("/api/v1/tutores/{id}", tutorA))
+				.andExpect(jsonPath("$.activo").value(false));
 	}
 
 	@Test
-	@DisplayName("Borrar al unico tutor de una mascota sin historial la elimina tambien")
+	@DisplayName("Dar de baja al unico tutor desactiva tambien a la mascota, sin borrarla")
 	void borrarUnicoTutorEliminaLaMascotaHuerfana() throws Exception {
 		long tutorId = crearTutor("51000003");
 		long mascotaId = crearMascota("Huerfana");
@@ -78,11 +83,12 @@ class PadronAbmTest {
 				.andExpect(status().isNoContent());
 
 		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.activo").value(false));
 	}
 
 	@Test
-	@DisplayName("Una mascota huerfana con historial bloquea el borrado del tutor con 409")
+	@DisplayName("Una mascota huerfana con historial ya no bloquea la baja del tutor: se desactivan los dos")
 	void mascotaHuerfanaConHistorialBloqueaElBorradoDelTutor() throws Exception {
 		long tutorId = crearTutor("51000004");
 		long mascotaId = crearMascota("ConHistorial");
@@ -90,17 +96,14 @@ class PadronAbmTest {
 		crearTurno(mascotaId);
 
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorId))
-				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.status").value(409))
-				.andExpect(jsonPath("$.mensaje", Matchers.containsString("quedaria sin tutor")));
+				.andExpect(status().isNoContent());
 
-		// Atomicidad: ni el tutor ni la mascota se borraron.
-		mockMvc.perform(get("/api/v1/tutores/{id}", tutorId)).andExpect(status().isOk());
-		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId)).andExpect(status().isOk());
+		mockMvc.perform(get("/api/v1/tutores/{id}", tutorId)).andExpect(jsonPath("$.activo").value(false));
+		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId)).andExpect(jsonPath("$.activo").value(false));
 	}
 
 	@Test
-	@DisplayName("Una mascota sin historial se elimina con 204")
+	@DisplayName("Una mascota sin historial se desactiva con 204 y sigue consultable")
 	void mascotaSinHistorialSeElimina() throws Exception {
 		long mascotaId = crearMascota("SinHistorial");
 
@@ -108,33 +111,38 @@ class PadronAbmTest {
 				.andExpect(status().isNoContent());
 
 		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.activo").value(false));
 	}
 
 	@Test
-	@DisplayName("Una mascota con turno no se elimina (409)")
+	@DisplayName("Una mascota con turno se desactiva y el turno queda registrado")
 	void mascotaConHistorialNoSeElimina() throws Exception {
 		long mascotaId = crearMascota("ConTurno");
 		crearTurno(mascotaId);
 
 		mockMvc.perform(delete("/api/v1/mascotas/{id}", mascotaId))
-				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.mensaje", Matchers.containsString("historial clinico o contable")));
+				.andExpect(status().isNoContent());
 
-		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId)).andExpect(status().isOk());
+		mockMvc.perform(get("/api/v1/mascotas/{id}", mascotaId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.activo").value(false));
 	}
 
 	@Test
-	@DisplayName("Un tutor con comandas no se elimina (409)")
+	@DisplayName("Un tutor con comandas se desactiva y su deuda sigue registrada")
 	void tutorConComandaNoSeElimina() throws Exception {
 		long tutorId = crearTutor("51000005");
 		emitirComanda(tutorId);
 
 		mockMvc.perform(delete("/api/v1/tutores/{id}", tutorId))
-				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.mensaje", Matchers.containsString("movimientos contables")));
+				.andExpect(status().isNoContent());
 
-		mockMvc.perform(get("/api/v1/tutores/{id}", tutorId)).andExpect(status().isOk());
+		mockMvc.perform(get("/api/v1/tutores/{id}", tutorId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.activo").value(false));
+		mockMvc.perform(get("/api/v1/tutores/{id}/deuda", tutorId))
+				.andExpect(jsonPath("$.tieneDeuda").value(true));
 	}
 
 	// ------------------------------------------------------------- helpers
