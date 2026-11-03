@@ -207,6 +207,14 @@ export function Agenda() {
         </div>
       </Panel>
 
+      {turnoAbierto && (
+        <AgendarTurnoModal
+          fechaPorDefecto={fecha}
+          onCerrar={() => setTurnoAbierto(false)}
+          onGuardado={refrescar}
+        />
+      )}
+
       {atendiendo && (
         <AtenderTurnoModal
           turno={atendiendo}
