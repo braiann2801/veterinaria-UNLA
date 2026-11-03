@@ -52,7 +52,7 @@ Necesitás Docker con Compose.
    - Cada cuenta nueva recibe una clave temporal que se muestra una sola vez.
    - Desactivar una cuenta, resetear su clave o cambiarle el rol cierra al instante las sesiones abiertas de esa persona.
 
-**Límite de intentos:** tras 5 contraseñas incorrectas para el mismo usuario desde la misma IP, el login queda bloqueado 15 minutos para ese par (responde 429, aun con la clave correcta). Un ingreso exitoso reinicia el contador. Se ajusta con `LOGIN_INTENTOS_MAXIMOS` y `LOGIN_BLOQUEO_MINUTOS`. El bloqueo vive en memoria: reiniciar el backend lo limpia.
+**Límite de intentos:** tras 5 contraseñas incorrectas para el mismo usuario desde la misma IP, el login queda bloqueado 15 minutos para ese par (responde 429, aun con la clave correcta). Un ingreso exitoso reinicia el contador. Se ajusta con `LOGIN_INTENTOS_MAXIMOS` y `LOGIN_BLOQUEO_MINUTOS`. El bloqueo vive en memoria: reiniciar el backend lo limpia. Detrás de un proxy o balanceador, todos los pedidos llegan con la IP del proxy: en ese caso hay que configurar Spring para que lea la IP real del cliente (`server.forward-headers-strategy=native`), y solo si el proxy es de confianza, porque esa cabecera se puede falsificar.
 
 Balance, Usuarios, cierre de caja y tarifas son solo para el Dueño, y el backend responde 403 al resto. La matriz de permisos vive en `backend/src/main/java/com/veterinaria/veterinaria_backend/security/SecurityConfig.java`.
 

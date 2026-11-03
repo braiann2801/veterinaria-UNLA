@@ -5,7 +5,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -18,22 +21,30 @@ import com.veterinaria.veterinaria_backend.exception.DemasiadosIntentosException
  * dejaria que cualquiera deje sin acceso a un empleado desde otra IP, y uno solo
  * por IP bloquearia a todo un local detras de la misma conexion.</p>
  *
- * <p>Los fallos se cuentan en una ventana que arranca en el primer fallo. Al
- * llegar al maximo, el par queda bloqueado durante la ventana: mientras dura no
- * se verifica la contrasena, asi que ni la correcta pasa. Un login exitoso borra
- * el contador. El estado vive en memoria: un reinicio lo limpia y, con varias
- * instancias, cada una cuenta por separado.</p>
+ * <p>Cada intento se reserva antes de verificar la contrasena, en una sola
+ * operacion atomica: asi, aunque lleguen muchos pedidos a la vez, nunca pasan
+ * mas intentos que el maximo. Si la contrasena es correcta, el contador se
+ * borra; si es incorrecta y se llego al maximo, el par queda bloqueado durante
+ * la ventana, y mientras dura no se verifica la contrasena (ni la correcta pasa).</p>
+ *
+ * <p>El estado vive en memoria: un reinicio lo limpia y, con varias instancias,
+ * cada una cuenta por separado.</p>
  */
 @Component
 public class LimitadorIntentosLogin {
 
-	/** Por encima de este tamaño se purgan las entradas vencidas, para que el mapa no crezca sin limite. */
+	private static final Logger log = LoggerFactory.getLogger(LimitadorIntentosLogin.class);
+
+	/** Por encima de este tamaño se purgan las entradas vencidas. */
 	private static final int UMBRAL_PURGA = 10_000;
+	/** La purga recorre todo el mapa: como mucho una vez por minuto, para que no se repita en cada pedido. */
+	private static final Duration INTERVALO_PURGA = Duration.ofMinutes(1);
 
 	private final Clock reloj;
 	private final int intentosMaximos;
 	private final Duration ventana;
 	private final Map<String, Estado> estados = new ConcurrentHashMap<>();
+	private final AtomicReference<Instant> ultimaPurga = new AtomicReference<>(Instant.EPOCH);
 
 	public LimitadorIntentosLogin(Clock reloj,
 			@Value("${veterinaria.auth.login-intentos-maximos:5}") int intentosMaximos,
@@ -51,29 +62,40 @@ public class LimitadorIntentosLogin {
 		return usernameNormalizado + "|" + ip;
 	}
 
-	/** 429 si el par esta bloqueado. Se llama antes de verificar la contrasena. */
+	/**
+	 * Reserva un intento para el par, o responde 429 si esta bloqueado o ya uso
+	 * todos sus intentos de la ventana. Se llama antes de verificar la contrasena.
+	 */
 	public void verificar(String clave) {
-		Estado estado = estados.get(clave);
 		Instant ahora = reloj.instant();
-		if (estado != null && estado.bloqueadoHasta() != null && ahora.isBefore(estado.bloqueadoHasta())) {
-			long segundos = Duration.between(ahora, estado.bloqueadoHasta()).toSeconds();
-			throw new DemasiadosIntentosException(Math.max(1, segundos));
+		boolean[] reservado = { false };
+		// compute es atomico por clave: dos pedidos simultaneos no pueden reservar el mismo cupo.
+		Estado estado = estados.compute(clave, (k, previo) -> {
+			Estado base = previo == null || vencido(previo, ahora) ? new Estado(0, ahora, null) : previo;
+			if (base.bloqueadoHasta() != null || base.intentos() >= intentosMaximos) {
+				return base;
+			}
+			reservado[0] = true;
+			return new Estado(base.intentos() + 1, base.primerIntento(), null);
+		});
+		if (!reservado[0]) {
+			Instant fin = estado.bloqueadoHasta() != null ? estado.bloqueadoHasta() : estado.primerIntento().plus(ventana);
+			throw new DemasiadosIntentosException(Math.max(1, Duration.between(ahora, fin).toSeconds()));
 		}
 	}
 
-	/** Suma un fallo; al llegar al maximo, bloquea el par durante la ventana. */
+	/** El intento reservado fallo: si fue el ultimo permitido, bloquea el par durante la ventana. */
 	public void registrarFallo(String clave) {
 		Instant ahora = reloj.instant();
-		// compute es atomico por clave: dos fallos simultaneos no se pisan el conteo.
-		estados.compute(clave, (k, previo) -> {
-			Estado base = previo == null || vencido(previo, ahora) ? new Estado(0, ahora, null) : previo;
-			int fallos = base.fallos() + 1;
-			Instant bloqueo = fallos >= intentosMaximos ? ahora.plus(ventana) : null;
-			return new Estado(fallos, base.primerFallo(), bloqueo);
-		});
-		if (estados.size() > UMBRAL_PURGA) {
-			estados.entrySet().removeIf(e -> vencido(e.getValue(), ahora));
+		Estado estado = estados.computeIfPresent(clave, (k, actual) ->
+				actual.bloqueadoHasta() == null && actual.intentos() >= intentosMaximos
+						? new Estado(actual.intentos(), actual.primerIntento(), ahora.plus(ventana))
+						: actual);
+		if (estado != null && ahora.plus(ventana).equals(estado.bloqueadoHasta())) {
+			// Sin la contrasena ni datos personales: el usuario y la IP alcanzan para investigar.
+			log.warn("Login bloqueado {} min por {} intentos fallidos: {}", ventana.toMinutes(), intentosMaximos, clave);
 		}
+		purgarSiHaceFalta(ahora);
 	}
 
 	/** Un login exitoso resetea el contador del par. */
@@ -81,14 +103,25 @@ public class LimitadorIntentosLogin {
 		estados.remove(clave);
 	}
 
-	/** Bloqueo cumplido, o ventana de conteo cerrada sin llegar al maximo. */
+	private void purgarSiHaceFalta(Instant ahora) {
+		Instant previa = ultimaPurga.get();
+		if (estados.size() <= UMBRAL_PURGA || ahora.isBefore(previa.plus(INTERVALO_PURGA))) {
+			return;
+		}
+		// Solo el hilo que gana el compareAndSet recorre el mapa.
+		if (ultimaPurga.compareAndSet(previa, ahora)) {
+			estados.entrySet().removeIf(e -> vencido(e.getValue(), ahora));
+		}
+	}
+
+	/** Bloqueo cumplido, o ventana de conteo cerrada sin bloqueo. */
 	private boolean vencido(Estado estado, Instant ahora) {
 		if (estado.bloqueadoHasta() != null) {
 			return !ahora.isBefore(estado.bloqueadoHasta());
 		}
-		return !ahora.isBefore(estado.primerFallo().plus(ventana));
+		return !ahora.isBefore(estado.primerIntento().plus(ventana));
 	}
 
-	private record Estado(int fallos, Instant primerFallo, Instant bloqueadoHasta) {
+	private record Estado(int intentos, Instant primerIntento, Instant bloqueadoHasta) {
 	}
 }
