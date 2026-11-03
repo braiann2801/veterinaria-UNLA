@@ -5,6 +5,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,6 +21,7 @@ import com.veterinaria.veterinaria_backend.exception.ApiErrorResponse;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.CredencialesInvalidasException;
+import com.veterinaria.veterinaria_backend.exception.DemasiadosIntentosException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,6 +50,16 @@ public class GlobalExceptionHandler {
 			HttpServletRequest request) {
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 				.body(ApiErrorResponse.of(HttpStatus.UNAUTHORIZED.value(), "Unauthorized",
+						ex.getMessage(), request.getRequestURI()));
+	}
+
+	/** 429: demasiados intentos de login fallidos. Retry-After dice cuantos segundos esperar. */
+	@ExceptionHandler(DemasiadosIntentosException.class)
+	public ResponseEntity<ApiErrorResponse> handleDemasiadosIntentos(DemasiadosIntentosException ex,
+			HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getSegundosRestantes()))
+				.body(ApiErrorResponse.of(HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many Requests",
 						ex.getMessage(), request.getRequestURI()));
 	}
 

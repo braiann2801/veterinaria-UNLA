@@ -14,6 +14,7 @@ import com.veterinaria.veterinaria_backend.dto.UsuarioResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.Usuario;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.CredencialesInvalidasException;
+import com.veterinaria.veterinaria_backend.security.LimitadorIntentosLogin;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
 import com.veterinaria.veterinaria_backend.repository.UsuarioRepository;
@@ -28,6 +29,7 @@ public class AuthServiceImpl implements AuthService {
 	private final PasswordEncoder passwordEncoder;
 	private final TokenService tokenService;
 	private final EntityMapper mapper;
+	private final LimitadorIntentosLogin limitador;
 	/**
 	 * Hash contra el que se compara cuando el usuario no existe: el login tarda
 	 * lo mismo exista o no la cuenta, y el tiempo de respuesta no la delata.
@@ -35,7 +37,8 @@ public class AuthServiceImpl implements AuthService {
 	private final String hashSenuelo;
 
 	public AuthServiceImpl(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder,
-			TokenService tokenService, EntityMapper mapper) {
+			TokenService tokenService, EntityMapper mapper, LimitadorIntentosLogin limitador) {
+		this.limitador = limitador;
 		this.usuarioRepository = usuarioRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.tokenService = tokenService;
@@ -49,13 +52,20 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	@Override
-	public LoginResponseDTO login(LoginRequestDTO request) {
-		Usuario usuario = usuarioRepository.findByUsername(normalizarUsername(request.username())).orElse(null);
+	public LoginResponseDTO login(LoginRequestDTO request, String ip) {
+		String username = normalizarUsername(request.username());
+		// El limite va por el usuario pedido, exista o no: asi el 429 no revela que cuentas existen.
+		String clave = LimitadorIntentosLogin.clave(username, ip);
+		limitador.verificar(clave);
+
+		Usuario usuario = usuarioRepository.findByUsername(username).orElse(null);
 		boolean claveOk = passwordEncoder.matches(request.password(),
 				usuario != null ? usuario.getPasswordHash() : hashSenuelo);
 		if (usuario == null || !claveOk || !usuario.isActivo()) {
+			limitador.registrarFallo(clave);
 			throw new CredencialesInvalidasException();
 		}
+		limitador.registrarExito(clave);
 		return tokenService.emitir(usuario);
 	}
 
