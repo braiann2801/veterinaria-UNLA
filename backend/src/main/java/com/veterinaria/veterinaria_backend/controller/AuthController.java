@@ -15,6 +15,7 @@ import com.veterinaria.veterinaria_backend.dto.LoginResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.UsuarioResponseDTO;
 import com.veterinaria.veterinaria_backend.service.AuthService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 /**
@@ -36,8 +37,10 @@ public class AuthController {
 
 	/** POST /api/v1/auth/login */
 	@PostMapping("/login")
-	public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequestDTO request) {
-		return ResponseEntity.ok(authService.login(request));
+	public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequestDTO request,
+			HttpServletRequest http) {
+		// getRemoteAddr y no X-Forwarded-For: ese header lo escribe el cliente y se puede falsificar.
+		return ResponseEntity.ok(authService.login(request, http.getRemoteAddr()));
 	}
 
 	/** GET /api/v1/auth/me */

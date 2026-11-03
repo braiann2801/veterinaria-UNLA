@@ -6,18 +6,17 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** rama `fix/correcciones-flujo-registros` (detalle en
-  `odd/tasks/correcciones-flujo-registros.md`): seña como pago, desactivar en
-  lugar de borrar, agenda de guardería propia, peso en la atención, Cargar
-  mascota en Mostrador, sin pestaña Ficha médica y confirmaciones en modal.
-  Implementada y verificada; pendiente de push/PR.
+- **Fase en curso:** rama `feat/login-throttling` (detalle en
+  `odd/tasks/login-throttling.md`): límite de intentos fallidos de login por
+  usuario+IP (5 en 15 min → 429). Implementada y verificada; pendiente de
+  push/PR.
 - **Base Git:** `main` en `e2edc3b` (merge del PR #2, deuda por mascota y
   normalización).
 - **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 287 tests de Spring Boot en verde
+- **Harness:** tsc limpio, Next.js build OK, 293 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 
 ## Hitos completados
@@ -102,6 +101,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       mascota (`GET /guarderia?desde=&hasta=`); peso en la ficha; Cargar
       mascota en Mostrador; sin pestaña Ficha médica; confirmaciones en modal.
       287 tests backend.
+- [x] **Límite de intentos de login** — `LimitadorIntentosLogin` (en memoria,
+      clave usuario+IP): 5 fallos en 15 min bloquean el par 15 min con 429
+      `ApiErrorResponse` + `Retry-After`; un login exitoso resetea. `Clock`
+      inyectable (`RelojConfig`) para testear el paso del tiempo. 293 tests.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -172,7 +175,7 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta` y
   `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`).
-- **Tests backend:** 287 en verde. Cobertura clave: aforo concurrente (lock
+- **Tests backend:** 293 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`).
