@@ -266,7 +266,7 @@ export function Caja() {
                         {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        #{c.id} · {c.fechaEmision.slice(11, 16)} · {c.nombreTutor}
+                        #{c.id} · {c.fechaEmision.slice(11, 16)} · {c.nombreTutor ?? "Urgencia sin datos"}
                         {c.nombreMascota ? ` · ${c.nombreMascota}` : ""}
                       </p>
                       <DetalleComanda comanda={c} />
@@ -301,7 +301,13 @@ export function Caja() {
                         </span>
                       </p>
                     )}
-                    {c.estado !== "PAGADA" && c.estado !== "CANCELADA" && (
+                    {/* Urgencia atendida sin datos: el backend rechaza el cobro hasta completarlos. */}
+                    {c.tutorId === null && c.estado !== "PAGADA" && c.estado !== "CANCELADA" && (
+                      <p className="text-xs text-red-700 dark:text-red-300">
+                        Completá los datos del cliente y la mascota desde la Agenda para poder cobrar.
+                      </p>
+                    )}
+                    {c.tutorId !== null && c.estado !== "PAGADA" && c.estado !== "CANCELADA" && (
                       <button
                         onClick={() => setACobrar(c)}
                         className={`inline-flex items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}

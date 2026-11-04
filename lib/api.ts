@@ -239,8 +239,17 @@ export interface TurnoClinico {
   fechaFinBloque: string
   motivo: string
   estado: "PENDIENTE" | "ATENDIDO" | "CANCELADO"
-  mascota: { id: number; nombre: string }
-  profesional: { id: number; nombreCompleto: string; matricula: string | null }
+  /** `null` solo en una urgencia cuyos datos todavía no se cargaron. */
+  mascota: { id: number; nombre: string } | null
+  /** `null` solo en una urgencia que todavía nadie atendió. */
+  profesional: { id: number; nombreCompleto: string; matricula: string | null } | null
+  /** Turno de urgencia: se registró sin datos a la hora en que llegó. */
+  urgencia: boolean
+}
+
+/** Nombre a mostrar de un turno: la mascota, o el aviso de que es una urgencia sin datos. */
+export function nombreDelTurno(turno: TurnoClinico): string {
+  return turno.mascota?.nombre ?? "Urgencia sin datos"
 }
 
 export interface TurnoClinicoInput {
@@ -329,7 +338,8 @@ export interface ConsultaMedica {
  */
 export interface ConsultaMedicaInput {
   turnoClinicoId?: number | null
-  mascotaId: number
+  /** Se omite solo al atender una urgencia que todavía no tiene datos. */
+  mascotaId?: number
   profesionalId: number
   fechaAtencion?: string
   anamnesis?: string
@@ -363,8 +373,9 @@ export interface ComandaCobro {
   /** Derivado en el backend como montoTotal - saldoPendiente. */
   totalPagado: number
   estado: EstadoComanda
-  tutorId: number
-  nombreTutor: string
+  /** `null` en la comanda de una urgencia sin datos: no se puede cobrar hasta completarlos. */
+  tutorId: number | null
+  nombreTutor: string | null
   mascotaId: number | null
   nombreMascota: string | null
   consultaMedicaId: number | null
@@ -641,6 +652,11 @@ export const turnos = {
     get<TurnoClinico[]>(`/turnos?desde=${desde}&hasta=${hasta}`),
   crear: (body: TurnoClinicoInput) => post<TurnoClinico>("/turnos", body),
   crearConAlta: (body: TurnoConAltaInput) => post<TurnoClinico>("/turnos/con-alta", body),
+  /** Urgencia: sin datos, a la hora actual. */
+  crearUrgencia: () => post<TurnoClinico>("/turnos/urgencia"),
+  /** Cliente y mascota de una urgencia registrada sin datos; después se puede cobrar. */
+  completarDatos: (turnoId: number, body: Omit<TurnoConAltaInput, "fechaHoraInicio" | "motivo" | "profesionalId">) =>
+    post<TurnoClinico>(`/turnos/${turnoId}/completar-datos`, body),
 }
 
 // -------------------------------------------------------------- guarderia
