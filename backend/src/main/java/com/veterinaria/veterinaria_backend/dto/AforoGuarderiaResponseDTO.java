@@ -11,5 +11,8 @@ public record AforoGuarderiaResponseDTO(
 		long cuposOcupados,
 		int aforoMaximo,
 		int cuposDisponibles,
-		boolean completo) {
+		boolean completo,
+		/** Plaza extra de urgencia clinica: no se suma a aforoMaximo ni a cuposOcupados. */
+		boolean plazaUrgenciaHabilitada,
+		boolean plazaUrgenciaOcupada) {
 }
