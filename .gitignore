@@ -16,6 +16,11 @@ __v0_jsx-dev-runtime.ts
 .env
 .env*.local
 
+# ---------- Datos historicos de importacion ----------
+# El Excel de Huellitas y los reportes contienen datos personales de tutores.
+# Se importan una sola vez y NO se versionan.
+datos/
+
 # ---------- Node / Next.js ----------
 node_modules/
 .next/
