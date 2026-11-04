@@ -127,6 +127,28 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       escrituras solo rol VETERINARIO en `SecurityConfig`, fuera del
       `contarCuposOcupados`, sin comanda, bajo el mismo semáforo del día.
       310 tests.
+- [x] **Landing pública rediseñada** — se integró el diseño claro
+      (crema/azul marino, Fredoka + Poppins) en `/`: hero con huellas,
+      tarjeta de servicios montada sobre el hero, estándares con fotos
+      circulares, "¿Por qué elegirnos?" y CTA de contacto. El contenido sigue
+      saliendo de `lib/negocio.ts` (nuevos `nombreCorto`, `estandares` y
+      `motivos`); imágenes optimizadas en `public/landing/`; nav móvil con menú
+      hamburguesa y "Ingreso empleados" siempre visible.
+- [x] **Identidad de la landing aplicada al login y al sistema** — el tema
+      oscuro se retiró: `app/layout.tsx` ya no monta la clase `dark` y los
+      tokens de `app/globals.css` pasan a papel cálido `#faf7f1`, tarjetas
+      blancas, azul marino `#232a5c` como primario y crema `#f6efe3` en el
+      sidebar. Como las pantallas son token-driven (solo 3 colores literales en
+      `components/`), no hubo que reescribir módulos: se quitaron los 81
+      overrides `dark:` de alertas (`caja`, `padron`, `egreso`, `balance`,
+      `fichas`, `agenda`, shadcn `button`) y quedan los valores claros
+      (`text-amber-700`, `bg-amber-50`, ...). Poppins pasa a ser la tipografía
+      del producto y Fredoka se aplica a `h1`/`h2`/`h3` desde `@layer base`.
+      `/login` se rediseñó con el lenguaje de la landing (fondo crema, huellas
+      decorativas, tarjeta blanca y marca). Verificado con `tsc --noEmit`,
+      `next build --webpack`, y auditoría en navegador headless: contraste
+      ≥ 3.5:1 en texto visible y `overflowX = 0` en 1440 px y 390 px, en
+      `/app` y `/login`.
 
 ## Decisiones Críticas de Arquitectura
 

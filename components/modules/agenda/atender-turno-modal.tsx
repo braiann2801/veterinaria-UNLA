@@ -111,7 +111,7 @@ export function AtenderTurnoModal({
           </Field>
         )}
         {!turno.mascota && (
-          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-300">
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900">
             Urgencia sin datos: podés atenderla igual. Antes de cobrar hay que completar el cliente y la mascota desde
             la Agenda.
           </p>
@@ -157,7 +157,7 @@ export function AtenderTurnoModal({
             ))}
           </Select>
           {CONDUCTAS_CON_ALERTA.has(conducta) && (
-            <span className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+            <span className="flex items-center gap-1.5 text-xs text-amber-800">
               <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
               Esta conducta va a quedar marcada como alerta en el retiro.
             </span>

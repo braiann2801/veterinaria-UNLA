@@ -173,7 +173,7 @@ export function AgendaGuarderia() {
                       <Users className="size-3.5" aria-hidden />
                       {a.cuposOcupados} de {a.aforoMaximo} cupos
                     </Semforo>
-                    {a.completo && <span className="text-xs text-red-700 dark:text-red-300">Aforo completo</span>}
+                    {a.completo && <span className="text-xs text-red-700">Aforo completo</span>}
                   </div>
                   <MeterAforo aforo={a} />
                 </div>
@@ -202,7 +202,7 @@ export function AgendaGuarderia() {
                               <p className="truncate text-sm font-medium">
                                 {r.nombreMascota}
                                 {r.urgenciaClinica && (
-                                  <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300">
+                                  <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700">
                                     Urgencia clínica
                                   </span>
                                 )}

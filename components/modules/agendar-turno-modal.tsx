@@ -125,7 +125,7 @@ export function AgendarTurnoModal({
           className={cn(
             "flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 text-sm font-medium",
             TOQUE_MINIMO,
-            urgencia ? "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-300" : "border-border",
+            urgencia ?"border-red-500/50 bg-red-500/10 text-red-700" :"border-border",
           )}
         >
           <span className="inline-flex items-center gap-2">

@@ -1,6 +1,24 @@
 import { Analytics } from '@vercel/analytics/next'
+import { Fredoka, Poppins } from 'next/font/google'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+
+/* Tipografías del producto: Poppins para el texto y Fredoka para los títulos.
+   Se cargan como variables CSS y las aplica `app/globals.css`, así la landing y
+   el sistema interno comparten la misma identidad. */
+const fredoka = Fredoka({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  variable: '--font-fredoka',
+  display: 'swap',
+})
+
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-poppins',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Veterinaria · Guardería canina',
@@ -26,8 +44,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'dark',
-  themeColor: '#131320',
+  colorScheme: 'light',
+  themeColor: '#faf7f1',
 }
 
 export default function RootLayout({
@@ -36,7 +54,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html
+      lang="es"
+      className={`${fredoka.variable} ${poppins.variable}`}
+      suppressHydrationWarning
+    >
       <body className="antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}

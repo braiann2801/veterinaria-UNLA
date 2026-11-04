@@ -143,7 +143,7 @@ export function NuevaReservaGuarderia({
               saldada.
             </p>
           ) : (
-            <p className="rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300" role="alert">
+            <p className="rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
               {creada.nombreMascota} no tiene tutor vinculado, así que la estadía no generó comanda. Para poder
               cobrarla: cancelá esta reserva, vinculá un tutor en el Padrón y volvé a reservar.
             </p>
