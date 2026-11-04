@@ -104,13 +104,14 @@ export default function Landing() {
               Reservar turno
             </a>
           </div>
-          {/* WebP con fondo transparente (PNG equivalente pesaba 882 KB y este
-              114 KB). Se apoya directo sobre el crema, sin marco ni blend. */}
+          {/* Recorte del fondo transparente del arte original (4386×4386) al
+              perro, escalado a 800 px de ancho y exportado a WebP: 87 KB. Se
+              apoya directo sobre el crema, sin marco ni blend. */}
           <Image
             src="/landing/hero.webp"
             alt="Perro en la veterinaria y guardería canina"
-            width={717}
-            height={1033}
+            width={800}
+            height={748}
             priority
             className="mx-auto w-full max-w-[300px] md:ml-auto md:max-w-[380px]"
           />
