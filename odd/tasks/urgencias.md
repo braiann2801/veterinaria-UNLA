@@ -13,12 +13,12 @@ Rama: `feat/urgencias` · Tests: `./mvnw test` contra el contenedor del 3307, `n
 
 | ID | Specs | Ruta | Estado | Commit |
 |---|---|---|---|---|
-| T1 | S1, S3 | inline | pendiente: excepciones en AGENTS.md (confirmadas) | |
-| T2 | S1, S2 | inline | pendiente: backend turno de urgencia, atención sin datos, comanda sin titular que no se cobra, completar datos + tests | |
-| T3 | S1, S2 | inline | pendiente: frontend toggle de urgencia, Atender con profesional, Completar datos | |
-| T4 | S3 | inline | pendiente: backend plaza de urgencia por día (solo Veterinario) + tests | |
-| T5 | S3 | inline | pendiente: frontend plaza de urgencia en Agenda guardería | |
-| T6 | — | inline | pendiente: e2e, README, PROGRESS.md | |
+| T1 | S1, S3 | inline | hecho: excepciones en AGENTS.md (confirmadas) | d8c945d |
+| T2 | S1, S2 | inline | hecho: backend turno de urgencia, atención sin datos, comanda sin titular que no se cobra, completar datos + tests (RED 7/8, 303 verdes) | d6cca4d |
+| T3 | S1, S2 | inline | hecho: frontend toggle de urgencia, Atender con profesional, Completar datos, Caja bloquea el cobro sin titular (tsc + build) | a8270e1 |
+| T4 | S3 | inline | hecho: backend plaza de urgencia por día (solo Veterinario) + tests (RED 7/7, 310 verdes) | 41a6653 |
+| T5 | S3 | inline | hecho: frontend plaza de urgencia en Agenda guardería (tsc + build) | 61da861 |
+| T6 | — | inline + verify (e2e) | en curso: README y PROGRESS.md hechos; e2e en `veterinaria_e2e` | |
 
 ## Log
 
@@ -31,3 +31,5 @@ Rama: `feat/urgencias` · Tests: `./mvnw test` contra el contenedor del 3307, `n
   - Completar datos: cliente nuevo o existente + mascota nueva o existente (mismo modelo que el alta combinada). Asigna la mascota al turno, a la ficha y a la comanda, y le pone de titular al tutor autorizado. Todo en una transacción.
   - Esquema: Hibernate `ddl-auto=update` no relaja `NOT NULL` en tablas existentes; un componente al arrancar hace `ALTER ... NULL` solo si la columna sigue siendo `NOT NULL` (sin reescribir datos).
   - Plaza de urgencia: entidad por día (`plaza_urgencia_guarderia`, fecha única). Habilitar, deshabilitar y ocupar: solo rol VETERINARIO (403 al resto, incluido el Dueño). La estadía que la ocupa es de un día, se marca `urgenciaClinica=true` y no cuenta en `cuposOcupados`. Deshabilitar exige que esté libre.
+- **L5** (implementación): el pago de una comanda sin titular responde 409 "Completá los datos del cliente y la mascota de la urgencia antes de cobrar" (no 400 como decía L4). La estadía en la plaza de urgencia no emite comanda de guardería (se cobra por la atención clínica). Corte de commits: T2 (backend S1-S2), T3 (frontend S1-S2), T4 (backend S3, incluye `SecurityConfig`: riesgo de permisos, commit propio), T5 (frontend S3).
+- **L6** (e2e parcial en `veterinaria_e2e`): como Dueño, el interruptor registró "Urgencia sin datos · 16:53 · Sin profesional asignado" en Mostrador y Agenda (rojo, con Atender y Completar datos); Atender pide "Profesional que atiende" y avisa que se puede atender sin datos.

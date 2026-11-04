@@ -93,9 +93,11 @@ El frontend todavía no tiene test runner.
 - **Guardería:** hay un máximo de 10 perros por día. Las reservas por rango se validan día por día.
   - La **Agenda guardería** tiene el mismo calendario mensual que la clínica. Cada mascota tiene su propio color, así una estadía de varios días se sigue a lo largo del mes.
   - La **seña** es parte de pago: al reservar se registra como un pago "Seña" en la comanda y se descuenta del total. No puede superar el total de la estadía.
+  - **Plaza de urgencia clínica:** el Veterinario puede habilitar, para un día, una plaza extra destinada solo a una urgencia clínica. No suma a los 10 cupos ni la usan las reservas normales (la reserva 11 sigue dando 409). Solo el rol Veterinario la habilita, la deshabilita o interna una mascota (el resto recibe 403, incluido el Dueño); cualquier empleado ve su estado en la Agenda guardería. Para deshabilitarla tiene que estar libre.
 - **Turnos clínicos:** cada turno dura 45 minutos de atención y le siguen 15 minutos de desinfección.
   - La **Agenda clínica** muestra el mes como calendario, con los turnos de cada día. Al elegir un día, sus turnos aparecen al costado (debajo en celular).
   - Para un cliente que llega por primera vez, el modal "Agendar turno" tiene un botón "Cliente o mascota nuevos": permite cargar el cliente y su mascota en el mismo paso. Todo se guarda junto: si el horario choca con otro turno, no queda nada creado a medias.
+  - **Turno de urgencia:** el interruptor "Turno de urgencia" del modal registra el turno para ahora, sin pedir cliente, mascota ni profesional, y puede superponerse con turnos agendados. Se ve en rojo en la Agenda. Al tocar **Atender** se elige el profesional y se puede cargar la ficha sin datos; la comanda queda sin titular y Caja no la deja cobrar hasta que se usa **Completar datos** (cliente nuevo o existente + mascota nueva o existente).
 - **Ficha clínica sin dinero:**
   - La consulta registra anamnesis, diagnóstico, tratamiento, conducta y el **peso** del día (que pasa a ser el peso actual de la mascota). El alta de la mascota ya no pide el peso.
   - El cobro se genera como comanda para el mostrador.
