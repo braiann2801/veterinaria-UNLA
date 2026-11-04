@@ -16,8 +16,13 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 293 tests de Spring Boot en verde
+- **Harness:** tsc limpio, Next.js build OK, 311 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
+- **Importación histórica de Huellitas:** aplicada sobre `veterinaria_db`
+  local (2026-11-04). Se cargaron las 3 hojas del Excel: 9 tutores, 11
+  mascotas, 11 vínculos, 2 profesionales placeholder, 10 consultas, 10
+  estadías, 20 comandas y 18 pagos. Reportes en `datos/` (gitignored):
+  `*-simulacion.md` (revisión previa) y `*-aplicado.md` (constancia).
 
 ## Hitos completados
 
@@ -105,6 +110,13 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       clave usuario+IP): 5 fallos en 15 min bloquean el par 15 min con 429
       `ApiErrorResponse` + `Retry-After`; un login exitoso resetea. `Clock`
       inyectable (`RelojConfig`) para testear el paso del tiempo. 293 tests.
+- [x] **Importación única de datos históricos** — `CommandLineRunner`
+      deshabilitado por defecto (`veterinaria.importacion.habilitada=false`)
+      lee el Excel de Huellitas con POI, construye un plan conciliado y escribe
+      todo en una sola transacción. Sin endpoint ni pantalla: el frontend no
+      cambia. La hoja 1 deduplica tutores/mascotas con DNI provisional; las
+      hojas 2 y 3 conservan fechas, importes y medios de pago históricos.
+      Reporte Markdown en `datos/` (simulación y aplicado). 311 tests.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -175,10 +187,19 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta` y
   `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`).
-- **Tests backend:** 293 en verde. Cobertura clave: aforo concurrente (lock
+- **Tests backend:** 311 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
-  `veterinaria_test` (no pisa `veterinaria_db`).
+  `veterinaria_test` (no pisa `veterinaria_db`) y parsers/conciliación de la
+  importación histórica.
+- **Importación histórica:** vive en `importacion/` (`ImportacionRunner`,
+  `ConstructorPlan`, `ConciliacionHistorica`, `ImportacionService`,
+  `ReporteImportacion`). Es una vía única de consola: no hay endpoint, no hay
+  botón y el runner no hace nada con `veterinaria.importacion.habilitada=false`.
+  Para re-ejecutar: `habilitada=true` + `aplicar=false` genera el reporte de
+  simulación; `aplicar=true` escribe y es idempotente por DNI, mascota+fecha de
+  consulta y mascota+fecha de ingreso. El Excel y los reportes están en
+  `datos/` (gitignored) porque contienen datos personales.
 - **Frontend sin test runner:** la calidad se sostiene con `tsc --noEmit` +
   `next build --webpack` (el harness 1/3 y 2/3).
 - **Refactor de referencia:** `components/modules/mostrador/` es el patrón a

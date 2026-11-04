@@ -1,5 +1,6 @@
 package com.veterinaria.veterinaria_backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +25,9 @@ public interface ConsultaMedicaRepository extends JpaRepository<ConsultaMedica, 
 	Optional<ConsultaMedica> findByTurnoClinicoId(Long turnoClinicoId);
 
 	boolean existsByTurnoClinicoId(Long turnoClinicoId);
+
+	/** Idempotencia de la importacion historica: una ficha por mascota y momento de atencion. */
+	boolean existsByMascotaIdAndFechaAtencion(Long mascotaId, LocalDateTime fechaAtencion);
 
 	/** ¿La mascota tiene consultas registradas? Bloquea su borrado desde el padron. */
 	boolean existsByMascotaId(Long mascotaId);
