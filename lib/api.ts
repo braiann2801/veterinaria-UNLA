@@ -270,6 +270,18 @@ export interface AforoGuarderia {
   aforoMaximo: number
   cuposDisponibles: number
   completo: boolean
+  /** Plaza extra de urgencia clínica: no se suma a `aforoMaximo` ni a `cuposOcupados`. */
+  plazaUrgenciaHabilitada: boolean
+  plazaUrgenciaOcupada: boolean
+}
+
+/** Plaza de urgencia clínica de un día; `reservaId` y `nombreMascota` son `null` si está libre. */
+export interface PlazaUrgencia {
+  fecha: string
+  habilitada: boolean
+  ocupada: boolean
+  reservaId: number | null
+  nombreMascota: string | null
 }
 
 export interface ReservaGuarderia {
@@ -290,6 +302,8 @@ export interface ReservaGuarderia {
   aforoMaximo: number
   /** Comanda de guardería emitida al reservar; `null` si la mascota no tiene tutor. */
   comandaId: number | null
+  /** Estadía en la plaza de urgencia clínica: no ocupa cupo del aforo de 10. */
+  urgenciaClinica: boolean
 }
 
 export interface ReservaGuarderiaInput {
@@ -673,6 +687,12 @@ export const guarderia = {
     put<ReservaGuarderia>(`/guarderia/${id}`, body),
   cancelar: (id: number) => put<ReservaGuarderia>(`/guarderia/${id}/cancelar`),
   eliminar: (id: number) => del<void>(`/guarderia/${id}`),
+  plazaUrgencia: (fecha: string) => get<PlazaUrgencia>(`/guarderia/urgencia?fecha=${fecha}`),
+  /** Solo Veterinario (el backend responde 403 al resto). */
+  habilitarPlazaUrgencia: (fecha: string) => put<PlazaUrgencia>(`/guarderia/urgencia/${fecha}`),
+  deshabilitarPlazaUrgencia: (fecha: string) => del<void>(`/guarderia/urgencia/${fecha}`),
+  ocuparPlazaUrgencia: (fecha: string, mascotaId: number) =>
+    post<ReservaGuarderia>(`/guarderia/urgencia/${fecha}/ocupar`, { mascotaId }),
 }
 
 // --------------------------------------------------------------- consultas
