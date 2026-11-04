@@ -118,7 +118,7 @@ export function Profesionales() {
                         onClick={() => reactivar(p)}
                         aria-label={`Reactivar ${p.nombreCompleto}`}
                         title="Reactivar profesional"
-                        className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300`}
+                        className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10`}
                       >
                         <RotateCcw className="size-4" aria-hidden />
                       </button>

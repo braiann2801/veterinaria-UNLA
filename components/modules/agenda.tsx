@@ -171,7 +171,7 @@ export function Agenda() {
                           <p className={`text-sm font-medium ${t.estado === "CANCELADO" ? "line-through opacity-60" : ""}`}>
                             {t.fechaHoraInicio.slice(11, 16)} · {nombreDelTurno(t)}
                             {t.urgencia && (
-                              <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300">
+                              <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700">
                                 Urgencia
                               </span>
                             )}
@@ -202,7 +202,7 @@ export function Agenda() {
                             <button
                               type="button"
                               onClick={() => setCompletando(t)}
-                              className={`inline-flex items-center justify-center gap-2 rounded-md border border-red-500/40 px-3 text-xs font-medium text-red-700 transition-colors hover:bg-red-500/10 dark:text-red-300 ${TOQUE_MINIMO}`}
+                              className={`inline-flex items-center justify-center gap-2 rounded-md border border-red-500/40 px-3 text-xs font-medium text-red-700 transition-colors hover:bg-red-500/10 ${TOQUE_MINIMO}`}
                             >
                               <UserCheck className="size-3.5" aria-hidden />
                               Completar datos
@@ -217,7 +217,7 @@ export function Agenda() {
             </Recurso>
             {aviso && (
               <p
-                className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-900 dark:text-emerald-300"
+                className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-900"
                 role="status"
               >
                 {aviso}

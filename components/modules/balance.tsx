@@ -361,7 +361,7 @@ function Etiqueta({ children }: { children: ReactNode }) {
  */
 function DeudaAnterior({ fechaEmision }: { fechaEmision: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-500/15 dark:text-amber-300">
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
       <History className="size-3" aria-hidden />
       Deuda anterior · {fechaCorta(fechaEmision)}
     </span>
@@ -371,12 +371,12 @@ function DeudaAnterior({ fechaEmision }: { fechaEmision: string }) {
 function EstadoComanda({ estado }: { estado: string }) {
   const tono =
     estado === "PAGADA"
-      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-300"
+      ?"bg-emerald-100 text-emerald-900"
       : estado === "PARCIAL"
-        ? "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-300"
+        ?"bg-amber-100 text-amber-900"
         : estado === "CANCELADA"
           ? "bg-muted text-muted-foreground"
-          : "bg-red-100 text-red-900 dark:bg-red-500/15 dark:text-red-300"
+          :"bg-red-100 text-red-900"
 
   return (
     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", tono)}>

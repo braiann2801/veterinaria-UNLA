@@ -76,7 +76,7 @@ export function TopBar({
   }, [query, tutores.datos])
 
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-background px-4 py-3">
+    <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3">
       {/* El buscador arranca en el margen izquierdo y ocupa todo el ancho libre. */}
       <div className="relative min-w-0 flex-1">
         <Search

@@ -241,10 +241,10 @@ function BotonNav({
       onClick={onClick}
       aria-current={activo ? "page" : undefined}
       className={cn(
-        "flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        "flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors",
         activo
           ? "bg-primary font-medium text-primary-foreground shadow-sm"
-          : "text-foreground/80 hover:bg-muted",
+          : "text-foreground/80 hover:bg-white",
       )}
     >
       <Icon className="size-4 shrink-0" aria-hidden />
@@ -256,11 +256,11 @@ function BotonNav({
 function Marca() {
   return (
     <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-      <div className="flex size-8 items-center justify-center rounded-md border border-primary/40">
-        <Dog className="size-4 text-primary" />
+      <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+        <Dog className="size-5" aria-hidden />
       </div>
       <div className="leading-tight">
-        <p className="text-sm font-semibold">Veterinaria</p>
+        <p className="font-display text-sm font-semibold">Veterinaria</p>
         <p className="text-xs text-muted-foreground">Guardería canina</p>
       </div>
     </div>

@@ -55,7 +55,7 @@ export function PlazaUrgenciaGuarderia({
         if (!p.habilitada && !esVeterinario) return null
         return (
           <div className="flex flex-col gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-3">
-            <p className="inline-flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-300">
+            <p className="inline-flex items-center gap-2 text-sm font-medium text-red-700">
               <Siren className="size-4" aria-hidden />
               Plaza de urgencia clínica
             </p>
