@@ -1,5 +1,6 @@
 package com.veterinaria.veterinaria_backend.service.impl;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -38,9 +39,11 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 	private final TurnoClinicoRepository turnoRepository;
 	private final MascotaRepository mascotaRepository;
 	private final ProfesionalRepository profesionalRepository;
+	private final Clock reloj;
 
 	public TurnoClinicoServiceImpl(TurnoClinicoRepository turnoRepository,
-			MascotaRepository mascotaRepository, ProfesionalRepository profesionalRepository) {
+			MascotaRepository mascotaRepository, ProfesionalRepository profesionalRepository, Clock reloj) {
+		this.reloj = reloj;
 		this.turnoRepository = turnoRepository;
 		this.mascotaRepository = mascotaRepository;
 		this.profesionalRepository = profesionalRepository;
@@ -121,6 +124,39 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 		verificarSolapamiento(profesional, turno, null);
 
 		return toResponse(turnoRepository.save(turno));
+	}
+
+	@Override
+	@Transactional
+	public TurnoClinicoResponseDTO crearUrgencia() {
+		TurnoClinico turno = new TurnoClinico();
+		turno.setUrgencia(true);
+		turno.setMotivo("Urgencia");
+		turno.setEstado(TurnoClinico.EstadoTurno.PENDIENTE);
+		// Al minuto: la grilla y el panel del dia muestran horas, no segundos.
+		turno.setFechaHoraInicio(LocalDateTime.now(reloj).truncatedTo(ChronoUnit.MINUTES));
+		return toResponse(turnoRepository.save(turno));
+	}
+
+	@Override
+	@Transactional
+	public TurnoClinicoResponseDTO asignarMascotaDeUrgencia(Long turnoId, Long mascotaId) {
+		verificarPendienteDeDatos(turnoId);
+		TurnoClinico turno = obtenerTurno(turnoId);
+		Mascota mascota = obtenerMascota(mascotaId);
+		if (!mascota.isActivo()) {
+			throw new BadRequestException("La mascota " + mascota.getNombre() + " esta desactivada");
+		}
+		turno.setMascota(mascota);
+		return toResponse(turno);
+	}
+
+	@Override
+	public void verificarPendienteDeDatos(Long turnoId) {
+		TurnoClinico turno = obtenerTurno(turnoId);
+		if (turno.getMascota() != null) {
+			throw new BadRequestException("El turno " + turnoId + " ya tiene cliente y mascota");
+		}
 	}
 
 	@Override
@@ -226,7 +262,8 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 				turno.getMotivo(),
 				turno.getEstado() != null ? turno.getEstado().name() : null,
 				mascotaDto,
-				profesionalDto);
+				profesionalDto,
+				turno.isUrgencia());
 	}
 
 	private LocalDateTime inicioDelDia(LocalDate dia) {

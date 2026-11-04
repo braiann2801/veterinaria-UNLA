@@ -35,4 +35,11 @@ public interface ConsultaMedicaService {
 	 * que el cobro quedo registrado sin entrar al detalle clinico.
 	 */
 	Long comandaDe(Long consultaId);
+
+	/**
+	 * Le asigna la mascota a la ficha de una urgencia atendida sin datos (si ya
+	 * se atendio) y a su comanda, que pasa a tener titular: el tutor autorizado a
+	 * retirar la mascota. Sin ficha todavia, no hace nada.
+	 */
+	void asignarMascotaDeUrgencia(Long turnoId, Long mascotaId);
 }

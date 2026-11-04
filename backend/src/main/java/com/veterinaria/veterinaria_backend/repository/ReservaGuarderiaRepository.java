@@ -63,10 +63,21 @@ public interface ReservaGuarderiaRepository extends JpaRepository<ReservaGuarder
 	@Query("""
 			SELECT COUNT(r) FROM ReservaGuarderia r
 			WHERE r.fecha <= :fecha AND COALESCE(r.fechaSalida, r.fecha) >= :fecha
+			  AND r.urgenciaClinica = false
 			  AND r.estado IN (com.veterinaria.veterinaria_backend.entity.ReservaGuarderia$EstadoReserva.RESERVADO,
 			                   com.veterinaria.veterinaria_backend.entity.ReservaGuarderia$EstadoReserva.INGRESADO)
 			""")
 	long contarCuposOcupados(@Param("fecha") LocalDate fecha);
+
+	/** Estadia en esos estados que ocupa la plaza de urgencia clinica del dia (a lo sumo una). */
+	@Query("""
+			SELECT r FROM ReservaGuarderia r
+			WHERE r.urgenciaClinica = true
+			  AND r.fecha <= :dia AND COALESCE(r.fechaSalida, r.fecha) >= :dia
+			  AND r.estado IN :estados
+			""")
+	List<ReservaGuarderia> findUrgenciaClinicaEnDia(@Param("dia") LocalDate dia,
+			@Param("estados") List<ReservaGuarderia.EstadoReserva> estados);
 
 	/** ¿La mascota ya tiene una estadia activa que se pise con [desde, hasta]? */
 	@Query("""

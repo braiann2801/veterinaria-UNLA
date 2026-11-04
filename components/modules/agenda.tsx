@@ -13,9 +13,9 @@
  */
 
 import { useMemo, useState } from "react"
-import { Plus, Stethoscope } from "lucide-react"
+import { Plus, Stethoscope, UserCheck } from "lucide-react"
 
-import { turnos as apiTurnos } from "@/lib/api"
+import { nombreDelTurno, turnos as apiTurnos } from "@/lib/api"
 import type { TurnoClinico } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Panel } from "@/components/ui/field"
@@ -29,6 +29,7 @@ import {
   type EventoCalendario,
 } from "@/components/modules/agenda/calendario-mensual"
 import { AtenderTurnoModal } from "@/components/modules/agenda/atender-turno-modal"
+import { CompletarDatosModal } from "@/components/modules/agenda/completar-datos-modal"
 
 const ETIQUETA_ESTADO: Record<TurnoClinico["estado"], string> = {
   PENDIENTE: "Pendiente",
@@ -53,6 +54,7 @@ export function Agenda() {
   const [vista, setVista] = useState(() => ({ anio: new Date().getFullYear(), mes: new Date().getMonth() }))
   const [turnoAbierto, setTurnoAbierto] = useState(false)
   const [atendiendo, setAtendiendo] = useState<TurnoClinico | null>(null)
+  const [completando, setCompletando] = useState<TurnoClinico | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
 
   const dias = diasVisibles(vista.anio, vista.mes)
@@ -81,9 +83,10 @@ export function Agenda() {
           .map((t) => ({
             id: t.id,
             hora: t.fechaHoraInicio.slice(11, 16),
-            texto: t.mascota.nombre,
-            titulo: `${t.fechaHoraInicio.slice(11, 16)} ${t.mascota.nombre} · ${t.motivo}${t.estado === "ATENDIDO" ? " · atendido" : ""}`,
-            clase: t.estado === "ATENDIDO" ? "bg-emerald-500/20" : "bg-primary/15",
+            texto: nombreDelTurno(t),
+            titulo: `${t.fechaHoraInicio.slice(11, 16)} ${nombreDelTurno(t)} · ${t.motivo}${t.estado === "ATENDIDO" ? " · atendido" : ""}`,
+            // Urgencias en rojo; atendidos en verde; el resto, el color del sistema.
+            clase: t.urgencia ? "bg-red-500/25" : t.estado === "ATENDIDO" ? "bg-emerald-500/20" : "bg-primary/15",
           })),
       )
     }
@@ -166,26 +169,46 @@ export function Agenda() {
                       <li key={t.id} className="flex flex-col gap-1 py-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className={`text-sm font-medium ${t.estado === "CANCELADO" ? "line-through opacity-60" : ""}`}>
-                            {t.fechaHoraInicio.slice(11, 16)} · {t.mascota.nombre}
+                            {t.fechaHoraInicio.slice(11, 16)} · {nombreDelTurno(t)}
+                            {t.urgencia && (
+                              <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300">
+                                Urgencia
+                              </span>
+                            )}
                           </p>
                           <Semforo tono={TONO_ESTADO[t.estado]}>{ETIQUETA_ESTADO[t.estado]}</Semforo>
                         </div>
                         <p className="text-xs text-muted-foreground">{t.motivo}</p>
                         <p className="text-xs text-muted-foreground">
-                          {t.profesional.nombreCompleto}
-                          {t.profesional.matricula ? ` · ${t.profesional.matricula}` : ""} · bloque hasta{" "}
+                          {t.profesional
+                            ? `${t.profesional.nombreCompleto}${t.profesional.matricula ? ` · ${t.profesional.matricula}` : ""}`
+                            : "Sin profesional asignado"}{" "}
+                          · bloque hasta{" "}
                           {t.fechaFinBloque.slice(11, 16)}
                         </p>
-                        {t.estado === "PENDIENTE" && (
-                          <button
-                            type="button"
-                            onClick={() => setAtendiendo(t)}
-                            className={`mt-1 inline-flex items-center justify-center gap-2 self-start rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-                          >
-                            <Stethoscope className="size-3.5" aria-hidden />
-                            Atender
-                          </button>
-                        )}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {t.estado === "PENDIENTE" && (
+                            <button
+                              type="button"
+                              onClick={() => setAtendiendo(t)}
+                              className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+                            >
+                              <Stethoscope className="size-3.5" aria-hidden />
+                              Atender
+                            </button>
+                          )}
+                          {/* Una urgencia sin datos no se puede cobrar hasta completarlos. */}
+                          {t.urgencia && !t.mascota && t.estado !== "CANCELADO" && (
+                            <button
+                              type="button"
+                              onClick={() => setCompletando(t)}
+                              className={`inline-flex items-center justify-center gap-2 rounded-md border border-red-500/40 px-3 text-xs font-medium text-red-700 transition-colors hover:bg-red-500/10 dark:text-red-300 ${TOQUE_MINIMO}`}
+                            >
+                              <UserCheck className="size-3.5" aria-hidden />
+                              Completar datos
+                            </button>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -212,6 +235,17 @@ export function Agenda() {
           fechaPorDefecto={fecha}
           onCerrar={() => setTurnoAbierto(false)}
           onGuardado={refrescar}
+        />
+      )}
+
+      {completando && (
+        <CompletarDatosModal
+          turno={completando}
+          onCerrar={() => setCompletando(null)}
+          onGuardado={async (mensaje) => {
+            setAviso(mensaje)
+            await turnosMes.recargar()
+          }}
         />
       )}
 

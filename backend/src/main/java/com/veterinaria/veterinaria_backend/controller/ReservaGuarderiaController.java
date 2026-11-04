@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.veterinaria.veterinaria_backend.dto.AforoGuarderiaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.OcuparPlazaUrgenciaRequestDTO;
+import com.veterinaria.veterinaria_backend.dto.PlazaUrgenciaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.ReservaGuarderiaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ReservaGuarderiaResponseDTO;
 import com.veterinaria.veterinaria_backend.service.ReservaGuarderiaService;
@@ -61,6 +63,36 @@ public class ReservaGuarderiaController {
 	public ResponseEntity<AforoGuarderiaResponseDTO> consultarAforo(
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
 		return ResponseEntity.ok(guarderiaService.consultarAforo(fecha));
+	}
+
+	/** GET /api/v1/guarderia/urgencia?fecha=2026-10-01: estado de la plaza de urgencia clinica. */
+	@GetMapping("/urgencia")
+	public ResponseEntity<PlazaUrgenciaResponseDTO> consultarPlazaUrgencia(
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+		return ResponseEntity.ok(guarderiaService.consultarPlazaUrgencia(fecha));
+	}
+
+	/** PUT /api/v1/guarderia/urgencia/2026-10-01: habilita la plaza (solo Veterinario, ver SecurityConfig). */
+	@PutMapping("/urgencia/{fecha}")
+	public ResponseEntity<PlazaUrgenciaResponseDTO> habilitarPlazaUrgencia(
+			@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+		return ResponseEntity.ok(guarderiaService.habilitarPlazaUrgencia(fecha));
+	}
+
+	/** DELETE /api/v1/guarderia/urgencia/2026-10-01 -> 204, o 409 si esta ocupada. */
+	@DeleteMapping("/urgencia/{fecha}")
+	public ResponseEntity<Void> deshabilitarPlazaUrgencia(
+			@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+		guarderiaService.deshabilitarPlazaUrgencia(fecha);
+		return ResponseEntity.noContent().build();
+	}
+
+	/** POST /api/v1/guarderia/urgencia/2026-10-01/ocupar -> 201, 400 si no esta habilitada, 409 si esta ocupada. */
+	@PostMapping("/urgencia/{fecha}/ocupar")
+	public ResponseEntity<ReservaGuarderiaResponseDTO> ocuparPlazaUrgencia(
+			@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+			@Valid @RequestBody OcuparPlazaUrgenciaRequestDTO request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(guarderiaService.ocuparPlazaUrgencia(fecha, request));
 	}
 
 	/**

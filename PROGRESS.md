@@ -6,17 +6,17 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
-- **Fase en curso:** rama `feat/login-throttling` (detalle en
-  `odd/tasks/login-throttling.md`): límite de intentos fallidos de login por
-  usuario+IP (5 en 15 min → 429). Implementada y verificada; pendiente de
-  push/PR.
+- **Fase en curso:** rama `feat/urgencias` (detalle en
+  `odd/tasks/urgencias.md`): turno de urgencia sin datos y plaza extra de
+  guardería para urgencia clínica (solo Veterinario). Implementada; e2e y
+  revisión en curso; pendiente de push/PR.
 - **Base Git:** `main` en `e2edc3b` (merge del PR #2, deuda por mascota y
   normalización).
 - **Next.js:** `agentRules: false` en `next.config.mjs` para que `next dev` no
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 311 tests de Spring Boot en verde
+- **Harness:** tsc limpio, Next.js build OK, 326 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 - **Importación histórica de Huellitas:** aplicada sobre `veterinaria_db`
   local (2026-11-04). Se cargaron las 3 hojas del Excel: 9 tutores, 11
@@ -117,6 +117,16 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       cambia. La hoja 1 deduplica tutores/mascotas con DNI provisional; las
       hojas 2 y 3 conservan fechas, importes y medios de pago históricos.
       Reporte Markdown en `datos/` (simulación y aplicado). 311 tests.
+- [x] **Urgencias** (`feat/urgencias`) — excepciones confirmadas a las
+      reglas 1 y 2 de AGENTS.md. Turno de urgencia (`POST /turnos/urgencia`):
+      sin mascota ni profesional, a la hora actual, sin chequeo de
+      solapamiento; se atiende eligiendo profesional y la comanda queda sin
+      titular (cobro → 409) hasta `POST /turnos/{id}/completar-datos`.
+      `EsquemaUrgencias` relaja los NOT NULL al arrancar. Plaza de urgencia de
+      guardería por día (`plaza_urgencia_guarderia`, `/guarderia/urgencia`):
+      escrituras solo rol VETERINARIO en `SecurityConfig`, fuera del
+      `contarCuposOcupados`, sin comanda, bajo el mismo semáforo del día.
+      310 tests.
 
 ## Decisiones Críticas de Arquitectura
 

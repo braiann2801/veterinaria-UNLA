@@ -7,7 +7,8 @@
  * se ven el aforo y las estadías de ese día.
  *
  * <p>El tope de 10 perros por día lo valida el backend (regla 1 de AGENTS.md);
- * acá solo se muestra.</p>
+ * acá solo se muestra. La plaza extra de urgencia clínica va aparte y solo la
+ * maneja el Veterinario.</p>
  */
 
 import { useMemo, useState } from "react"
@@ -16,6 +17,8 @@ import { CalendarDays, Clock, Plus, Users } from "lucide-react"
 import { guarderia as apiGuarderia } from "@/lib/api"
 import type { AforoGuarderia, ReservaGuarderia } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
+import { useAuth } from "@/lib/auth"
+import { PlazaUrgenciaGuarderia } from "@/components/modules/agenda/plaza-urgencia"
 import { Panel } from "@/components/ui/field"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
 import { NuevaReservaGuarderia } from "@/components/modules/nueva-reserva"
@@ -60,6 +63,7 @@ export function AgendaGuarderia() {
   const [fecha, setFecha] = useState(hoy)
   const [vista, setVista] = useState(() => ({ anio: new Date().getFullYear(), mes: new Date().getMonth() }))
   const [reservaAbierta, setReservaAbierta] = useState(false)
+  const { role } = useAuth()
 
   const dias = diasVisibles(vista.anio, vista.mes)
   const desde = aClave(dias[0])
@@ -91,8 +95,9 @@ export function AgendaGuarderia() {
           id: `${r.id}-${clave}`,
           hora: clave === r.fecha && r.horaEntrada ? r.horaEntrada.slice(0, 5) : undefined,
           texto: r.nombreMascota,
-          titulo: `${r.nombreMascota} · ${r.fecha}${r.fechaSalida ? ` al ${r.fechaSalida}` : ""}`,
-          color: colorDeMascota(r.mascotaId),
+          titulo: `${r.nombreMascota} · ${r.fecha}${r.fechaSalida ? ` al ${r.fechaSalida}` : ""}${r.urgenciaClinica ? " · urgencia clínica" : ""}`,
+          // La plaza de urgencia va en rojo, como las urgencias de la agenda clínica.
+          color: r.urgenciaClinica ? "hsl(0 85% 55% / 0.35)" : colorDeMascota(r.mascotaId),
         })),
       )
     }
@@ -175,6 +180,8 @@ export function AgendaGuarderia() {
               )}
             </Recurso>
 
+            <PlazaUrgenciaGuarderia fecha={fecha} esVeterinario={role === "veterinario"} onCambio={refrescar} />
+
             <Recurso estado={estadias} textoCarga="Cargando estadías" onReintentar={estadias.recargar}>
               {() =>
                 delDia.length === 0 ? (
@@ -192,7 +199,14 @@ export function AgendaGuarderia() {
                               aria-hidden
                             />
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{r.nombreMascota}</p>
+                              <p className="truncate text-sm font-medium">
+                                {r.nombreMascota}
+                                {r.urgenciaClinica && (
+                                  <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300">
+                                    Urgencia clínica
+                                  </span>
+                                )}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 <CalendarDays className="mr-1 inline size-3" aria-hidden />
                                 {r.fechaSalida ? `${r.fecha.slice(8, 10)}/${r.fecha.slice(5, 7)} al ${r.fechaSalida.slice(8, 10)}/${r.fechaSalida.slice(5, 7)}` : r.tipoEstadia.replace("_", " ")}

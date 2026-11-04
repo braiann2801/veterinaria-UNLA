@@ -13,7 +13,15 @@
 import { useState } from "react"
 import { Stethoscope, TriangleAlert } from "lucide-react"
 
-import { consultas as apiConsultas, type ConductaObservada, type TurnoClinico } from "@/lib/api"
+import {
+  consultas as apiConsultas,
+  nombreDelTurno,
+  profesionales as apiProfesionales,
+  type ConductaObservada,
+  type Profesional,
+  type TurnoClinico,
+} from "@/lib/api"
+import { useApi } from "@/lib/use-api"
 import { Button } from "@/components/ui/button"
 import { Field, Select, TextArea, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
@@ -30,6 +38,9 @@ export function AtenderTurnoModal({
   onCerrar: () => void
   onGuardado: (mensaje: string) => void | Promise<void>
 }) {
+  const profesionales = useApi<Profesional[]>(() => apiProfesionales.listar())
+  // La urgencia se agenda sin profesional: lo elige quien la atiende.
+  const [profesionalId, setProfesionalId] = useState(turno.profesional ? String(turno.profesional.id) : "")
   const [anamnesis, setAnamnesis] = useState("")
   const [diagnostico, setDiagnostico] = useState("")
   const [tratamiento, setTratamiento] = useState("")
@@ -46,8 +57,9 @@ export function AtenderTurnoModal({
     try {
       ficha = await apiConsultas.registrar({
         turnoClinicoId: turno.id,
-        mascotaId: turno.mascota.id,
-        profesionalId: turno.profesional.id,
+        // Una urgencia sin datos se atiende sin mascota: la comanda queda sin titular hasta completarlos.
+        mascotaId: turno.mascota?.id,
+        profesionalId: Number(profesionalId),
         fechaAtencion: turno.fechaHoraInicio,
         anamnesis: anamnesis.trim(),
         diagnostico: diagnostico.trim() || undefined,
@@ -65,7 +77,9 @@ export function AtenderTurnoModal({
     // como error del guardado (un reintento chocaría con "el turno ya tiene ficha").
     try {
       await onGuardado(
-        `Atención de ${turno.mascota.nombre} cerrada. Se emitió la comanda #${ficha.comandaId} para cobrar en el mostrador.`,
+        turno.mascota
+          ? `Atención de ${turno.mascota.nombre} cerrada. Se emitió la comanda #${ficha.comandaId} para cobrar en el mostrador.`
+          : `Urgencia atendida. La comanda #${ficha.comandaId} se podrá cobrar cuando se completen los datos del cliente y la mascota.`,
       )
     } catch {
       // El padre muestra la agenda desactualizada con su propio estado de error.
@@ -75,12 +89,33 @@ export function AtenderTurnoModal({
   }
 
   return (
-    <Modal open onClose={onCerrar} title={`Atender a ${turno.mascota.nombre}`}>
+    <Modal open onClose={onCerrar} title={`Atender a ${nombreDelTurno(turno)}`}>
       <div className="flex flex-col gap-3">
         <p className="text-xs text-muted-foreground">
-          {turno.fechaHoraInicio.slice(11, 16)} · {turno.motivo} · {turno.profesional.nombreCompleto}
+          {turno.fechaHoraInicio.slice(11, 16)} · {turno.motivo}
+          {turno.profesional ? ` · ${turno.profesional.nombreCompleto}` : ""}
         </p>
 
+        {!turno.profesional && (
+          <Field label="Profesional que atiende">
+            <Select value={profesionalId} onChange={(e) => setProfesionalId(e.target.value)} className={TOQUE_MINIMO}>
+              <option value="">Elegí un profesional…</option>
+              {(profesionales.datos ?? [])
+                .filter((p) => p.activo)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.matricula ? `${p.nombreCompleto} · ${p.matricula}` : p.nombreCompleto}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        )}
+        {!turno.mascota && (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-300">
+            Urgencia sin datos: podés atenderla igual. Antes de cobrar hay que completar el cliente y la mascota desde
+            la Agenda.
+          </p>
+        )}
         <Field label="Anamnesis">
           <TextArea value={anamnesis} onChange={(e) => setAnamnesis(e.target.value)} rows={3} maxLength={2000} />
         </Field>
@@ -143,7 +178,9 @@ export function AtenderTurnoModal({
           </Button>
           <Button
             onClick={guardar}
-            disabled={guardando || anamnesis.trim() === "" || (peso !== "" && !(Number(peso) > 0))}
+            disabled={
+              guardando || profesionalId === "" || anamnesis.trim() === "" || (peso !== "" && !(Number(peso) > 0))
+            }
             type="button"
             className={TOQUE_MINIMO}
           >
