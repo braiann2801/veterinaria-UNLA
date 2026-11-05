@@ -674,6 +674,8 @@ export const turnos = {
     get<TurnoClinico[]>(`/turnos?desde=${desde}&hasta=${hasta}`),
   crear: (body: TurnoClinicoInput) => post<TurnoClinico>("/turnos", body),
   crearConAlta: (body: TurnoConAltaInput) => post<TurnoClinico>("/turnos/con-alta", body),
+  /** Libera el bloque de 45+15: el turno queda en la agenda tachado, no se borra. */
+  cancelar: (id: number) => put<TurnoClinico>(`/turnos/${id}/cancelar`),
   /** Urgencia: sin datos, a la hora actual. */
   crearUrgencia: () => post<TurnoClinico>("/turnos/urgencia"),
   /** Cliente y mascota de una urgencia registrada sin datos; después se puede cobrar. */

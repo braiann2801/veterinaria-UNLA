@@ -13,13 +13,14 @@
  */
 
 import { useMemo, useState } from "react"
-import { Plus, Stethoscope, UserCheck } from "lucide-react"
+import { Plus, Stethoscope, UserCheck, X } from "lucide-react"
 
 import { nombreDelTurno, turnos as apiTurnos } from "@/lib/api"
 import type { TurnoClinico } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Panel } from "@/components/ui/field"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
+import { ConfirmarModal, type Confirmacion } from "@/components/ui/confirmar"
 import { AgendarTurnoModal } from "@/components/modules/agendar-turno-modal"
 import {
   CalendarioMensual,
@@ -56,6 +57,32 @@ export function Agenda() {
   const [atendiendo, setAtendiendo] = useState<TurnoClinico | null>(null)
   const [completando, setCompletando] = useState<TurnoClinico | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null)
+
+  function pedirCancelacion(turno: TurnoClinico) {
+    setConfirmacion({
+      titulo: "Cancelar turno",
+      mensaje: `¿Seguro que querés cancelar el turno de ${nombreDelTurno(turno)} de las ${turno.fechaHoraInicio.slice(11, 16)}? El horario queda libre para otro turno.`,
+      textoConfirmar: "Cancelar turno",
+      textoDescartar: "Volver",
+      peligrosa: true,
+      alConfirmar: () => cancelar(turno),
+    })
+  }
+
+  async function cancelar(turno: TurnoClinico) {
+    setAviso(null)
+    setError(null)
+    try {
+      await apiTurnos.cancelar(turno.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cancelar el turno")
+      return
+    }
+    setAviso(`Turno de ${nombreDelTurno(turno)} de las ${turno.fechaHoraInicio.slice(11, 16)} cancelado.`)
+    await turnosMes.recargar()
+  }
 
   const dias = diasVisibles(vista.anio, vista.mes)
   const desde = aClave(dias[0])
@@ -97,6 +124,7 @@ export function Agenda() {
   function seleccionar(clave: string) {
     setFecha(clave)
     setAviso(null)
+    setError(null)
     const dia = deClave(clave)
     if (dia.getMonth() !== vista.mes || dia.getFullYear() !== vista.anio) {
       setVista({ anio: dia.getFullYear(), mes: dia.getMonth() })
@@ -197,6 +225,17 @@ export function Agenda() {
                               Atender
                             </button>
                           )}
+                          {/* Solo un turno pendiente: uno atendido ya tiene ficha y comanda. */}
+                          {t.estado === "PENDIENTE" && (
+                            <button
+                              type="button"
+                              onClick={() => pedirCancelacion(t)}
+                              className={`inline-flex items-center justify-center gap-2 rounded-md border border-input px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${TOQUE_MINIMO}`}
+                            >
+                              <X className="size-3.5" aria-hidden />
+                              Cancelar
+                            </button>
+                          )}
                           {/* Una urgencia sin datos no se puede cobrar hasta completarlos. */}
                           {t.urgencia && !t.mascota && t.estado !== "CANCELADO" && (
                             <button
@@ -215,6 +254,14 @@ export function Agenda() {
                 )
               }}
             </Recurso>
+            {error && (
+              <p
+                className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                role="alert"
+              >
+                {error}
+              </p>
+            )}
             {aviso && (
               <p
                 className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-900"
@@ -237,6 +284,8 @@ export function Agenda() {
           onGuardado={refrescar}
         />
       )}
+
+      <ConfirmarModal confirmacion={confirmacion} onCerrar={() => setConfirmacion(null)} />
 
       {completando && (
         <CompletarDatosModal
