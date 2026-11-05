@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Field, Select, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
+import { HoraPicker } from "@/components/ui/hora-picker"
 import { cn } from "@/lib/utils"
 import { TOQUE_MINIMO } from "@/lib/vista"
 import {
@@ -220,15 +221,7 @@ export function AgendarTurnoModal({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <DatePicker label="Fecha" value={fecha} onChange={setFecha} />
-              <Field label="Hora">
-                <TextInput
-                  type="time"
-                  step={900}
-                  value={hora}
-                  onChange={(e) => setHora(e.target.value)}
-                  className={TOQUE_MINIMO}
-                />
-              </Field>
+              <HoraPicker label="Hora" value={hora} onChange={setHora} />
             </div>
 
             <Field label="Motivo de consulta">
