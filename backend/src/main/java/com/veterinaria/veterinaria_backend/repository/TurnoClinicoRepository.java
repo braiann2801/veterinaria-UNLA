@@ -32,6 +32,17 @@ public interface TurnoClinicoRepository extends JpaRepository<TurnoClinico, Long
 
 	List<TurnoClinico> findByMascotaId(Long mascotaId);
 
+	/** Turnos de la mascota que siguen PENDIENTE en [desde, hasta): bloquean su retiro. */
+	@Query("""
+			SELECT t FROM TurnoClinico t
+			WHERE t.mascota.id = :mascotaId
+			  AND t.estado = com.veterinaria.veterinaria_backend.entity.TurnoClinico$EstadoTurno.PENDIENTE
+			  AND t.fechaHoraInicio >= :desde AND t.fechaHoraInicio < :hasta
+			ORDER BY t.fechaHoraInicio, t.id
+			""")
+	List<TurnoClinico> findPendientesDeMascota(@Param("mascotaId") Long mascotaId,
+			@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
+
 	/** ¿La mascota tiene turnos clinicos? Bloquea su borrado desde el padron. */
 	boolean existsByMascotaId(Long mascotaId);
 

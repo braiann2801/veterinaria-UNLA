@@ -97,6 +97,7 @@ El frontend todavía no tiene test runner.
   - La **seña** es parte de pago: al reservar se registra como un pago "Seña" en la comanda y se descuenta del total. No puede superar el total de la estadía.
   - **Plaza de urgencia clínica:** el Veterinario puede habilitar, para un día, una plaza extra destinada solo a una urgencia clínica. No suma a los 10 cupos ni la usan las reservas normales (la reserva 11 sigue dando 409). Solo el rol Veterinario la habilita, la deshabilita o interna una mascota (el resto recibe 403, incluido el Dueño); cualquier empleado ve su estado en la Agenda guardería. Para deshabilitarla tiene que estar libre.
 - **Turnos clínicos:** cada turno dura 45 minutos de atención y le siguen 15 minutos de desinfección.
+  - Los selectores de fecha se abren junto al campo sin salirse de la pantalla (en celular, como panel inferior) y la hora se elige en formato 24 h, de a 15 minutos.
   - La **Agenda clínica** muestra el mes como calendario, con los turnos de cada día. Al elegir un día, sus turnos aparecen al costado (debajo en celular).
   - Para un cliente que llega por primera vez, el modal "Agendar turno" tiene un botón "Cliente o mascota nuevos": permite cargar el cliente y su mascota en el mismo paso. Todo se guarda junto: si el horario choca con otro turno, no queda nada creado a medias.
   - **Turno de urgencia:** el interruptor "Turno de urgencia" del modal registra el turno para ahora, sin pedir cliente, mascota ni profesional, y puede superponerse con turnos agendados. Se ve en rojo en la Agenda. Al tocar **Atender** se elige el profesional y se puede cargar la ficha sin datos; la comanda queda sin titular y Caja no la deja cobrar hasta que se usa **Completar datos** (cliente nuevo o existente + mascota nueva o existente).
@@ -113,6 +114,7 @@ El frontend todavía no tiene test runner.
   - Un registro desactivado no puede tomar turnos ni reservas nuevas. Se puede reactivar desde el Padrón o la lista de Profesionales, con el interruptor "Mostrar desactivados". Una mascota solo vuelve si tiene al menos un tutor activo.
 - **Deuda por mascota:**
   - Se puede retirar una mascota cuando sus propias comandas están saldadas.
+  - Tampoco se retira si tiene un turno clínico de ese día **sin atender**: hay que atenderlo o cancelarlo antes. La comanda de la consulta nace al atender, así que un turno pendiente no deja deuda que lo frene.
   - Si un tutor tiene dos mascotas y paga la deuda de una, esa sale aunque la otra siga debiendo.
   - Una comanda sin mascota cuenta como deuda del tutor, pero no retiene a ninguna mascota.
   - En el **Balance**, un cobro se marca como **deuda anterior** cuando el servicio es de un día previo a la jornada: el último día de la estadía o el de la atención, aunque se haya cargado hoy. Una comanda manual, sin servicio, usa su fecha de emisión.
