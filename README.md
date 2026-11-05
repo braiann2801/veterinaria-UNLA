@@ -105,7 +105,7 @@ El frontend todavía no tiene test runner.
   - La consulta registra anamnesis, diagnóstico, tratamiento, conducta y el **peso** del día (que pasa a ser el peso actual de la mascota). El alta de la mascota ya no pide el peso.
   - El cobro se genera como comanda para el mostrador.
   - La atención se registra solo desde la Agenda clínica: cada turno pendiente tiene el botón **Atender**, que abre la ficha ya vinculada al turno. Al finalizar, el turno queda como **Atendido**.
-  - Un turno pendiente se puede **Cancelar** desde el panel del día de la Agenda clínica, con confirmación. Queda en la agenda tachado y su horario se libera para otro turno. Los turnos atendidos no muestran el botón: ya tienen ficha y comanda.
+  - Un turno pendiente se puede **Cancelar** desde el panel del día de la Agenda clínica, con confirmación. Queda en la agenda tachado y su horario se libera para otro turno. Un turno atendido no se cancela (el backend responde 409): ya tiene ficha y comanda.
   - El profesional puede sumar **extras** (vacunas, urgencias, insumos) del catálogo que arma el Dueño en **Tarifas**. No ve precios: la comanda suma la consulta más los extras, y Caja muestra el detalle de cada línea.
   - Cambiar el precio de un extra rige para las atenciones nuevas; las comandas ya emitidas conservan su precio. Un extra no se borra, se desactiva.
 - **Tutores y mascotas:** la relación es N:M. Cada vínculo indica si ese tutor está autorizado a retirar a la mascota.
