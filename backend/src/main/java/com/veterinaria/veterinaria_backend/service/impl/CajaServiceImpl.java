@@ -184,7 +184,9 @@ public class CajaServiceImpl implements CajaService {
 				fila.getNombreTutor(),
 				fila.getNombrePagador(),
 				fila.getNombreMascota(),
-				fila.getEstadoComanda() != null ? fila.getEstadoComanda().name() : null);
+				fila.getEstadoComanda() != null ? fila.getEstadoComanda().name() : null,
+				fila.getFechaFinEstadia() != null ? fila.getFechaFinEstadia()
+						: fila.getFechaAtencion() != null ? fila.getFechaAtencion().toLocalDate() : null);
 	}
 
 	/**

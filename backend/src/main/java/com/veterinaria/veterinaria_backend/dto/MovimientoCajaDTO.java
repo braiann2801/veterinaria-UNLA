@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -29,6 +30,11 @@ import java.time.LocalDateTime;
  * @param nombreMascota puede ser {@code null}: las comandas de guarderia sin
  *                      mascota no la tienen
  * @param estadoComanda estado de la comanda despues del pago
+ * @param fechaServicio dia del servicio cobrado: el ultimo dia de la estadia o
+ *                      el de la atencion. Si es anterior a la jornada, el cobro
+ *                      salda una deuda de otro dia aunque la comanda se haya
+ *                      emitido hoy (servicio cargado despues de ocurrido).
+ *                      {@code null} en las comandas manuales, sin servicio
  */
 public record MovimientoCajaDTO(
 		Long id,
@@ -40,5 +46,6 @@ public record MovimientoCajaDTO(
 		String nombreTutor,
 		String nombrePagador,
 		String nombreMascota,
-		String estadoComanda) {
+		String estadoComanda,
+		LocalDate fechaServicio) {
 }

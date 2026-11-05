@@ -441,6 +441,12 @@ export interface MovimientoCaja {
   /** `null` en las comandas de guardería sin mascota. */
   nombreMascota: string | null
   estadoComanda: EstadoComanda
+  /**
+   * Día del servicio cobrado: el último de la estadía o el de la atención.
+   * Si es anterior a la jornada, el pago salda una deuda de otro día aunque la
+   * comanda se haya emitido hoy. `null` en las comandas manuales.
+   */
+  fechaServicio: string | null
 }
 
 export interface CierreCaja {
