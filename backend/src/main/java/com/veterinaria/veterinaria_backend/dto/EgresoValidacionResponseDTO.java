@@ -22,6 +22,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param puedeRetirar          veredicto final; solo lo decide {@code motivoBloqueo}
  * @param motivoBloqueo         por que no se puede entregar, o {@link MotivoBloqueo#NINGUNO}
  * @param tutorAutorizado       el vinculo existe con {@code autorizadoRetiro=true}
+ * @param turnoSinAtender       la mascota tiene un turno clinico de la jornada
+ *                              que sigue pendiente: hay que atenderlo o cancelarlo
  * @param tieneDeuda            la mascota debe en comandas pendientes
  * @param saldoDeuda            saldo pendiente de la mascota, 0.00 si no debe
  * @param alertaConducta        avisar tomar con precaucion al entregar: no bloquea
@@ -38,6 +40,7 @@ public record EgresoValidacionResponseDTO(
 		boolean puedeRetirar,
 		MotivoBloqueo motivoBloqueo,
 		boolean tutorAutorizado,
+		boolean turnoSinAtender,
 		boolean tieneDeuda,
 		BigDecimal saldoDeuda,
 		boolean alertaConducta,
@@ -56,7 +59,8 @@ public record EgresoValidacionResponseDTO(
 	 * <p>La precedencia es fija y no arbitraria: primero la identidad de quien
 	 * retira, despues la plata. Si alguien no autorizado esta debiendo, primero
 	 * hay que resolver quien es: de nada sirve discutir el saldo con alguien a
-	 * quien no le corresponde la mascota.</p>
+	 * quien no le corresponde la mascota. El turno sin atender va antes que la
+	 * deuda: la consulta todavia no se cobro porque todavia no ocurrio.</p>
 	 *
 	 * <p>{@code ALERTA_CONDUCTA} no aparece como motivo de bloqueo a proposito.
 	 * Un perro que grune se entrega igual, con una recomendacion de tomarlo con
@@ -66,6 +70,7 @@ public record EgresoValidacionResponseDTO(
 	public enum MotivoBloqueo {
 		NINGUNO,
 		TUTOR_NO_AUTORIZADO,
+		TURNO_SIN_ATENDER,
 		DEUDA_PENDIENTE
 	}
 
@@ -84,6 +89,7 @@ public record EgresoValidacionResponseDTO(
 		return switch (motivoBloqueo) {
 			case NINGUNO -> "Retiro permitido";
 			case TUTOR_NO_AUTORIZADO -> "Tutor sin autorización de retiro";
+			case TURNO_SIN_ATENDER -> "Turno clínico sin atender";
 			case DEUDA_PENDIENTE -> "Mascota con deuda pendiente";
 		};
 	}

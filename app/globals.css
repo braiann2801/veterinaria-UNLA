@@ -146,9 +146,11 @@
  * mismos nombres con significados distintos: en HeroUI `muted` es texto atenuado
  * y `accent` es el color de marca; en el tema son colores de fondo. Sin esto, las
  * barras de la fecha, el separador y el ícono quedan invisibles y los días
- * elegidos, grises. Se reasignan solo dentro del selector y de su popover.
+ * elegidos, grises. Se reasignan solo dentro del selector y de su popover, y en
+ * el calendario del `DatePicker` (`calendario-tema`).
  */
-.rango-estadia {
+.rango-estadia,
+.calendario-tema {
   /* El tema usa @theme inline: las utilidades leen --muted/--accent directo,
      no --color-*. Se reasignan las dos capas. */
   --muted: var(--muted-foreground);

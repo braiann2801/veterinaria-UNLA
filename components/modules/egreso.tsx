@@ -11,7 +11,8 @@
  *
  * La pantalla **no recalcula ninguna regla**. Si el semáforo dice rojo, es porque
  * el servidor dijo `puedeRetirar: false` con un `motivoBloqueo`: identidad primero
- * (quién se presenta), después deuda, y por último la alerta de conducta. La UI
+ * (quién se presenta), después un turno clínico de la jornada sin atender,
+ * después deuda, y por último la alerta de conducta. La UI
  * solo pinta ese veredicto. Reimplementar el semáforo acá daría dos verdades y
  * el mostrador acabaría entregando un perro que el backend nunca autorizó.
  */
@@ -25,6 +26,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShieldX,
+  Stethoscope,
   TriangleAlert,
 } from "lucide-react"
 
@@ -337,6 +339,14 @@ function Veredicto({ veredicto }: { veredicto: EgresoValidacion }) {
           <p className="mt-1 leading-relaxed text-muted-foreground">{veredicto.mensaje}</p>
         </div>
       </div>
+
+      {/* Aparte del motivo: si el bloqueo es otro, igual hay que saber que falta atenderla. */}
+      {veredicto.turnoSinAtender && veredicto.motivoBloqueo !== "TURNO_SIN_ATENDER" && (
+        <p className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          <Stethoscope className="size-4 shrink-0" aria-hidden />
+          <span>{veredicto.mascotaNombre} tiene un turno clínico de la jornada sin atender.</span>
+        </p>
+      )}
 
       {veredicto.tieneDeuda && (
         <p className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">

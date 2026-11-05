@@ -191,6 +191,12 @@ public class TurnoClinicoServiceImpl implements TurnoClinicoService {
 		if (turno.getEstado() == TurnoClinico.EstadoTurno.CANCELADO) {
 			throw new BadRequestException("El turno " + id + " ya estaba cancelado");
 		}
+		// Atendido ya tiene ficha y comanda: cancelarlo las dejaria colgadas de un
+		// turno que figura como no ocurrido.
+		if (turno.getEstado() == TurnoClinico.EstadoTurno.ATENDIDO) {
+			throw new BusinessConflictException("El turno " + id
+					+ " ya fue atendido: tiene ficha clínica y comanda, no se puede cancelar");
+		}
 
 		turno.setEstado(TurnoClinico.EstadoTurno.CANCELADO);
 		return toResponse(turno);

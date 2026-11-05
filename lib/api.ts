@@ -165,7 +165,7 @@ export type ConductaObservada = "TRANQUILO" | "NERVIOSO" | "REACTIVO" | "AGRESIV
 export type MetodoPago = "EFECTIVO" | "TRANSFERENCIA" | "DEBITO" | "CREDITO" | "SENA"
 export type ConceptoCobro = "CONSULTA_CLINICA" | "GUARDERIA" | "OTRO"
 export type EstadoComanda = "PENDIENTE" | "PARCIAL" | "PAGADA" | "CANCELADA"
-export type MotivoBloqueo = "NINGUNO" | "TUTOR_NO_AUTORIZADO" | "DEUDA_PENDIENTE"
+export type MotivoBloqueo = "NINGUNO" | "TUTOR_NO_AUTORIZADO" | "TURNO_SIN_ATENDER" | "DEUDA_PENDIENTE"
 
 export interface TutorResumen {
   id: number
@@ -466,6 +466,8 @@ export interface EgresoValidacion {
   puedeRetirar: boolean
   motivoBloqueo: MotivoBloqueo
   tutorAutorizado: boolean
+  /** La mascota tiene un turno clínico de la jornada que sigue pendiente. */
+  turnoSinAtender: boolean
   tieneDeuda: boolean
   saldoDeuda: number
   alertaConducta: boolean
@@ -672,6 +674,8 @@ export const turnos = {
     get<TurnoClinico[]>(`/turnos?desde=${desde}&hasta=${hasta}`),
   crear: (body: TurnoClinicoInput) => post<TurnoClinico>("/turnos", body),
   crearConAlta: (body: TurnoConAltaInput) => post<TurnoClinico>("/turnos/con-alta", body),
+  /** Libera el bloque de 45+15: el turno queda en la agenda tachado, no se borra. */
+  cancelar: (id: number) => put<TurnoClinico>(`/turnos/${id}/cancelar`),
   /** Urgencia: sin datos, a la hora actual. */
   crearUrgencia: () => post<TurnoClinico>("/turnos/urgencia"),
   /** Cliente y mascota de una urgencia registrada sin datos; después se puede cobrar. */
