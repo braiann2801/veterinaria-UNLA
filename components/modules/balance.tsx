@@ -82,7 +82,17 @@ function fechaCorta(iso: string) {
 }
 
 /** Movimiento del extracto enriquecido con el criterio de la jornada mirada. */
-type MovimientoVista = MovimientoCaja & { deudaAnterior: boolean }
+type MovimientoVista = MovimientoCaja & { deudaAnterior: boolean; fechaDeuda: string }
+
+/**
+ * Día al que pertenece lo cobrado: el del servicio (estadía o atención), que
+ * puede ser anterior a la emisión cuando se carga después de ocurrido. Sin
+ * servicio (comanda manual) vale la emisión; el último fallback, `fechaHora`,
+ * cubre a un backend desalineado.
+ */
+function fechaDeLaDeuda(m: MovimientoCaja): string {
+  return m.fechaServicio ?? (m.fechaEmision ?? m.fechaHora).slice(0, 10)
+}
 
 export function Balance() {
   const [fecha, setFecha] = useState(hoyLocal())
@@ -105,15 +115,15 @@ export function Balance() {
       }
     : null
 
-  // Una comanda emitida antes de la jornada que se está mirando significa que
+  // Un servicio prestado antes de la jornada que se está mirando significa que
   // este pago salda una deuda vieja. Se calcula acá, contra la fecha elegida,
   // y no se guarda en el backend, para que siga siendo válido al cambiar de
-  // jornada. El fallback a `fechaHora` cubre a un backend desalineado.
+  // jornada.
   const movimientos: MovimientoVista[] = datos
-    ? datos.movimientos.map((m) => ({
-        ...m,
-        deudaAnterior: (m.fechaEmision ?? m.fechaHora).slice(0, 10) < fecha,
-      }))
+    ? datos.movimientos.map((m) => {
+        const fechaDeuda = fechaDeLaDeuda(m)
+        return { ...m, fechaDeuda, deudaAnterior: fechaDeuda < fecha }
+      })
     : []
 
   return (
@@ -288,7 +298,7 @@ function ListaMovimientos({ movimientos }: { movimientos: MovimientoVista[] }) {
               </span>
               <EstadoComanda estado={m.estadoComanda} />
               {m.deudaAnterior && (
-                <DeudaAnterior fechaEmision={m.fechaEmision ?? m.fechaHora} />
+                <DeudaAnterior fecha={m.fechaDeuda} />
               )}
             </div>
           </li>
@@ -330,7 +340,7 @@ function ListaMovimientos({ movimientos }: { movimientos: MovimientoVista[] }) {
                   <div className="flex flex-col items-start gap-1.5">
                     <EstadoComanda estado={m.estadoComanda} />
                     {m.deudaAnterior && (
-                      <DeudaAnterior fechaEmision={m.fechaEmision ?? m.fechaHora} />
+                      <DeudaAnterior fecha={m.fechaDeuda} />
                     )}
                   </div>
                 </td>
@@ -354,16 +364,16 @@ function Etiqueta({ children }: { children: ReactNode }) {
 /**
  * Marca de un pago que salda una deuda de otro día.
  *
- * Lleva la fecha de emisión de la comanda: "deuda anterior" sin el día obliga a
+ * Lleva el día de la deuda (el del servicio): "deuda anterior" sin el día obliga a
  * abrir la comanda para saber de cuándo venía; con la fecha, el arqueo se lee de
  * un vistazo. Color ámbar y no rojo: no es una alerta de morosidad viva, es un
  * cobro que se está regularizando hoy.
  */
-function DeudaAnterior({ fechaEmision }: { fechaEmision: string }) {
+function DeudaAnterior({ fecha }: { fecha: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
       <History className="size-3" aria-hidden />
-      Deuda anterior · {fechaCorta(fechaEmision)}
+      Deuda anterior · {fechaCorta(fecha)}
     </span>
   )
 }

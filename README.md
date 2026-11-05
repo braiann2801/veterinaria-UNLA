@@ -60,6 +60,8 @@ Balance, Usuarios, cierre de caja y tarifas son solo para el Dueño, y el backen
 
 Necesitás un MySQL 8 en `localhost:3306` con usuario `root` sin clave, o definir `DB_HOST`, `DB_PORT`, `DB_USERNAME` y `DB_PASSWORD`. La base se crea sola.
 
+Las horas del sistema (pagos, comandas, jornada del Balance) son de Argentina aunque el servidor esté en UTC, como en Docker o en la nube: el backend fija la zona `America/Argentina/Buenos_Aires` al arrancar. Se cambia con la variable `ZONA_HORARIA`.
+
 ```bash
 # Backend (en backend/)
 ./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
@@ -113,6 +115,7 @@ El frontend todavía no tiene test runner.
   - Se puede retirar una mascota cuando sus propias comandas están saldadas.
   - Si un tutor tiene dos mascotas y paga la deuda de una, esa sale aunque la otra siga debiendo.
   - Una comanda sin mascota cuenta como deuda del tutor, pero no retiene a ninguna mascota.
+  - En el **Balance**, un cobro se marca como **deuda anterior** cuando el servicio es de un día previo a la jornada: el último día de la estadía o el de la atención, aunque se haya cargado hoy. Una comanda manual, sin servicio, usa su fecha de emisión.
 - **Datos normalizados:**
   - El backend corrige el formato al guardar, así que el mostrador puede escribir los datos como le resulte cómodo (ver tabla).
   - La normalización se aplica en cada alta y en cada edición.
