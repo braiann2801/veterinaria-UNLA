@@ -3,11 +3,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import { createPortal } from "react-dom"
 import { CalendarDays, ChevronDown } from "lucide-react"
-import type { Matcher } from "react-day-picker"
+import { Calendar } from "@heroui/react"
+import { getLocalTimeZone, parseDate, today, type CalendarDate } from "@internationalized/date"
+import { I18nProvider } from "react-aria-components"
 
-import { Calendar } from "@/components/ui/calendar"
 import { hoyLocal } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { TOQUE_MINIMO } from "@/lib/vista"
 
 const FORMATO_FECHA = new Intl.DateTimeFormat("es-AR", {
   weekday: "short",
@@ -30,12 +32,17 @@ function aFecha(iso: string): Date | undefined {
   return new Date(anio, mes - 1, dia)
 }
 
-/** `Date` a `YYYY-MM-DD` local, que es lo que espera el backend. */
-function aIso(fecha: Date): string {
-  const anio = fecha.getFullYear()
-  const mes = String(fecha.getMonth() + 1).padStart(2, "0")
-  const dia = String(fecha.getDate()).padStart(2, "0")
-  return `${anio}-${mes}-${dia}`
+/**
+ * `YYYY-MM-DD` a la fecha sin hora de HeroUI. `parseDate` tira con un texto
+ * mal formado: se devuelve `undefined` para que el calendario arranque vacio.
+ */
+function aFechaCalendario(iso: string | undefined): CalendarDate | undefined {
+  if (!iso) return undefined
+  try {
+    return parseDate(iso)
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -55,6 +62,13 @@ function ubicarPanel(disparador: DOMRect, altoPanel: number): CSSProperties {
         : Math.max(MARGEN, window.innerHeight - altoPanel - MARGEN)
   const left = Math.min(Math.max(disparador.left, MARGEN), window.innerWidth - ancho - MARGEN)
   return { top, left, width: ancho }
+}
+
+/** La fecha dentro de [min, max]: cambiar el año puede sacarla del rango. */
+function acotar(fecha: CalendarDate, min?: CalendarDate, max?: CalendarDate): CalendarDate {
+  if (min && fecha.compare(min) < 0) return min
+  if (max && fecha.compare(max) > 0) return max
+  return fecha
 }
 
 export interface DatePickerProps {
@@ -87,6 +101,11 @@ export interface DatePickerProps {
  * panel del dialogo. En escritorio se ubica junto al boton (arriba si abajo no
  * entra) y lo sigue al scrollear; en el celular es una hoja inferior.
  *
+ * El calendario es el `Calendar` de HeroUI con selector de año (el mismo que
+ * usa el rango de la guarderia): tocando el encabezado se elige el año sin ir
+ * mes por mes, util para fechas de nacimiento. Los colores salen del tema con
+ * la clase `calendario-tema` (ver `app/globals.css`).
+ *
  * Reutilizable en cualquier modulo: recibe y devuelve la fecha como
  * `YYYY-MM-DD` (el formato del backend) y no sabe nada del dato que filtra.
  * El atajo "Hoy" usa `hoyLocal()` para no caer en el corrimiento de UTC.
@@ -108,12 +127,28 @@ export function DatePicker({
   // Sin posicion calculada el panel se monta invisible: asi se mide su alto
   // antes de mostrarlo y no aparece un instante en la esquina.
   const [posicion, setPosicion] = useState<CSSProperties | null>(null)
+  // Foco del calendario (el mes que se ve) y selector de año, controlados: ver
+  // `alCambiarFoco`.
+  const [foco, setFoco] = useState<CalendarDate>(() => today(getLocalTimeZone()))
+  const [eligiendoAnio, setEligiendoAnio] = useState(false)
   const contenedorRef = useRef<HTMLDivElement>(null)
   const disparadorRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const fondoRef = useRef<HTMLDivElement>(null)
 
   const fechaSeleccionada = value ? aFecha(value) : undefined
+  const minimo = aFechaCalendario(min)
+  const maximo = aFechaCalendario(max)
+
+  /**
+   * Al elegir un año, el selector de HeroUI mueve el foco al 31 de diciembre de
+   * ese año: le pasa a react-aria todo el rango 1900-2099 y react-aria arma la
+   * lista de años desde ese borde. Se conserva el mes y el dia que se estaban
+   * viendo y solo cambia el año.
+   */
+  function alCambiarFoco(nuevo: CalendarDate) {
+    setFoco(eligiendoAnio && nuevo.year !== foco.year ? acotar(foco.set({ year: nuevo.year }), minimo, maximo) : nuevo)
+  }
 
   function alternar() {
     if (abierto) {
@@ -122,6 +157,8 @@ export function DatePicker({
     }
     setEsMovil(window.matchMedia(CONSULTA_MOVIL).matches)
     setPosicion(null)
+    setFoco(acotar(aFechaCalendario(value) ?? today(getLocalTimeZone()), minimo, maximo))
+    setEligiendoAnio(false)
     setAbierto(true)
   }
 
@@ -182,30 +219,52 @@ export function DatePicker({
     }
   }, [abierto])
 
-  const noSeleccionables: Matcher[] = []
-  const desde = min ? aFecha(min) : undefined
-  const hasta = max ? aFecha(max) : undefined
-  if (desde) noSeleccionables.push({ before: desde })
-  if (hasta) noSeleccionables.push({ after: hasta })
-
   const texto = fechaSeleccionada ? FORMATO_FECHA.format(fechaSeleccionada) : placeholder
 
   const contenido = (
     <>
-      <Calendar
-        mode="single"
-        selected={fechaSeleccionada}
-        defaultMonth={fechaSeleccionada ?? new Date()}
-        startMonth={desde}
-        endMonth={hasta}
-        disabled={noSeleccionables.length > 0 ? noSeleccionables : undefined}
-        className={cn(esMovil && "mx-auto")}
-        onSelect={(dia) => {
-          if (!dia) return
-          onChange(aIso(dia))
-          setAbierto(false)
-        }}
-      />
+      {/* es-AR: meses y dias en español y la semana arranca el lunes. */}
+      <I18nProvider locale="es-AR">
+        <Calendar
+          aria-label={label ?? "Fecha"}
+          value={aFechaCalendario(value) ?? null}
+          minValue={minimo}
+          maxValue={maximo}
+          focusedValue={foco}
+          onFocusChange={alCambiarFoco}
+          isYearPickerOpen={eligiendoAnio}
+          onYearPickerOpenChange={setEligiendoAnio}
+          onChange={(dia: CalendarDate) => {
+            // CalendarDate.toString() ya es `YYYY-MM-DD`, el formato del backend.
+            onChange(dia.toString())
+            setAbierto(false)
+          }}
+          className={cn("calendario-tema w-full p-3", esMovil && "mx-auto max-w-sm")}
+        >
+          <Calendar.Header>
+            <Calendar.YearPickerTrigger className={TOQUE_MINIMO}>
+              <Calendar.YearPickerTriggerHeading className="whitespace-nowrap text-sm font-medium first-letter:uppercase" />
+              <Calendar.YearPickerTriggerIndicator />
+            </Calendar.YearPickerTrigger>
+            <Calendar.NavButton slot="previous" className="size-11" />
+            <Calendar.NavButton slot="next" className="size-11" />
+          </Calendar.Header>
+          <Calendar.Grid className="w-full">
+            <Calendar.GridHeader>
+              {(dia) => (
+                <Calendar.HeaderCell className="text-xs font-normal text-muted-foreground">{dia}</Calendar.HeaderCell>
+              )}
+            </Calendar.GridHeader>
+            {/* Celdas de 44 px: area de toque minima (regla 3.4 de AGENTS.md). */}
+            <Calendar.GridBody>{(dia) => <Calendar.Cell date={dia} className="size-11 text-sm" />}</Calendar.GridBody>
+          </Calendar.Grid>
+          <Calendar.YearPickerGrid>
+            <Calendar.YearPickerGridBody>
+              {({ year }) => <Calendar.YearPickerCell year={year} className="min-h-[44px] text-sm" />}
+            </Calendar.YearPickerGridBody>
+          </Calendar.YearPickerGrid>
+        </Calendar>
+      </I18nProvider>
       <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
         <div className="flex items-center gap-2">
           <button
