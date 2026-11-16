@@ -26,5 +26,6 @@ public record ReservaGuarderiaResponseDTO(
 		long cuposOcupados,
 		int aforoMaximo,
 		/** Comanda de GUARDERIA emitida por la reserva; {@code null} si la mascota no tiene tutor. */
-		Long comandaId) {
+		Long comandaId,
+		boolean urgenciaClinica) {
 }

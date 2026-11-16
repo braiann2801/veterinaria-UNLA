@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth"
 import { ErrorBox, TOQUE_MINIMO } from "@/lib/vista"
 import { Field, TextInput } from "@/components/ui/field"
 import { Button } from "@/components/ui/button"
+import { Paw } from "@/components/paw"
 import { cn } from "@/lib/utils"
 import { NEGOCIO } from "@/lib/negocio"
 
@@ -52,69 +53,87 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start gap-6 bg-background p-4 pt-12 text-foreground sm:justify-center sm:pt-4">
-      <form
-        onSubmit={enviar}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-lg"
-        aria-labelledby="titulo-login"
-      >
-        <header className="flex flex-col items-center gap-2 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <PawPrint className="h-6 w-6" aria-hidden />
-          </span>
-          <h1 id="titulo-login" className="text-lg font-semibold">
-            Ingreso de empleados
-          </h1>
-          <p className="text-sm text-muted-foreground">{NEGOCIO.nombre}</p>
-        </header>
+    <main className="relative flex min-h-screen flex-col items-center justify-center gap-6 overflow-hidden bg-cream p-4 py-10 text-navy sm:py-4">
+      {/* Huellas decorativas: la marca de la landing, muy tenues para no competir
+          con el formulario. */}
+      <Paw className="pointer-events-none absolute -left-16 top-4 h-56 w-56 text-navy/5" />
+      <Paw className="pointer-events-none absolute -right-20 bottom-0 h-72 w-72 text-navy/[0.04]" />
 
-        {sesionVencida && !error && (
-          <p className="rounded-md border border-border bg-muted p-3 text-sm" role="status">
-            Tu sesión terminó. Volvé a ingresar para continuar.
+      <div className="relative flex w-full max-w-sm flex-col gap-5">
+        <Link
+          href="/"
+          className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
+        >
+          <PawPrint className="h-6 w-6 shrink-0 text-navy" aria-hidden />
+          <span className="font-display text-lg font-semibold">{NEGOCIO.nombreCorto}</span>
+        </Link>
+
+        <form
+          onSubmit={enviar}
+          className="flex flex-col gap-4 rounded-3xl border border-navy/10 bg-white p-6 shadow-[0_28px_70px_-40px_rgba(35,42,92,0.55)]"
+          aria-labelledby="titulo-login"
+        >
+          <header className="flex flex-col items-center gap-2 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-lilac/60 text-navy">
+              <PawPrint className="h-7 w-7" aria-hidden />
+            </span>
+            <h1 id="titulo-login" className="text-2xl leading-tight font-semibold">
+              Ingreso de empleados
+            </h1>
+            <p className="text-sm text-ink-muted">Sistema interno · {NEGOCIO.nombre}</p>
+          </header>
+
+          {sesionVencida && !error && (
+            <p className="rounded-xl border border-navy/10 bg-cream p-3 text-sm" role="status">
+              Tu sesión terminó. Volvé a ingresar para continuar.
+            </p>
+          )}
+
+          <Field label="Usuario">
+            <TextInput
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className={TOQUE_MINIMO}
+              required
+            />
+          </Field>
+          <Field label="Contraseña">
+            <TextInput
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={TOQUE_MINIMO}
+              required
+            />
+          </Field>
+
+          <ErrorBox error={error} />
+
+          <Button type="submit" disabled={enviando} className={cn("w-full rounded-xl", TOQUE_MINIMO)}>
+            {enviando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <LogIn className="h-4 w-4" aria-hidden />}
+            Ingresar
+          </Button>
+          <p className="text-center text-xs text-ink-muted">
+            ¿Olvidaste la contraseña? Pedile al Dueño que la resetee.
           </p>
-        )}
+        </form>
 
-        <Field label="Usuario">
-          <TextInput
-            autoComplete="username"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className={TOQUE_MINIMO}
-            required
-          />
-        </Field>
-        <Field label="Contraseña">
-          <TextInput
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={TOQUE_MINIMO}
-            required
-          />
-        </Field>
-
-        <ErrorBox error={error} />
-
-        <Button type="submit" disabled={enviando} className={cn("w-full", TOQUE_MINIMO)}>
-          {enviando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <LogIn className="h-4 w-4" aria-hidden />}
-          Ingresar
-        </Button>
-        <p className="text-center text-xs text-muted-foreground">
-          ¿Olvidaste la contraseña? Pedile al Dueño que la resetee.
-        </p>
-      </form>
-
-      <Link
-        href="/"
-        className={cn("inline-flex items-center gap-2 rounded-xl px-3 text-sm text-muted-foreground hover:text-foreground", TOQUE_MINIMO)}
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        Volver al sitio
-      </Link>
+        <Link
+          href="/"
+          className={cn(
+            "inline-flex items-center justify-center gap-2 rounded-xl px-3 text-sm text-ink-muted transition-colors hover:text-navy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy",
+            TOQUE_MINIMO,
+          )}
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Volver al sitio
+        </Link>
+      </div>
     </main>
   )
 }

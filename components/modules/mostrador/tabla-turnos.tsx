@@ -1,6 +1,6 @@
 "use client"
 
-import type { TurnoClinico } from "@/lib/api"
+import { nombreDelTurno, type TurnoClinico } from "@/lib/api"
 import type { EstadoApi } from "@/lib/use-api"
 
 import { ColumnaLista } from "./columna-lista"
@@ -29,8 +29,8 @@ export function TablaTurnos({ turnos }: { turnos: EstadoApi<TurnoClinico[]> }) {
       }
       items={turnosVigentes.map((t) => ({
         id: String(t.id),
-        top: `${t.mascota.nombre} · ${t.fechaHoraInicio.slice(11, 16)}`,
-        sub: `${t.profesional.nombreCompleto} · ${t.motivo}`,
+        top: `${nombreDelTurno(t)} · ${t.fechaHoraInicio.slice(11, 16)}`,
+        sub: `${t.profesional?.nombreCompleto ?? "Sin profesional asignado"} · ${t.motivo}`,
       }))}
       icon="turno"
     />

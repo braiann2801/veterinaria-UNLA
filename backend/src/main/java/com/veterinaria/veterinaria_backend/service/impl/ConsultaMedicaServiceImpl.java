@@ -82,7 +82,8 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 	@Override
 	@Transactional
 	public ConsultaMedicaResponseDTO registrar(ConsultaMedicaRequestDTO request) {
-		Mascota mascota = obtenerMascota(request.mascotaId());
+		// Sin mascota solo se atiende una urgencia que todavia no tiene datos (se valida abajo).
+		Mascota mascota = request.mascotaId() == null ? null : obtenerMascota(request.mascotaId());
 		Profesional profesional = obtenerProfesional(request.profesionalId());
 
 		// Idempotencia por turno: una consulta cerrada no se vuelve a cargar.
@@ -96,6 +97,9 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 
 		// Todo lo que puede rechazar el pedido se resuelve antes de escribir.
 		TurnoClinico turno = request.turnoClinicoId() == null ? null : turnoAtendible(request.turnoClinicoId(), mascota);
+		if (mascota == null && (turno == null || !turno.isUrgencia())) {
+			throw new BadRequestException("El id de la mascota es obligatorio");
+		}
 		List<ExtraUsado> extras = resolverExtras(request.extras());
 
 		ConsultaMedica consulta = new ConsultaMedica();
@@ -103,6 +107,14 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 		consulta.setProfesional(profesional);
 		if (turno != null) {
 			consulta.setTurnoClinico(turno);
+			// La urgencia se agenda sin profesional: lo define quien la atiende.
+			if (turno.getProfesional() == null) {
+				turno.setProfesional(profesional);
+			}
+			// Si el veterinario ya sabe de quien es, la urgencia queda con sus datos.
+			if (turno.getMascota() == null && mascota != null) {
+				turno.setMascota(mascota);
+			}
 			// Guardar la ficha es dar la atencion por terminada.
 			turno.setEstado(TurnoClinico.EstadoTurno.ATENDIDO);
 		}
@@ -141,6 +153,21 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 	}
 
 	@Override
+	@Transactional
+	public void asignarMascotaDeUrgencia(Long turnoId, Long mascotaId) {
+		Mascota mascota = obtenerMascota(mascotaId);
+		consultaRepository.findByTurnoClinicoId(turnoId)
+				.filter(consulta -> consulta.getMascota() == null)
+				.ifPresent(consulta -> {
+					consulta.setMascota(mascota);
+					comandaRepository.findByConsultaMedicaId(consulta.getId()).ifPresent(comanda -> {
+						comanda.setMascota(mascota);
+						comanda.setTutor(tutorCobrador(mascota));
+					});
+				});
+	}
+
+	@Override
 	public Long comandaDe(Long consultaId) {
 		obtenerConsulta(consultaId);
 		return comandaRepository.findByConsultaMedicaId(consultaId)
@@ -158,7 +185,8 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 	 * es quien asume la deuda.</p>
 	 */
 	private ComandaCobro emitirComanda(ConsultaMedica consulta, Mascota mascota, List<ExtraUsado> extras) {
-		Tutor tutor = tutorCobrador(mascota);
+		// Urgencia sin datos: la comanda nace sin titular y no se puede cobrar hasta completarlos.
+		Tutor tutor = mascota == null ? null : tutorCobrador(mascota);
 
 		ComandaCobro comanda = new ComandaCobro();
 		// Una linea por la consulta y una por cada extra; el total es su suma.
@@ -251,11 +279,19 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 				.orElseThrow(() -> new ResourceNotFoundException("No existe un turno con id " + id));
 	}
 
-	/** El turno tiene que ser de esta mascota y no estar cancelado. */
+	/**
+	 * El turno tiene que ser de esta mascota y no estar cancelado. Una urgencia
+	 * sin datos se puede atender con o sin mascota.
+	 */
 	private TurnoClinico turnoAtendible(Long turnoId, Mascota mascota) {
 		TurnoClinico turno = obtenerTurno(turnoId);
-		if (!Objects.equals(turno.getMascota().getId(), mascota.getId())) {
-			throw new BadRequestException("El turno " + turnoId + " es de otra mascota");
+		if (turno.getMascota() != null) {
+			if (mascota == null) {
+				throw new BadRequestException("El id de la mascota es obligatorio");
+			}
+			if (!Objects.equals(turno.getMascota().getId(), mascota.getId())) {
+				throw new BadRequestException("El turno " + turnoId + " es de otra mascota");
+			}
 		}
 		if (turno.getEstado() == TurnoClinico.EstadoTurno.CANCELADO) {
 			throw new BadRequestException("El turno " + turnoId + " esta cancelado: no se puede atender");

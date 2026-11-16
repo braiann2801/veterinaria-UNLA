@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.veterinaria.veterinaria_backend.entity.ComandaCobro;
@@ -38,4 +39,10 @@ public interface MovimientoCajaProyeccion {
 	String getNombreMascota();
 
 	ComandaCobro.EstadoComanda getEstadoComanda();
+
+	/** Ultimo dia de la estadia cobrada; null si la comanda no es de una reserva. */
+	LocalDate getFechaFinEstadia();
+
+	/** Momento de la atencion cobrada; null si la comanda no es de una consulta. */
+	LocalDateTime getFechaAtencion();
 }

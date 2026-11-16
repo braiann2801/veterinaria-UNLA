@@ -100,6 +100,14 @@ public class ReservaGuarderia {
 	@Column(name = "observaciones", length = 300)
 	private String observaciones;
 
+	/**
+	 * Estadia en la plaza extra de urgencia clinica que habilita el Veterinario
+	 * ({@link PlazaUrgenciaGuarderia}). No cuenta para el aforo de
+	 * {@link #AFORO_MAXIMO} y no emite comanda de guarderia.
+	 */
+	@Column(name = "urgencia_clinica", nullable = false, columnDefinition = "bit(1) default 0")
+	private boolean urgenciaClinica = false;
+
 	/** Un estado ocupa cupo en el aforo del dia. */
 	public boolean ocupaCupo() {
 		return estado == EstadoReserva.RESERVADO || estado == EstadoReserva.INGRESADO;

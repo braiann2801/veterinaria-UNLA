@@ -259,7 +259,7 @@ export function AltaMascota({
           </p>
         )}
         {exito && (
-          <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
+          <p className="text-sm text-emerald-700" role="status">
             {exito}
           </p>
         )}

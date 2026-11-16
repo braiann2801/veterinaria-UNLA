@@ -68,8 +68,12 @@ public class ComandaCobro {
 	@Column(name = "estado", nullable = false, length = 20)
 	private EstadoComanda estado = EstadoComanda.PENDIENTE;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "tutor_id", nullable = false)
+	/**
+	 * Titular de la deuda. Nulo solo en la comanda de una urgencia sin datos:
+	 * esa comanda no se puede cobrar hasta que se completen cliente y mascota.
+	 */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "tutor_id")
 	private Tutor tutor;
 
 	/** Opcional: las comandas de guarderia pueden no tener mascota. */

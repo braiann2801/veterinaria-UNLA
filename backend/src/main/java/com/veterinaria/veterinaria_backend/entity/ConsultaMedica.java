@@ -51,8 +51,9 @@ public class ConsultaMedica {
 	@JoinColumn(name = "turno_clinico_id")
 	private TurnoClinico turnoClinico;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "mascota_id", nullable = false)
+	/** Nula solo en la ficha de una urgencia atendida antes de cargar los datos. */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "mascota_id")
 	private Mascota mascota;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)

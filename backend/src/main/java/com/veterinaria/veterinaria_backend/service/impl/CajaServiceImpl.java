@@ -82,6 +82,11 @@ public class CajaServiceImpl implements CajaService {
 			throw new BusinessConflictException(
 					"La comanda " + comandaId + " ya esta saldada.");
 		}
+		// Urgencia atendida sin datos: los datos se cargan antes de cobrar.
+		if (comanda.getTutor() == null) {
+			throw new BusinessConflictException(
+					"Completá los datos del cliente y la mascota de la urgencia antes de cobrar");
+		}
 
 		// Se resuelve una sola vez por operacion: es la misma persona en los tres
 		// medios de un cobro mixto, y validarlo por linea haria tres viajes a la
@@ -179,7 +184,9 @@ public class CajaServiceImpl implements CajaService {
 				fila.getNombreTutor(),
 				fila.getNombrePagador(),
 				fila.getNombreMascota(),
-				fila.getEstadoComanda() != null ? fila.getEstadoComanda().name() : null);
+				fila.getEstadoComanda() != null ? fila.getEstadoComanda().name() : null,
+				fila.getFechaFinEstadia() != null ? fila.getFechaFinEstadia()
+						: fila.getFechaAtencion() != null ? fila.getFechaAtencion().toLocalDate() : null);
 	}
 
 	/**

@@ -164,7 +164,7 @@ export function Padron() {
                         onClick={() => reactivar(() => apiTutores.reactivar(t.id))}
                         aria-label={`Reactivar ${t.nombreCompleto}`}
                         title="Reactivar tutor"
-                        className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300`}
+                        className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10`}
                       >
                         <RotateCcw className="size-4" aria-hidden />
                       </button>
@@ -206,7 +206,7 @@ export function Padron() {
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       {m.conducta && m.conducta !== "normal" && (
-                        <span className="mr-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-500/15 dark:text-amber-300">
+                        <span className="mr-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
                           {m.conducta}
                         </span>
                       )}
@@ -232,7 +232,7 @@ export function Padron() {
                           onClick={() => reactivar(() => apiMascotas.reactivar(m.id))}
                           aria-label={`Reactivar ${m.nombre}`}
                           title="Reactivar mascota"
-                          className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300`}
+                          className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10`}
                         >
                           <RotateCcw className="size-4" aria-hidden />
                         </button>
@@ -484,7 +484,7 @@ function ModalAltaTutorNuevo({
                   aria-checked={autorizadoRetiro}
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${TOQUE_MINIMO} ${
                     autorizadoRetiro
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
+                      ?"border-emerald-300 bg-emerald-50 text-emerald-900"
                       : "border-border bg-muted text-muted-foreground"
                   }`}
                 >
@@ -892,7 +892,7 @@ function ModalAltaTutor({
                                 aria-label={`Autorizado a retirar a ${m.nombre}`}
                                 className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${TOQUE_MINIMO} ${
                                   vinculo.autorizadoRetiro
-                                    ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
+                                    ?"border-emerald-300 bg-emerald-50 text-emerald-900"
                                     : "border-border bg-muted text-muted-foreground"
                                 }`}
                               >

@@ -16,7 +16,9 @@
 ## 2. Reglas de Negocio Inviolables (Core Domain)
 
 1. **Aforo de Guardería:** Límite máximo e innegociable de 10 perros concurrentes por día. Ningún endpoint ni flujo de UI puede confirmar una reserva si `cuposOcupados >= 10`.
+   - **Excepción — plaza de urgencia clínica:** solo un Veterinario puede habilitar, para un día puntual, 1 plaza extra destinada a una urgencia clínica. Es independiente de las 10, el flujo de reservas nunca puede usarla y no cuenta en `cuposOcupados`.
 2. **Turnos Clínicos:** Bloques estructurados de 45 minutos de atención médica seguidos obligatoriamente de 15 minutos de desinfección/limpieza antes del próximo turno.
+   - **Excepción — turno de urgencia:** se registra a la fecha y hora actual, sin datos ni profesional, y puede superponerse con turnos agendados. Cliente y mascota se completan antes de cobrar; la comanda se emite recién entonces.
 3. **Desacople Clínico-Contable:** La consulta médica registra anamnesis, diagnóstico, tratamiento y notas de conducta. NO almacena cobros ni medios de pago en la vista del veterinario; genera una comanda de cobro diferida al mostrador.
 4. **Relación Tutor-Mascota ($N:M$):** Un tutor puede tener $N$ mascotas; una mascota puede tener $M$ tutores/cotutores. Cada tupla debe registrar explícitamente el flag booleano `autorizado_retiro`.
 5. **Caja Multipago y Retiros:** La liquidación permite pagos combinados (Efectivo, Transferencia, Débito, Crédito, Seña previa imputada por mascota). Todo egreso de guardería con saldo deudor pendiente dispara alerta visual de morosidad.

@@ -13,13 +13,14 @@
  */
 
 import { useMemo, useState } from "react"
-import { Plus, Stethoscope } from "lucide-react"
+import { Plus, Stethoscope, UserCheck, X } from "lucide-react"
 
-import { turnos as apiTurnos } from "@/lib/api"
+import { nombreDelTurno, turnos as apiTurnos } from "@/lib/api"
 import type { TurnoClinico } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 import { Panel } from "@/components/ui/field"
 import { Recurso, Semforo, TOQUE_MINIMO } from "@/lib/vista"
+import { ConfirmarModal, type Confirmacion } from "@/components/ui/confirmar"
 import { AgendarTurnoModal } from "@/components/modules/agendar-turno-modal"
 import {
   CalendarioMensual,
@@ -29,6 +30,7 @@ import {
   type EventoCalendario,
 } from "@/components/modules/agenda/calendario-mensual"
 import { AtenderTurnoModal } from "@/components/modules/agenda/atender-turno-modal"
+import { CompletarDatosModal } from "@/components/modules/agenda/completar-datos-modal"
 
 const ETIQUETA_ESTADO: Record<TurnoClinico["estado"], string> = {
   PENDIENTE: "Pendiente",
@@ -53,7 +55,34 @@ export function Agenda() {
   const [vista, setVista] = useState(() => ({ anio: new Date().getFullYear(), mes: new Date().getMonth() }))
   const [turnoAbierto, setTurnoAbierto] = useState(false)
   const [atendiendo, setAtendiendo] = useState<TurnoClinico | null>(null)
+  const [completando, setCompletando] = useState<TurnoClinico | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null)
+
+  function pedirCancelacion(turno: TurnoClinico) {
+    setConfirmacion({
+      titulo: "Cancelar turno",
+      mensaje: `¿Seguro que querés cancelar el turno de ${nombreDelTurno(turno)} de las ${turno.fechaHoraInicio.slice(11, 16)}? El horario queda libre para otro turno.`,
+      textoConfirmar: "Cancelar turno",
+      textoDescartar: "Volver",
+      peligrosa: true,
+      alConfirmar: () => cancelar(turno),
+    })
+  }
+
+  async function cancelar(turno: TurnoClinico) {
+    setAviso(null)
+    setError(null)
+    try {
+      await apiTurnos.cancelar(turno.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cancelar el turno")
+      return
+    }
+    setAviso(`Turno de ${nombreDelTurno(turno)} de las ${turno.fechaHoraInicio.slice(11, 16)} cancelado.`)
+    await turnosMes.recargar()
+  }
 
   const dias = diasVisibles(vista.anio, vista.mes)
   const desde = aClave(dias[0])
@@ -81,9 +110,10 @@ export function Agenda() {
           .map((t) => ({
             id: t.id,
             hora: t.fechaHoraInicio.slice(11, 16),
-            texto: t.mascota.nombre,
-            titulo: `${t.fechaHoraInicio.slice(11, 16)} ${t.mascota.nombre} · ${t.motivo}${t.estado === "ATENDIDO" ? " · atendido" : ""}`,
-            clase: t.estado === "ATENDIDO" ? "bg-emerald-500/20" : "bg-primary/15",
+            texto: nombreDelTurno(t),
+            titulo: `${t.fechaHoraInicio.slice(11, 16)} ${nombreDelTurno(t)} · ${t.motivo}${t.estado === "ATENDIDO" ? " · atendido" : ""}`,
+            // Urgencias en rojo; atendidos en verde; el resto, el color del sistema.
+            clase: t.urgencia ? "bg-red-500/25" : t.estado === "ATENDIDO" ? "bg-emerald-500/20" : "bg-primary/15",
           })),
       )
     }
@@ -94,6 +124,7 @@ export function Agenda() {
   function seleccionar(clave: string) {
     setFecha(clave)
     setAviso(null)
+    setError(null)
     const dia = deClave(clave)
     if (dia.getMonth() !== vista.mes || dia.getFullYear() !== vista.anio) {
       setVista({ anio: dia.getFullYear(), mes: dia.getMonth() })
@@ -166,35 +197,74 @@ export function Agenda() {
                       <li key={t.id} className="flex flex-col gap-1 py-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className={`text-sm font-medium ${t.estado === "CANCELADO" ? "line-through opacity-60" : ""}`}>
-                            {t.fechaHoraInicio.slice(11, 16)} · {t.mascota.nombre}
+                            {t.fechaHoraInicio.slice(11, 16)} · {nombreDelTurno(t)}
+                            {t.urgencia && (
+                              <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                                Urgencia
+                              </span>
+                            )}
                           </p>
                           <Semforo tono={TONO_ESTADO[t.estado]}>{ETIQUETA_ESTADO[t.estado]}</Semforo>
                         </div>
                         <p className="text-xs text-muted-foreground">{t.motivo}</p>
                         <p className="text-xs text-muted-foreground">
-                          {t.profesional.nombreCompleto}
-                          {t.profesional.matricula ? ` · ${t.profesional.matricula}` : ""} · bloque hasta{" "}
+                          {t.profesional
+                            ? `${t.profesional.nombreCompleto}${t.profesional.matricula ? ` · ${t.profesional.matricula}` : ""}`
+                            : "Sin profesional asignado"}{" "}
+                          · bloque hasta{" "}
                           {t.fechaFinBloque.slice(11, 16)}
                         </p>
-                        {t.estado === "PENDIENTE" && (
-                          <button
-                            type="button"
-                            onClick={() => setAtendiendo(t)}
-                            className={`mt-1 inline-flex items-center justify-center gap-2 self-start rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
-                          >
-                            <Stethoscope className="size-3.5" aria-hidden />
-                            Atender
-                          </button>
-                        )}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {t.estado === "PENDIENTE" && (
+                            <button
+                              type="button"
+                              onClick={() => setAtendiendo(t)}
+                              className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 ${TOQUE_MINIMO}`}
+                            >
+                              <Stethoscope className="size-3.5" aria-hidden />
+                              Atender
+                            </button>
+                          )}
+                          {/* Solo un turno pendiente: uno atendido ya tiene ficha y comanda. */}
+                          {t.estado === "PENDIENTE" && (
+                            <button
+                              type="button"
+                              onClick={() => pedirCancelacion(t)}
+                              className={`inline-flex items-center justify-center gap-2 rounded-md border border-input px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${TOQUE_MINIMO}`}
+                            >
+                              <X className="size-3.5" aria-hidden />
+                              Cancelar
+                            </button>
+                          )}
+                          {/* Una urgencia sin datos no se puede cobrar hasta completarlos. */}
+                          {t.urgencia && !t.mascota && t.estado !== "CANCELADO" && (
+                            <button
+                              type="button"
+                              onClick={() => setCompletando(t)}
+                              className={`inline-flex items-center justify-center gap-2 rounded-md border border-red-500/40 px-3 text-xs font-medium text-red-700 transition-colors hover:bg-red-500/10 ${TOQUE_MINIMO}`}
+                            >
+                              <UserCheck className="size-3.5" aria-hidden />
+                              Completar datos
+                            </button>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )
               }}
             </Recurso>
+            {error && (
+              <p
+                className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                role="alert"
+              >
+                {error}
+              </p>
+            )}
             {aviso && (
               <p
-                className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-900 dark:text-emerald-300"
+                className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-900"
                 role="status"
               >
                 {aviso}
@@ -212,6 +282,19 @@ export function Agenda() {
           fechaPorDefecto={fecha}
           onCerrar={() => setTurnoAbierto(false)}
           onGuardado={refrescar}
+        />
+      )}
+
+      <ConfirmarModal confirmacion={confirmacion} onCerrar={() => setConfirmacion(null)} />
+
+      {completando && (
+        <CompletarDatosModal
+          turno={completando}
+          onCerrar={() => setCompletando(null)}
+          onGuardado={async (mensaje) => {
+            setAviso(mensaje)
+            await turnosMes.recargar()
+          }}
         />
       )}
 

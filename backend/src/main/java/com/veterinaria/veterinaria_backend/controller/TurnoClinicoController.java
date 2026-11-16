@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.veterinaria.veterinaria_backend.dto.CompletarDatosRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoConAltaRequestDTO;
@@ -89,6 +90,22 @@ public class TurnoClinicoController {
 	 * nueva de un cliente existente) y el turno, todo o nada: 400 por datos o
 	 * combinacion invalida, 404 si el cliente no existe, 409 si el turno se solapa.
 	 */
+	/** POST /api/v1/turnos/urgencia -> 201: turno de urgencia sin datos, a la hora actual. */
+	@PostMapping("/urgencia")
+	public ResponseEntity<TurnoClinicoResponseDTO> crearUrgencia() {
+		return ResponseEntity.status(HttpStatus.CREATED).body(turnoService.crearUrgencia());
+	}
+
+	/**
+	 * POST /api/v1/turnos/{id}/completar-datos -> 200. Cliente y mascota de una
+	 * urgencia registrada sin datos; despues de esto su comanda se puede cobrar.
+	 */
+	@PostMapping("/{id}/completar-datos")
+	public ResponseEntity<TurnoClinicoResponseDTO> completarDatos(@PathVariable Long id,
+			@Valid @RequestBody CompletarDatosRequestDTO request) {
+		return ResponseEntity.ok(turnoConAltaService.completarDatos(id, request));
+	}
+
 	@PostMapping("/con-alta")
 	public ResponseEntity<TurnoClinicoResponseDTO> crearConAlta(@Valid @RequestBody TurnoConAltaRequestDTO request) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(turnoConAltaService.agendar(request));

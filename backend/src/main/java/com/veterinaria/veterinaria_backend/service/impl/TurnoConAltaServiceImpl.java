@@ -5,15 +5,18 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.veterinaria.veterinaria_backend.dto.CompletarDatosRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoClinicoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TurnoConAltaRequestDTO;
+import com.veterinaria.veterinaria_backend.dto.TutorRequestDTO;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
+import com.veterinaria.veterinaria_backend.service.ConsultaMedicaService;
 import com.veterinaria.veterinaria_backend.service.MascotaService;
 import com.veterinaria.veterinaria_backend.service.TurnoClinicoService;
 import com.veterinaria.veterinaria_backend.service.TurnoConAltaService;
@@ -32,10 +35,12 @@ public class TurnoConAltaServiceImpl implements TurnoConAltaService {
 	private final TurnoClinicoService turnoService;
 	private final TutorRepository tutorRepository;
 	private final TutorMascotaRepository vinculoRepository;
+	private final ConsultaMedicaService consultaService;
 
 	public TurnoConAltaServiceImpl(TutorService tutorService, MascotaService mascotaService,
 			TurnoClinicoService turnoService, TutorRepository tutorRepository,
-			TutorMascotaRepository vinculoRepository) {
+			TutorMascotaRepository vinculoRepository, ConsultaMedicaService consultaService) {
+		this.consultaService = consultaService;
 		this.vinculoRepository = vinculoRepository;
 		this.tutorService = tutorService;
 		this.mascotaService = mascotaService;
@@ -46,48 +51,67 @@ public class TurnoConAltaServiceImpl implements TurnoConAltaService {
 	@Override
 	@Transactional
 	public TurnoClinicoResponseDTO agendar(TurnoConAltaRequestDTO request) {
-		validarCombinacion(request);
-
-		Long mascotaId = request.mascotaId();
-		if (mascotaId != null && request.tutorId() != null) {
-			// El cliente indicado tiene que ser uno de los tutores de la mascota: si no,
-			// el pedido trae un dato inconsistente y se rechaza en vez de ignorarlo.
-			tutorExistente(request.tutorId());
-			if (vinculoRepository.findByTutorIdAndMascotaId(request.tutorId(), mascotaId).isEmpty()) {
-				throw new BadRequestException("La mascota elegida no pertenece al cliente indicado");
-			}
-		}
-		if (request.mascotaNueva() != null) {
-			Long tutorId = request.tutorNuevo() != null
-					? tutorService.crear(request.tutorNuevo()).id()
-					: tutorExistente(request.tutorId());
-			mascotaId = mascotaService.crear(conTitular(request.mascotaNueva(), tutorId)).id();
-		}
-
+		Long mascotaId = resolverMascota(request.tutorId(), request.tutorNuevo(), request.mascotaId(),
+				request.mascotaNueva());
 		return turnoService.crear(new TurnoClinicoRequestDTO(
 				request.fechaHoraInicio(), request.motivo(), mascotaId, request.profesionalId(), null));
 	}
 
-	/** Se valida antes de escribir nada, para que un 400 de combinacion no dependa del rollback. */
-	private void validarCombinacion(TurnoConAltaRequestDTO request) {
-		boolean mascotaExistente = request.mascotaId() != null;
-		boolean mascotaNueva = request.mascotaNueva() != null;
-		boolean tutorExistente = request.tutorId() != null;
-		boolean tutorNuevo = request.tutorNuevo() != null;
+	@Override
+	@Transactional
+	public TurnoClinicoResponseDTO completarDatos(Long turnoId, CompletarDatosRequestDTO request) {
+		// Antes de crear cliente o mascota: un turno que ya tiene datos no deja altas sueltas.
+		turnoService.verificarPendienteDeDatos(turnoId);
+		Long mascotaId = resolverMascota(request.tutorId(), request.tutorNuevo(), request.mascotaId(),
+				request.mascotaNueva());
+		TurnoClinicoResponseDTO turno = turnoService.asignarMascotaDeUrgencia(turnoId, mascotaId);
+		consultaService.asignarMascotaDeUrgencia(turnoId, mascotaId);
+		return turno;
+	}
 
-		if (mascotaExistente && mascotaNueva) {
+	/**
+	 * Devuelve la mascota del pedido, creando cliente y/o mascota si hacen falta.
+	 * Con cliente y mascota existentes, la mascota tiene que ser de ese cliente.
+	 */
+	private Long resolverMascota(Long tutorId, TutorRequestDTO tutorNuevo, Long mascotaId,
+			MascotaRequestDTO mascotaNueva) {
+		validarCombinacion(tutorId, tutorNuevo, mascotaId, mascotaNueva);
+		if (mascotaId != null && tutorId != null) {
+			// El cliente indicado tiene que ser uno de los tutores de la mascota: si no,
+			// el pedido trae un dato inconsistente y se rechaza en vez de ignorarlo.
+			tutorExistente(tutorId);
+			if (vinculoRepository.findByTutorIdAndMascotaId(tutorId, mascotaId).isEmpty()) {
+				throw new BadRequestException("La mascota elegida no pertenece al cliente indicado");
+			}
+		}
+		if (mascotaNueva != null) {
+			Long titular = tutorNuevo != null ? tutorService.crear(tutorNuevo).id() : tutorExistente(tutorId);
+			return mascotaService.crear(conTitular(mascotaNueva, titular)).id();
+		}
+		return mascotaId;
+	}
+
+	/** Se valida antes de escribir nada, para que un 400 de combinacion no dependa del rollback. */
+	private static void validarCombinacion(Long tutorId, TutorRequestDTO tutorNuevo, Long mascotaId,
+			MascotaRequestDTO mascotaNueva) {
+		boolean mascotaExistente = mascotaId != null;
+		boolean esMascotaNueva = mascotaNueva != null;
+		boolean tutorExistente = tutorId != null;
+		boolean esTutorNuevo = tutorNuevo != null;
+
+		if (mascotaExistente && esMascotaNueva) {
 			throw new BadRequestException("Indicá una mascota existente o una nueva, no las dos");
 		}
-		if (tutorExistente && tutorNuevo) {
+		if (tutorExistente && esTutorNuevo) {
 			throw new BadRequestException("Indicá un cliente existente o uno nuevo, no los dos");
 		}
-		if (!mascotaExistente && !mascotaNueva) {
+		if (!mascotaExistente && !esMascotaNueva) {
 			throw new BadRequestException("Falta la mascota del turno");
 		}
-		if (tutorNuevo && !mascotaNueva) {
+		if (esTutorNuevo && !esMascotaNueva) {
 			throw new BadRequestException("Un cliente nuevo se carga con una mascota nueva");
 		}
-		if (mascotaNueva && !tutorExistente && !tutorNuevo) {
+		if (esMascotaNueva && !tutorExistente && !esTutorNuevo) {
 			throw new BadRequestException("La mascota nueva necesita un cliente: elegí uno existente o cargá uno nuevo");
 		}
 	}

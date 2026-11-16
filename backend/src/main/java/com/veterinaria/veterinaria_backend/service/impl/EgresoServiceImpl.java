@@ -24,6 +24,7 @@ import com.veterinaria.veterinaria_backend.entity.EgresoMascota;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.ReservaGuarderia;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
+import com.veterinaria.veterinaria_backend.entity.TurnoClinico;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
@@ -36,6 +37,7 @@ import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.ReservaGuarderiaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
+import com.veterinaria.veterinaria_backend.repository.TurnoClinicoRepository;
 import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.EgresoService;
 import com.veterinaria.veterinaria_backend.service.JornadaDelDiaService;
@@ -72,6 +74,7 @@ public class EgresoServiceImpl implements EgresoService {
 	private final JornadaDelDiaService jornadaDelDiaService;
 	private final EgresoMascotaRepository egresoRepository;
 	private final ReservaGuarderiaRepository reservaRepository;
+	private final TurnoClinicoRepository turnoRepository;
 
 	public EgresoServiceImpl(MascotaRepository mascotaRepository,
 			TutorRepository tutorRepository,
@@ -80,9 +83,11 @@ public class EgresoServiceImpl implements EgresoService {
 			ComandaCobroService comandaService,
 			JornadaDelDiaService jornadaDelDiaService,
 			EgresoMascotaRepository egresoRepository,
-			ReservaGuarderiaRepository reservaRepository) {
+			ReservaGuarderiaRepository reservaRepository,
+			TurnoClinicoRepository turnoRepository) {
 		this.egresoRepository = egresoRepository;
 		this.reservaRepository = reservaRepository;
+		this.turnoRepository = turnoRepository;
 		this.mascotaRepository = mascotaRepository;
 		this.tutorRepository = tutorRepository;
 		this.vinculoRepository = vinculoRepository;
@@ -142,7 +147,12 @@ public class EgresoServiceImpl implements EgresoService {
 		// Se vuelve a validar aca: el veredicto que vio la pantalla puede estar
 		// viejo (alguien cambio la autorizacion o se emitio otra comanda) o haber
 		// sido salteado llamando a la API directo.
-		EgresoValidacionResponseDTO veredicto = validarPorTutorId(request.mascotaId(), request.tutorId());
+		if (request.tutorId() == null) {
+			throw new BadRequestException("El id del tutor es obligatorio");
+		}
+		Tutor quienRetira = tutorRepository.findById(request.tutorId())
+				.orElseThrow(() -> ResourceNotFoundException.tutor(request.tutorId()));
+		EgresoValidacionResponseDTO veredicto = validar(request.mascotaId(), quienRetira, dia);
 		if (!veredicto.puedeRetirar()) {
 			throw new BusinessConflictException(veredicto.mensaje());
 		}
@@ -181,7 +191,7 @@ public class EgresoServiceImpl implements EgresoService {
 		String dni = NormalizadorAr.dni(tutorDni);
 		Tutor tutor = tutorRepository.findByDni(dni)
 				.orElseThrow(() -> ResourceNotFoundException.tutorPorDni(dni));
-		return validar(mascotaId, tutor);
+		return validar(mascotaId, tutor, LocalDate.now());
 	}
 
 	@Override
@@ -190,7 +200,7 @@ public class EgresoServiceImpl implements EgresoService {
 			throw new BadRequestException("El id del tutor es obligatorio");
 		}
 		return validar(mascotaId, tutorRepository.findById(tutorId)
-				.orElseThrow(() -> ResourceNotFoundException.tutor(tutorId)));
+				.orElseThrow(() -> ResourceNotFoundException.tutor(tutorId)), LocalDate.now());
 	}
 
 	/**
@@ -202,10 +212,16 @@ public class EgresoServiceImpl implements EgresoService {
 	 * ademas hay una deuda; corregir la autorizacion no destrabaria el egreso y
 	 * el ticket volveria al mostrador dos veces.</p>
 	 */
-	private EgresoValidacionResponseDTO validar(Long mascotaId, Tutor tutor) {
+	private EgresoValidacionResponseDTO validar(Long mascotaId, Tutor tutor, LocalDate dia) {
 		Mascota mascota = obtenerMascota(mascotaId);
 
 		boolean autorizado = esTutorAutorizado(mascotaId, tutor.getId());
+
+		// La comanda de una consulta nace al atender: un turno pendiente no deja
+		// deuda, asi que sin esta regla el animal se iba sin que nadie lo viera.
+		TurnoClinico pendiente = turnoRepository.findPendientesDeMascota(mascotaId,
+				dia.atStartOfDay(), dia.plusDays(1).atStartOfDay()).stream().findFirst().orElse(null);
+		boolean turnoSinAtender = pendiente != null;
 
 		DeudaMascotaResponseDTO deuda = comandaService.consultarDeudaDeMascota(mascotaId);
 		boolean tieneDeuda = Boolean.TRUE.equals(deuda.tieneDeuda());
@@ -223,6 +239,12 @@ public class EgresoServiceImpl implements EgresoService {
 			motivo = MotivoBloqueo.TUTOR_NO_AUTORIZADO;
 			mensaje = "El DNI presentado no está autorizado a retirar a "
 					+ mascota.getNombre() + ". Autorización: regla 2.4 (vínculo Tutor-Mascota).";
+		} else if (turnoSinAtender) {
+			motivo = MotivoBloqueo.TURNO_SIN_ATENDER;
+			mensaje = mascota.getNombre() + " tiene un turno clínico "
+					+ (dia.equals(LocalDate.now()) ? "de hoy" : "del " + dia) + " a las "
+					+ pendiente.getFechaHoraInicio().toLocalTime().toString().substring(0, 5)
+					+ " sin atender: atendelo o cancelalo antes del retiro.";
 		} else if (tieneDeuda) {
 			motivo = MotivoBloqueo.DEUDA_PENDIENTE;
 			mensaje = formatear(saldo) + " pendientes en "
@@ -241,6 +263,7 @@ public class EgresoServiceImpl implements EgresoService {
 				motivo == MotivoBloqueo.NINGUNO,
 				motivo,
 				autorizado,
+				turnoSinAtender,
 				tieneDeuda,
 				saldo,
 				alertaConducta,

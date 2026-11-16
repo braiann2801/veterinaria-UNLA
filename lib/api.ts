@@ -165,7 +165,7 @@ export type ConductaObservada = "TRANQUILO" | "NERVIOSO" | "REACTIVO" | "AGRESIV
 export type MetodoPago = "EFECTIVO" | "TRANSFERENCIA" | "DEBITO" | "CREDITO" | "SENA"
 export type ConceptoCobro = "CONSULTA_CLINICA" | "GUARDERIA" | "OTRO"
 export type EstadoComanda = "PENDIENTE" | "PARCIAL" | "PAGADA" | "CANCELADA"
-export type MotivoBloqueo = "NINGUNO" | "TUTOR_NO_AUTORIZADO" | "DEUDA_PENDIENTE"
+export type MotivoBloqueo = "NINGUNO" | "TUTOR_NO_AUTORIZADO" | "TURNO_SIN_ATENDER" | "DEUDA_PENDIENTE"
 
 export interface TutorResumen {
   id: number
@@ -239,8 +239,17 @@ export interface TurnoClinico {
   fechaFinBloque: string
   motivo: string
   estado: "PENDIENTE" | "ATENDIDO" | "CANCELADO"
-  mascota: { id: number; nombre: string }
-  profesional: { id: number; nombreCompleto: string; matricula: string | null }
+  /** `null` solo en una urgencia cuyos datos todavía no se cargaron. */
+  mascota: { id: number; nombre: string } | null
+  /** `null` solo en una urgencia que todavía nadie atendió. */
+  profesional: { id: number; nombreCompleto: string; matricula: string | null } | null
+  /** Turno de urgencia: se registró sin datos a la hora en que llegó. */
+  urgencia: boolean
+}
+
+/** Nombre a mostrar de un turno: la mascota, o el aviso de que es una urgencia sin datos. */
+export function nombreDelTurno(turno: TurnoClinico): string {
+  return turno.mascota?.nombre ?? "Urgencia sin datos"
 }
 
 export interface TurnoClinicoInput {
@@ -261,6 +270,18 @@ export interface AforoGuarderia {
   aforoMaximo: number
   cuposDisponibles: number
   completo: boolean
+  /** Plaza extra de urgencia clínica: no se suma a `aforoMaximo` ni a `cuposOcupados`. */
+  plazaUrgenciaHabilitada: boolean
+  plazaUrgenciaOcupada: boolean
+}
+
+/** Plaza de urgencia clínica de un día; `reservaId` y `nombreMascota` son `null` si está libre. */
+export interface PlazaUrgencia {
+  fecha: string
+  habilitada: boolean
+  ocupada: boolean
+  reservaId: number | null
+  nombreMascota: string | null
 }
 
 export interface ReservaGuarderia {
@@ -281,6 +302,8 @@ export interface ReservaGuarderia {
   aforoMaximo: number
   /** Comanda de guardería emitida al reservar; `null` si la mascota no tiene tutor. */
   comandaId: number | null
+  /** Estadía en la plaza de urgencia clínica: no ocupa cupo del aforo de 10. */
+  urgenciaClinica: boolean
 }
 
 export interface ReservaGuarderiaInput {
@@ -329,7 +352,8 @@ export interface ConsultaMedica {
  */
 export interface ConsultaMedicaInput {
   turnoClinicoId?: number | null
-  mascotaId: number
+  /** Se omite solo al atender una urgencia que todavía no tiene datos. */
+  mascotaId?: number
   profesionalId: number
   fechaAtencion?: string
   anamnesis?: string
@@ -363,8 +387,9 @@ export interface ComandaCobro {
   /** Derivado en el backend como montoTotal - saldoPendiente. */
   totalPagado: number
   estado: EstadoComanda
-  tutorId: number
-  nombreTutor: string
+  /** `null` en la comanda de una urgencia sin datos: no se puede cobrar hasta completarlos. */
+  tutorId: number | null
+  nombreTutor: string | null
   mascotaId: number | null
   nombreMascota: string | null
   consultaMedicaId: number | null
@@ -416,6 +441,12 @@ export interface MovimientoCaja {
   /** `null` en las comandas de guardería sin mascota. */
   nombreMascota: string | null
   estadoComanda: EstadoComanda
+  /**
+   * Día del servicio cobrado: el último de la estadía o el de la atención.
+   * Si es anterior a la jornada, el pago salda una deuda de otro día aunque la
+   * comanda se haya emitido hoy. `null` en las comandas manuales.
+   */
+  fechaServicio: string | null
 }
 
 export interface CierreCaja {
@@ -435,6 +466,8 @@ export interface EgresoValidacion {
   puedeRetirar: boolean
   motivoBloqueo: MotivoBloqueo
   tutorAutorizado: boolean
+  /** La mascota tiene un turno clínico de la jornada que sigue pendiente. */
+  turnoSinAtender: boolean
   tieneDeuda: boolean
   saldoDeuda: number
   alertaConducta: boolean
@@ -641,6 +674,13 @@ export const turnos = {
     get<TurnoClinico[]>(`/turnos?desde=${desde}&hasta=${hasta}`),
   crear: (body: TurnoClinicoInput) => post<TurnoClinico>("/turnos", body),
   crearConAlta: (body: TurnoConAltaInput) => post<TurnoClinico>("/turnos/con-alta", body),
+  /** Libera el bloque de 45+15: el turno queda en la agenda tachado, no se borra. */
+  cancelar: (id: number) => put<TurnoClinico>(`/turnos/${id}/cancelar`),
+  /** Urgencia: sin datos, a la hora actual. */
+  crearUrgencia: () => post<TurnoClinico>("/turnos/urgencia"),
+  /** Cliente y mascota de una urgencia registrada sin datos; después se puede cobrar. */
+  completarDatos: (turnoId: number, body: Omit<TurnoConAltaInput, "fechaHoraInicio" | "motivo" | "profesionalId">) =>
+    post<TurnoClinico>(`/turnos/${turnoId}/completar-datos`, body),
 }
 
 // -------------------------------------------------------------- guarderia
@@ -657,6 +697,12 @@ export const guarderia = {
     put<ReservaGuarderia>(`/guarderia/${id}`, body),
   cancelar: (id: number) => put<ReservaGuarderia>(`/guarderia/${id}/cancelar`),
   eliminar: (id: number) => del<void>(`/guarderia/${id}`),
+  plazaUrgencia: (fecha: string) => get<PlazaUrgencia>(`/guarderia/urgencia?fecha=${fecha}`),
+  /** Solo Veterinario (el backend responde 403 al resto). */
+  habilitarPlazaUrgencia: (fecha: string) => put<PlazaUrgencia>(`/guarderia/urgencia/${fecha}`),
+  deshabilitarPlazaUrgencia: (fecha: string) => del<void>(`/guarderia/urgencia/${fecha}`),
+  ocuparPlazaUrgencia: (fecha: string, mascotaId: number) =>
+    post<ReservaGuarderia>(`/guarderia/urgencia/${fecha}/ocupar`, { mascotaId }),
 }
 
 // --------------------------------------------------------------- consultas

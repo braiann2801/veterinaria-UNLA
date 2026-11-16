@@ -107,7 +107,8 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 				: parseEstado(estado);
 
 		return mapper.toComandaResponseList(delDia.stream()
-				.filter(comanda -> tutorId == null || tutorId.equals(comanda.getTutor().getId()))
+				.filter(comanda -> tutorId == null
+						|| (comanda.getTutor() != null && tutorId.equals(comanda.getTutor().getId())))
 				.filter(comanda -> estadoFiltro == null || estadoFiltro.equals(comanda.getEstado()))
 				.toList());
 	}

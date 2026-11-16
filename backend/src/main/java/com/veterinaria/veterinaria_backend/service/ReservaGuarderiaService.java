@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.veterinaria.veterinaria_backend.dto.AforoGuarderiaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.OcuparPlazaUrgenciaRequestDTO;
+import com.veterinaria.veterinaria_backend.dto.PlazaUrgenciaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.ReservaGuarderiaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ReservaGuarderiaResponseDTO;
 
@@ -18,6 +20,27 @@ public interface ReservaGuarderiaService {
 
 	/** Reservas de una fecha, con el aforo del dia en cada item. */
 	List<ReservaGuarderiaResponseDTO> listarPorFecha(LocalDate fecha);
+
+	/** Estado de la plaza de urgencia clinica del dia. */
+	PlazaUrgenciaResponseDTO consultarPlazaUrgencia(LocalDate fecha);
+
+	/** Habilita la plaza de urgencia del dia. Idempotente. */
+	PlazaUrgenciaResponseDTO habilitarPlazaUrgencia(LocalDate fecha);
+
+	/**
+	 * Deshabilita la plaza de urgencia del dia.
+	 *
+	 * @throws com.veterinaria.veterinaria_backend.exception.BusinessConflictException si esta ocupada
+	 */
+	void deshabilitarPlazaUrgencia(LocalDate fecha);
+
+	/**
+	 * Interna a la mascota en la plaza de urgencia del dia, sin tocar el aforo de 10.
+	 *
+	 * @throws com.veterinaria.veterinaria_backend.exception.BadRequestException       si la plaza no esta habilitada o la mascota ya tiene estadia ese dia
+	 * @throws com.veterinaria.veterinaria_backend.exception.BusinessConflictException si la plaza ya esta ocupada
+	 */
+	ReservaGuarderiaResponseDTO ocuparPlazaUrgencia(LocalDate fecha, OcuparPlazaUrgenciaRequestDTO request);
 
 	/**
 	 * Estadias que ocupan algun dia de [desde, hasta] (ambos inclusive). Lo usa la

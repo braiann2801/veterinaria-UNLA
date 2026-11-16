@@ -12,15 +12,19 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.AforoGuarderiaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.OcuparPlazaUrgenciaRequestDTO;
+import com.veterinaria.veterinaria_backend.dto.PlazaUrgenciaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.ReservaGuarderiaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ReservaGuarderiaResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ControlAforoDiario;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
+import com.veterinaria.veterinaria_backend.entity.PlazaUrgenciaGuarderia;
 import com.veterinaria.veterinaria_backend.entity.ReservaGuarderia;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
+import com.veterinaria.veterinaria_backend.repository.PlazaUrgenciaGuarderiaRepository;
 import com.veterinaria.veterinaria_backend.repository.ReservaGuarderiaRepository;
 import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.ReservaGuarderiaService;
@@ -51,18 +55,21 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	private final ControlAforoService controlAforoService;
 	private final ComandaCobroService comandaService;
 	private final TarifaGuarderiaService tarifaService;
+	private final PlazaUrgenciaGuarderiaRepository plazaUrgenciaRepository;
 
 	/** Tope de una estadia por rango: evita bloquear cientos de semaforos por un error de fecha. */
 	static final int MAXIMO_DIAS_ESTADIA = 60;
 
 	public ReservaGuarderiaServiceImpl(ReservaGuarderiaRepository reservaRepository,
 			MascotaRepository mascotaRepository, ControlAforoService controlAforoService,
-			ComandaCobroService comandaService, TarifaGuarderiaService tarifaService) {
+			ComandaCobroService comandaService, TarifaGuarderiaService tarifaService,
+			PlazaUrgenciaGuarderiaRepository plazaUrgenciaRepository) {
 		this.reservaRepository = reservaRepository;
 		this.mascotaRepository = mascotaRepository;
 		this.controlAforoService = controlAforoService;
 		this.comandaService = comandaService;
 		this.tarifaService = tarifaService;
+		this.plazaUrgenciaRepository = plazaUrgenciaRepository;
 	}
 
 	@Override
@@ -221,6 +228,82 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 		return construirAforo(dia, reservaRepository.contarCuposOcupados(dia));
 	}
 
+	// ------------------------------------------------- plaza de urgencia (S3)
+	//
+	// Todas las escrituras toman el mismo semaforo del dia que las reservas
+	// normales: habilitar, deshabilitar y ocupar quedan serializadas entre si y
+	// con las reservas de la misma mascota. READ_COMMITTED por lo mismo que en
+	// crear: lo que se lee despues del lock tiene que ser lo ultimo confirmado.
+
+	@Override
+	public PlazaUrgenciaResponseDTO consultarPlazaUrgencia(LocalDate fecha) {
+		return estadoPlaza(fecha);
+	}
+
+	@Override
+	@Transactional(isolation = Isolation.READ_COMMITTED)
+	public PlazaUrgenciaResponseDTO habilitarPlazaUrgencia(LocalDate fecha) {
+		controlAforoService.bloquearDia(fecha);
+		if (!plazaUrgenciaRepository.existsByFecha(fecha)) {
+			plazaUrgenciaRepository.save(new PlazaUrgenciaGuarderia(fecha));
+		}
+		return estadoPlaza(fecha);
+	}
+
+	@Override
+	@Transactional(isolation = Isolation.READ_COMMITTED)
+	public void deshabilitarPlazaUrgencia(LocalDate fecha) {
+		controlAforoService.bloquearDia(fecha);
+		if (ocupanteDePlaza(fecha) != null) {
+			throw new BusinessConflictException("La plaza de urgencia del " + fecha
+					+ " esta ocupada: liberala antes de deshabilitarla");
+		}
+		plazaUrgenciaRepository.findByFecha(fecha).ifPresent(plazaUrgenciaRepository::delete);
+	}
+
+	@Override
+	@Transactional(isolation = Isolation.READ_COMMITTED)
+	public ReservaGuarderiaResponseDTO ocuparPlazaUrgencia(LocalDate fecha, OcuparPlazaUrgenciaRequestDTO request) {
+		Mascota mascota = obtenerMascota(request.mascotaId());
+		if (!mascota.isActivo()) {
+			throw new BadRequestException("La mascota " + mascota.getNombre() + " esta desactivada");
+		}
+
+		controlAforoService.bloquearDia(fecha);
+		if (!plazaUrgenciaRepository.existsByFecha(fecha)) {
+			throw new BadRequestException("La plaza de urgencia no esta habilitada para el " + fecha);
+		}
+		if (reservaRepository.existeEstadiaSolapada(mascota.getId(), fecha, fecha, ESTADOS_QUE_OCUPAN)) {
+			throw new BadRequestException("La mascota " + mascota.getId() + " ya tiene una reserva activa para el "
+					+ fecha);
+		}
+		if (ocupanteDePlaza(fecha) != null) {
+			throw new BusinessConflictException("La plaza de urgencia del " + fecha + " ya esta ocupada");
+		}
+
+		// Un solo dia y sin comanda de guarderia: es una internacion clinica, que
+		// se cobra por la atencion y no por la estadia.
+		ReservaGuarderia reserva = new ReservaGuarderia();
+		reserva.setFecha(fecha);
+		reserva.setEstado(ReservaGuarderia.EstadoReserva.RESERVADO);
+		reserva.setTipoEstadia(ReservaGuarderia.TipoEstadia.COMPLETA_24H);
+		reserva.setMascota(mascota);
+		reserva.setUrgenciaClinica(true);
+		ReservaGuarderia guardada = reservaRepository.save(reserva);
+		return toResponse(guardada, contarOcupados(fecha), null);
+	}
+
+	private PlazaUrgenciaResponseDTO estadoPlaza(LocalDate fecha) {
+		ReservaGuarderia ocupante = ocupanteDePlaza(fecha);
+		return new PlazaUrgenciaResponseDTO(fecha, plazaUrgenciaRepository.existsByFecha(fecha), ocupante != null,
+				ocupante != null ? ocupante.getId() : null,
+				ocupante != null ? ocupante.getMascota().getNombre() : null);
+	}
+
+	private ReservaGuarderia ocupanteDePlaza(LocalDate fecha) {
+		return reservaRepository.findUrgenciaClinicaEnDia(fecha, ESTADOS_QUE_OCUPAN).stream().findFirst().orElse(null);
+	}
+
 	// ------------------------------------------------------------- internos
 
 	/**
@@ -361,7 +444,8 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 	private AforoGuarderiaResponseDTO construirAforo(LocalDate fecha, long ocupados) {
 		int maximo = ReservaGuarderia.AFORO_MAXIMO;
 		int disponibles = (int) Math.max(0, maximo - ocupados);
-		return new AforoGuarderiaResponseDTO(fecha, ocupados, maximo, disponibles, disponibles == 0);
+		return new AforoGuarderiaResponseDTO(fecha, ocupados, maximo, disponibles, disponibles == 0,
+				plazaUrgenciaRepository.existsByFecha(fecha), ocupanteDePlaza(fecha) != null);
 	}
 
 	private ReservaGuarderiaResponseDTO toResponse(ReservaGuarderia reserva, long ocupados) {
@@ -384,7 +468,8 @@ public class ReservaGuarderiaServiceImpl implements ReservaGuarderiaService {
 				reserva.getObservaciones(),
 				ocupados,
 				ReservaGuarderia.AFORO_MAXIMO,
-				comandaId);
+				comandaId,
+				reserva.isUrgenciaClinica());
 	}
 
 	private Mascota obtenerMascota(Long id) {

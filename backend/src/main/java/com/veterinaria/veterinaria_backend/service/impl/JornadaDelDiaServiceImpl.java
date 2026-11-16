@@ -162,6 +162,10 @@ public class JornadaDelDiaServiceImpl implements JornadaDelDiaService {
 				continue;
 			}
 			Mascota mascota = turno.getMascota();
+			if (mascota == null) {
+				// Urgencia sin datos: todavia no es de ninguna mascota del padron.
+				continue;
+			}
 			Acumulado acumulado = porMascota.computeIfAbsent(
 					mascota.getId(), id -> new Acumulado(id, mascota));
 			acumulado.cantidadTurnos++;

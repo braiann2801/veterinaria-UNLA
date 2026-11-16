@@ -34,6 +34,21 @@ public interface TurnoClinicoService {
 	 */
 	TurnoClinicoResponseDTO crear(TurnoClinicoRequestDTO request);
 
+	/**
+	 * Turno de urgencia: sin mascota ni profesional, a la hora actual y sin
+	 * chequeo de solapamiento (excepcion de la regla 2 de AGENTS.md).
+	 */
+	TurnoClinicoResponseDTO crearUrgencia();
+
+	/**
+	 * Asigna la mascota a una urgencia que se registro sin datos. 400 si el turno
+	 * no es una urgencia pendiente de datos o si la mascota esta desactivada.
+	 */
+	TurnoClinicoResponseDTO asignarMascotaDeUrgencia(Long turnoId, Long mascotaId);
+
+	/** 400 si el turno no es una urgencia todavia sin datos. Se valida antes de crear nada. */
+	void verificarPendienteDeDatos(Long turnoId);
+
 	/** Reprograma o cambia el estado de un turno, revalidando solapamientos. */
 	TurnoClinicoResponseDTO actualizar(Long id, TurnoClinicoRequestDTO request);
 
