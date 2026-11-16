@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +20,7 @@ import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MovimientoCajaDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.SerieDiaDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorDelDiaResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ComandaCobro;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
@@ -47,6 +51,16 @@ public class CajaServiceImpl implements CajaService {
 
 	/** Cero con la misma escala que los montos, para que el mapa no mezcle 0 y 0.00. */
 	private static final BigDecimal CERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+	/**
+	 * Tope del periodo consultable.
+	 *
+	 * <p>Un anio es lo que el Balance necesita para mirar la gestion completa. El
+	 * limite no es capricho: el extracto viaja entero en la misma respuesta y un
+	 * rango abierto (por ejemplo, desde el alta del sistema) traeria miles de
+	 * pagos al celular.</p>
+	 */
+	private static final int DIAS_MAXIMOS_PERIODO = 366;
 
 	private final ComandaCobroRepository comandaRepository;
 	private final PagoRepository pagoRepository;
@@ -129,8 +143,31 @@ public class CajaServiceImpl implements CajaService {
 	@Override
 	public CierreCajaResponseDTO cerrarJornada(LocalDate fecha) {
 		LocalDate dia = fecha != null ? fecha : LocalDate.now();
-		LocalDateTime desde = dia.atStartOfDay();
-		LocalDateTime hasta = dia.plusDays(1).atStartOfDay();
+		return cerrarPeriodo(dia, dia);
+	}
+
+	@Override
+	public CierreCajaResponseDTO cerrarPeriodo(LocalDate desde, LocalDate hasta) {
+		if (desde == null || hasta == null) {
+			throw new BadRequestException(
+					"Para consultar un periodo hay que informar la fecha inicial y la final");
+		}
+		if (hasta.isBefore(desde)) {
+			throw new BadRequestException(
+					"La fecha final del periodo (" + hasta + ") no puede ser anterior a la inicial ("
+							+ desde + ").");
+		}
+
+		long dias = ChronoUnit.DAYS.between(desde, hasta) + 1;
+		if (dias > DIAS_MAXIMOS_PERIODO) {
+			throw new BadRequestException(
+					"El periodo maximo es de un anio (" + DIAS_MAXIMOS_PERIODO
+							+ " dias). Pediste " + dias + " dias: elegi un rango mas corto.");
+		}
+
+		LocalDateTime inicio = desde.atStartOfDay();
+		// Rango semiabierto: el dia siguiente a `hasta` a las 00:00 queda afuera.
+		LocalDateTime fin = hasta.plusDays(1).atStartOfDay();
 
 		// Se arrancan los cinco metodos en cero para que el cierre no venga con
 		// huecos: el mostrador tiene que ver que el CREDITO dio 0, no que no
@@ -141,28 +178,69 @@ public class CajaServiceImpl implements CajaService {
 			porMetodo.put(metodo.name(), CERO);
 		}
 
-		for (Object[] fila : pagoRepository.totaledPorMetodoPago(desde, hasta)) {
+		for (Object[] fila : pagoRepository.totalesPorMetodoPagoEnRango(inicio, fin)) {
 			porMetodo.put(nombreDeMetodo(fila[0]).name(),
 					((BigDecimal) fila[1]).setScale(2, RoundingMode.HALF_UP));
 		}
 
-		// Todas las cifras se agregan en MySQL: la jornada no se trae fila por
+		// Todas las cifras se agregan en MySQL: el periodo no se trae fila por
 		// fila para sumar en memoria. El extracto se proyecta plano y acotado al
 		// mismo rango semiabierto.
-		BigDecimal totalCobrado = pagoRepository.sumarTotalDelDia(desde, hasta)
+		BigDecimal totalCobrado = pagoRepository.sumarTotalEnRango(inicio, fin)
 				.setScale(2, RoundingMode.HALF_UP);
-		long cantidadPagos = pagoRepository.contarPagosDelDia(desde, hasta);
-		long comandasCobradas = pagoRepository.contarComandasCobradas(desde, hasta);
-		BigDecimal saldosPendientes = comandaRepository.sumarSaldoPendienteDelDia(desde, hasta)
+		long cantidadPagos = pagoRepository.contarPagosEnRango(inicio, fin);
+		long comandasCobradas = pagoRepository.contarComandasCobradasEnRango(inicio, fin);
+		BigDecimal saldosPendientes = comandaRepository.sumarSaldoPendienteEnRango(inicio, fin)
+				.setScale(2, RoundingMode.HALF_UP);
+		BigDecimal totalFacturado = comandaRepository.sumarFacturadoEnRango(inicio, fin)
 				.setScale(2, RoundingMode.HALF_UP);
 
-		List<MovimientoCajaDTO> movimientos = pagoRepository.movimientosDelDia(desde, hasta)
+		List<MovimientoCajaDTO> movimientos = pagoRepository.movimientosEnRango(inicio, fin)
 				.stream()
 				.map(this::aMovimiento)
 				.toList();
 
-		return new CierreCajaResponseDTO(dia, totalCobrado, (int) cantidadPagos,
-				(int) comandasCobradas, saldosPendientes, porMetodo, movimientos);
+		return new CierreCajaResponseDTO(desde, hasta, (int) dias, totalFacturado, totalCobrado,
+				(int) cantidadPagos, (int) comandasCobradas, saldosPendientes, porMetodo,
+				serieDiaria(desde, hasta, inicio, fin), movimientos);
+	}
+
+	/**
+	 * Recaudacion dia por dia del periodo.
+	 *
+	 * <p>La base devuelve solo los dias con pagos; la serie se completa aca con
+	 * cero en los dias sin cobros. Un grafico con huecos obligaria a la vista a
+	 * reconstruir el calendario y a decidir por su cuenta que significa un dia
+	 * ausente, que es justo la clase de regla que termina distinta en cada
+	 * pantalla.</p>
+	 */
+	private List<SerieDiaDTO> serieDiaria(LocalDate desde, LocalDate hasta,
+			LocalDateTime inicio, LocalDateTime fin) {
+		Map<LocalDate, BigDecimal> totalPorDia = new HashMap<>();
+		Map<LocalDate, Integer> cantidadPorDia = new HashMap<>();
+
+		for (Object[] fila : pagoRepository.totalesPorDiaEnRango(inicio, fin)) {
+			LocalDate dia = LocalDate.of(entero(fila[0]), entero(fila[1]), entero(fila[2]));
+			totalPorDia.put(dia, ((BigDecimal) fila[3]).setScale(2, RoundingMode.HALF_UP));
+			cantidadPorDia.put(dia, entero(fila[4]));
+		}
+
+		List<SerieDiaDTO> serie = new ArrayList<>();
+		for (LocalDate dia = desde; !dia.isAfter(hasta); dia = dia.plusDays(1)) {
+			serie.add(new SerieDiaDTO(dia, totalPorDia.getOrDefault(dia, CERO),
+					cantidadPorDia.getOrDefault(dia, 0)));
+		}
+		return serie;
+	}
+
+	/**
+	 * Normaliza un entero de una fila agregada.
+	 *
+	 * <p>Una proyeccion JPQL sin tipo declarado ({@code Object[]}) puede devolver
+	 * {@code Integer}, {@code Long} o {@code BigInteger} segun el driver.</p>
+	 */
+	private int entero(Object valor) {
+		return ((Number) valor).intValue();
 	}
 
 	/**

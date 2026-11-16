@@ -36,6 +36,23 @@ public interface CajaService {
 	CierreCajaResponseDTO cerrarJornada(LocalDate fecha);
 
 	/**
+	 * Cierre de caja de un periodo, con el arqueo, la serie diaria y el
+	 * extracto de los pagos.
+	 *
+	 * <p>El Balance no se mira solo dia por dia: el Duenio necesita ver un
+	 * mes, un trimestre o un anio para saber como viene la caja. El rango es
+	 * inclusivo por los dos extremos y se valida aca, no en el controlador,
+	 * para que cualquier entrada al caso de uso respete las mismas reglas.</p>
+	 *
+	 * @param desde primer dia del periodo (inclusive)
+	 * @param hasta ultimo dia del periodo (inclusive)
+	 * @throws com.veterinaria.veterinaria_backend.exception.BadRequestException si falta
+	 *         un extremo, si la fecha final es anterior a la inicial o si el
+	 *         periodo supera un anio
+	 */
+	CierreCajaResponseDTO cerrarPeriodo(LocalDate desde, LocalDate hasta);
+
+	/**
 	 * Tutores con actividad en la jornada: la lista de llegada de la caja.
 	 *
 	 * <p>Para que el mostrador elija entre quienes efectivamente vinieron y no entre

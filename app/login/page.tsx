@@ -17,6 +17,7 @@ import { ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ErrorBox, TOQUE_MINIMO } from "@/lib/vista"
 import { Field, TextInput } from "@/components/ui/field"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Button } from "@/components/ui/button"
 import { Paw } from "@/components/paw"
 import { cn } from "@/lib/utils"
@@ -95,6 +96,7 @@ export default function LoginPage() {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
+              maxLength={40}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className={TOQUE_MINIMO}
@@ -102,9 +104,9 @@ export default function LoginPage() {
             />
           </Field>
           <Field label="Contraseña">
-            <TextInput
-              type="password"
+            <PasswordInput
               autoComplete="current-password"
+              maxLength={72}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={TOQUE_MINIMO}

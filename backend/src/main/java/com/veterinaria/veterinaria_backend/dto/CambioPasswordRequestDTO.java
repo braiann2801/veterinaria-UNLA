@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Size;
 public record CambioPasswordRequestDTO(
 
 		@NotBlank(message = "La contraseña actual es obligatoria")
+		@Size(max = 72, message = "La contraseña actual no puede superar los 72 caracteres")
 		String actual,
 
 		@NotBlank(message = "La contraseña nueva es obligatoria")

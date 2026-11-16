@@ -155,6 +155,32 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       ≥ 3.5:1 en texto visible y `overflowX = 0` en 1440 px y 390 px, en
       `/app` y `/login`.
 
+- [x] **Balance por período** — `GET /api/v1/caja/cierre?desde=&hasta=`
+      (rango inclusivo, máx. 366 días; `?fecha=` sigue siendo un día) con
+      total facturado, cobrado, saldos pendientes, arqueo por medio, serie
+      diaria completa y extracto. En el frontend, botón "Seleccionar período"
+      con calendario de dos fechas y atajos (hoy, 7 días, este mes, mes
+      anterior, este año); tarjetas de cobranza, gráfico de barras por día y
+      extracto con "Ver más". Detalle: `odd/tasks/balance-periodo.md`.
+
+- [x] **Ver contraseña en los formularios** — `PasswordInput`
+      (`components/ui/password-input.tsx`) envuelve `TextInput` y agrega el
+      botón de ojo (`Eye`/`EyeOff`, `aria-pressed`) sin robar el foco al
+      destapar. Se usa en el login y en los tres campos del cambio de contraseña
+      (pantalla obligatoria y modal): escribir a ciegas terminaba en "usuario o
+      contraseña incorrectos" y, tras 5 intentos, en el bloqueo de 15 min.
+
+- [x] **Verificación de entradas y permisos (seguridad)** — auditoría completa
+      de DTOs, repositorios y matriz de roles. Sin inyección SQL: las dos únicas
+      consultas nativas usan parámetros. Topes en el login (usuario ≤ 40, clave
+      ≤ 72 caracteres y ≤ 72 bytes UTF-8, porque BCrypt corta ahí), body
+      ilegible sin detalle interno, CORS configurable y sin credenciales,
+      tarifa con validación declarativa y `maxLength` en el frontend.
+      Los campos sensibles (`rol`, `activo`, `debeCambiarPassword`,
+      `passwordHash`) se ignoran si el cliente los manda; el rol siempre sale
+      de la base. Tests en `EntradaSeguraTest`; detalle en
+      `odd/tasks/seguridad-entradas.md`.
+
 ## Decisiones Críticas de Arquitectura
 
 1. **Rutas:** frontend en `app/` + `components/` + `lib/` (sin `frontend/src/`);
@@ -221,14 +247,16 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 - **Endpoints vivos que el frontend consume** (todos bajo `/api/v1`): tutores,
   mascotas, profesionales, turnos, guarderia, egreso (`/egreso/validar`,
   `/egreso/pacientes-hoy`), caja (`/comandas/dia`, `/caja/pagos/{id}`,
-  `/caja/tutores-del-dia`, `/caja/cierre`, `/comandas/tarifas/{concepto}`),
+  `/caja/tutores-del-dia`, `/caja/cierre` (día con `fecha` o período con
+  `desde`/`hasta`), `/comandas/tarifas/{concepto}`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta` y
   `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`).
-- **Tests backend:** 311 en verde. Cobertura clave: aforo concurrente (lock
+- **Tests backend:** 350 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
-  `veterinaria_test` (no pisa `veterinaria_db`) y parsers/conciliación de la
-  importación histórica.
+  `veterinaria_test` (no pisa `veterinaria_db`), balance por período (rango
+  inclusivo, serie diaria completa, facturado ≠ cobrado, límite de 366 días) y
+  parsers/conciliación de la importación histórica.
 - **Importación histórica:** vive en `importacion/` (`ImportacionRunner`,
   `ConstructorPlan`, `ConciliacionHistorica`, `ImportacionService`,
   `ReporteImportacion`). Es una vía única de consola: no hay endpoint, no hay

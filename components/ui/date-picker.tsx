@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
+import { useState } from "react"
 import { createPortal } from "react-dom"
 import { CalendarDays, ChevronDown } from "lucide-react"
 import { Calendar } from "@heroui/react"
@@ -9,6 +9,7 @@ import { I18nProvider } from "react-aria-components"
 
 import { hoyLocal } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { usePanelFlotante } from "@/lib/use-panel-flotante"
 import { TOQUE_MINIMO } from "@/lib/vista"
 
 const FORMATO_FECHA = new Intl.DateTimeFormat("es-AR", {
@@ -18,12 +19,8 @@ const FORMATO_FECHA = new Intl.DateTimeFormat("es-AR", {
   year: "numeric",
 })
 
-/** Separación entre el panel y el botón, y entre el panel y el borde de la pantalla. */
-const MARGEN = 8
 /** Ancho del panel en escritorio: el calendario de 7 celdas de 44 px más su padding. */
 const ANCHO_PANEL = 352
-/** Debajo de `sm` (640 px) el panel es una hoja inferior (regla 3.4 de AGENTS.md). */
-const CONSULTA_MOVIL = "(max-width: 639px)"
 
 /** `YYYY-MM-DD` local a `Date`, sin pasar por `new Date(iso)` (que asume UTC). */
 function aFecha(iso: string): Date | undefined {
@@ -46,25 +43,8 @@ function aFechaCalendario(iso: string | undefined): CalendarDate | undefined {
 }
 
 /**
- * Dónde va el panel en escritorio: debajo del botón si entra, si no arriba, y
- * si no entra en ningún lado, pegado al borde inferior. Nunca sale de la
- * pantalla por los costados.
+ * La fecha dentro de [min, max]: cambiar el año puede sacarla del rango.
  */
-function ubicarPanel(disparador: DOMRect, altoPanel: number): CSSProperties {
-  const ancho = Math.min(ANCHO_PANEL, window.innerWidth - MARGEN * 2)
-  const libreAbajo = window.innerHeight - disparador.bottom - MARGEN * 2
-  const libreArriba = disparador.top - MARGEN * 2
-  const top =
-    altoPanel <= libreAbajo
-      ? disparador.bottom + MARGEN
-      : altoPanel <= libreArriba
-        ? disparador.top - MARGEN - altoPanel
-        : Math.max(MARGEN, window.innerHeight - altoPanel - MARGEN)
-  const left = Math.min(Math.max(disparador.left, MARGEN), window.innerWidth - ancho - MARGEN)
-  return { top, left, width: ancho }
-}
-
-/** La fecha dentro de [min, max]: cambiar el año puede sacarla del rango. */
 function acotar(fecha: CalendarDate, min?: CalendarDate, max?: CalendarDate): CalendarDate {
   if (min && fecha.compare(min) < 0) return min
   if (max && fecha.compare(max) > 0) return max
@@ -122,19 +102,10 @@ export function DatePicker({
   placeholder = "Elegir fecha",
   limpiable = false,
 }: DatePickerProps) {
-  const [abierto, setAbierto] = useState(false)
-  const [esMovil, setEsMovil] = useState(false)
-  // Sin posicion calculada el panel se monta invisible: asi se mide su alto
-  // antes de mostrarlo y no aparece un instante en la esquina.
-  const [posicion, setPosicion] = useState<CSSProperties | null>(null)
   // Foco del calendario (el mes que se ve) y selector de año, controlados: ver
   // `alCambiarFoco`.
   const [foco, setFoco] = useState<CalendarDate>(() => today(getLocalTimeZone()))
   const [eligiendoAnio, setEligiendoAnio] = useState(false)
-  const contenedorRef = useRef<HTMLDivElement>(null)
-  const disparadorRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const fondoRef = useRef<HTMLDivElement>(null)
 
   const fechaSeleccionada = value ? aFecha(value) : undefined
   const minimo = aFechaCalendario(min)
@@ -150,74 +121,22 @@ export function DatePicker({
     setFoco(eligiendoAnio && nuevo.year !== foco.year ? acotar(foco.set({ year: nuevo.year }), minimo, maximo) : nuevo)
   }
 
-  function alternar() {
-    if (abierto) {
-      setAbierto(false)
-      return
-    }
-    setEsMovil(window.matchMedia(CONSULTA_MOVIL).matches)
-    setPosicion(null)
+  const {
+    abierto,
+    esMovil,
+    posicion,
+    contenedorRef,
+    disparadorRef,
+    panelRef,
+    fondoRef,
+    alternar,
+    cerrar,
+  } = usePanelFlotante(ANCHO_PANEL, () => {
+    // Al abrir, el calendario arranca en la fecha elegida (o en hoy) y con el
+    // selector de año cerrado.
     setFoco(acotar(aFechaCalendario(value) ?? today(getLocalTimeZone()), minimo, maximo))
     setEligiendoAnio(false)
-    setAbierto(true)
-  }
-
-  // Ubicacion en escritorio. Se recalcula al scrollear (cualquier contenedor,
-  // por eso en captura), al cambiar el tamaño de la ventana y cuando el panel
-  // cambia de alto (un mes de 6 semanas o el selector de mes y año).
-  useLayoutEffect(() => {
-    if (!abierto || esMovil) return
-
-    function ubicar() {
-      const disparador = disparadorRef.current
-      const panel = panelRef.current
-      if (!disparador || !panel) return
-      setPosicion(ubicarPanel(disparador.getBoundingClientRect(), panel.offsetHeight))
-    }
-
-    ubicar()
-    const observador = new ResizeObserver(ubicar)
-    if (panelRef.current) observador.observe(panelRef.current)
-    window.addEventListener("resize", ubicar)
-    window.addEventListener("scroll", ubicar, true)
-    return () => {
-      observador.disconnect()
-      window.removeEventListener("resize", ubicar)
-      window.removeEventListener("scroll", ubicar, true)
-    }
-  }, [abierto, esMovil])
-
-  // Cierre por click afuera y por Escape. Escape devuelve el foco al boton para
-  // que la navegacion por teclado no se pierda al cerrar. El keydown se escucha
-  // en captura y se marca con preventDefault: dentro de un `Modal`, ese Escape
-  // cierra solo el calendario y no el dialogo entero.
-  useEffect(() => {
-    if (!abierto) return
-
-    function alPresionarFuera(evento: PointerEvent) {
-      const destino = evento.target as Node
-      // El fondo de la hoja inferior cierra con su propio click: si cerrara en
-      // el pointerdown, el click terminaria en lo que quedo debajo.
-      if (fondoRef.current?.contains(destino)) return
-      if (!contenedorRef.current?.contains(destino) && !panelRef.current?.contains(destino)) {
-        setAbierto(false)
-      }
-    }
-    function alPresionarTecla(evento: KeyboardEvent) {
-      if (evento.key === "Escape") {
-        evento.preventDefault()
-        setAbierto(false)
-        disparadorRef.current?.focus()
-      }
-    }
-
-    document.addEventListener("pointerdown", alPresionarFuera)
-    document.addEventListener("keydown", alPresionarTecla, true)
-    return () => {
-      document.removeEventListener("pointerdown", alPresionarFuera)
-      document.removeEventListener("keydown", alPresionarTecla, true)
-    }
-  }, [abierto])
+  })
 
   const texto = fechaSeleccionada ? FORMATO_FECHA.format(fechaSeleccionada) : placeholder
 
@@ -237,7 +156,7 @@ export function DatePicker({
           onChange={(dia: CalendarDate) => {
             // CalendarDate.toString() ya es `YYYY-MM-DD`, el formato del backend.
             onChange(dia.toString())
-            setAbierto(false)
+            cerrar()
           }}
           className={cn("calendario-tema w-full p-3", esMovil && "mx-auto max-w-sm")}
         >
@@ -271,7 +190,7 @@ export function DatePicker({
             type="button"
             onClick={() => {
               onChange(hoyLocal())
-              setAbierto(false)
+              cerrar()
             }}
             className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-primary transition-colors hover:bg-muted"
           >
@@ -282,7 +201,7 @@ export function DatePicker({
               type="button"
               onClick={() => {
                 onChange("")
-                setAbierto(false)
+                cerrar()
               }}
               className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
@@ -292,7 +211,7 @@ export function DatePicker({
         </div>
         <button
           type="button"
-          onClick={() => setAbierto(false)}
+          onClick={() => cerrar()}
           className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
         >
           Cerrar
@@ -345,7 +264,7 @@ export function DatePicker({
               <div
                 ref={fondoRef}
                 className="fixed inset-0 z-[70] bg-black/30"
-                onClick={() => setAbierto(false)}
+                onClick={() => cerrar()}
                 aria-hidden
               />
               <div

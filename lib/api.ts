@@ -449,15 +449,32 @@ export interface MovimientoCaja {
   fechaServicio: string | null
 }
 
-export interface CierreCaja {
+/** Recaudación de un día dentro de un período del Balance. */
+export interface SerieDiaCaja {
   fecha: string
   totalCobrado: number
   cantidadPagos: number
+}
+
+export interface CierreCaja {
+  /** Primer día del período. */
+  desde: string
+  /** Último día del período, inclusive. */
+  hasta: string
+  /** Cantidad de días del período, contando los dos extremos. */
+  dias: number
+  /** Monto de las comandas emitidas en el período (sin las canceladas). */
+  totalFacturado: number
+  /** Suma de los pagos del período, fechados por el momento del cobro. */
+  totalCobrado: number
+  cantidadPagos: number
   cantidadComandas: number
-  /** Deuda aún no cobrada de las comandas emitidas ese día. */
+  /** Saldo que hoy sigue impago de las comandas emitidas en el período. */
   saldosPendientes: number
   totalesPorMetodo: Record<string, number>
-  /** Extracto de los pagos de la jornada, ordenado por hora ascendente. */
+  /** Recaudación día por día, con los días sin cobros en cero. */
+  porDia: SerieDiaCaja[]
+  /** Extracto de los pagos del período, ordenado por hora ascendente. */
   movimientos: MovimientoCaja[]
 }
 
@@ -792,7 +809,15 @@ export const caja = {
     tutorId?: number,
   ) => post<ComandaCobro>(`/caja/pagos/${comandaId}`, { pagos, tutorId }),
   pagosDe: (comandaId: number) => get<Pago[]>(`/caja/pagos/${comandaId}`),
-  cierre: (fecha: string) => get<CierreCaja>(`/caja/cierre?fecha=${fecha}`),
+  /**
+   * Cierre de caja de un período inclusivo.
+   *
+   * Un solo día es `desde === hasta`: no hay un endpoint aparte para la jornada,
+   * porque el corte diario es el caso particular del período y dos caminos
+   * distintos podrían devolver números distintos para la misma consulta.
+   */
+  cierre: (desde: string, hasta: string) =>
+    get<CierreCaja>(`/caja/cierre?${query({ desde, hasta })}`),
   /** Quién estuvo en la jornada, para cobrarle sin recorrer todo el padrón. */
   tutoresDelDia: (fecha?: string) => get<TutorDelDia[]>(`/caja/tutores-del-dia?${query({ fecha })}`),
 }

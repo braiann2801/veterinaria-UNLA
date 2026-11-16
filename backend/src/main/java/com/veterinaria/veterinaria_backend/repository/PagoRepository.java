@@ -17,29 +17,29 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 	List<Pago> findByComandaIdOrderByFechaHoraAsc(Long comandaId);
 
 	/**
-	 * Total cobrado en una jornada.
+	 * Total cobrado en un rango de jornadas.
 	 *
 	 * <p>{@code COALESCE} a cero porque {@code SUM} sobre un conjunto vacio
-	 * devuelve NULL. Sumar en la base y no trayendo las filas: una jornada con
-	 * cientos de pagos no tiene por que viajar entera solo para sacar un total.</p>
+	 * devuelve NULL. Sumar en la base y no trayendo las filas: un periodo con
+	 * cientos de pagos no tiene por que viajar entero solo para sacar un total.</p>
 	 */
 	@Query("""
 			SELECT COALESCE(SUM(p.monto), 0)
 			FROM Pago p
 			WHERE p.fechaHora >= :desde AND p.fechaHora < :hasta
 			""")
-	BigDecimal sumarTotalDelDia(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
+	BigDecimal sumarTotalEnRango(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 
-	/** Cantidad de pagos registrados en la jornada (una comanda mixta suma varias). */
+	/** Cantidad de pagos registrados en el rango (una comanda mixta suma varias). */
 	@Query("""
 			SELECT COUNT(p)
 			FROM Pago p
 			WHERE p.fechaHora >= :desde AND p.fechaHora < :hasta
 			""")
-	long contarPagosDelDia(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
+	long contarPagosEnRango(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 
 	/**
-	 * Extracto plano de los pagos de una jornada, para el Balance.
+	 * Extracto plano de los pagos de un rango, para el Balance.
 	 *
 	 * <p>Trae solo las columnas que muestra la vista y resuelve el nombre del
 	 * tutor con {@code CONCAT}: {@code Tutor.nombreCompleto} es un getter
@@ -71,14 +71,14 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 			WHERE p.fechaHora >= :desde AND p.fechaHora < :hasta
 			ORDER BY p.fechaHora ASC, p.id ASC
 			""")
-	List<MovimientoCajaProyeccion> movimientosDelDia(@Param("desde") LocalDateTime desde,
+	List<MovimientoCajaProyeccion> movimientosEnRango(@Param("desde") LocalDateTime desde,
 			@Param("hasta") LocalDateTime hasta);
 
 	/**
-	 * Total cobrado por metodo de pago en una jornada.
+	 * Total cobrado por metodo de pago en un rango.
 	 *
 	 * <p>Agrupar en la base y no en Java: la caja cierra con el detalle de las
-	 * boletas del dia y traer todas las filas para sumarlas en memoria escala
+	 * boletas del periodo y traer todas las filas para sumarlas en memoria escala
 	 * mal, ademas de abrir la puerta a olvidar alguna fila del arqueo.</p>
 	 */
 	@Query("""
@@ -87,11 +87,30 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 			WHERE p.fechaHora >= :desde AND p.fechaHora < :hasta
 			GROUP BY p.metodoPago
 			""")
-	List<Object[]> totaledPorMetodoPago(@Param("desde") LocalDateTime desde,
+	List<Object[]> totalesPorMetodoPagoEnRango(@Param("desde") LocalDateTime desde,
 			@Param("hasta") LocalDateTime hasta);
 
 	/**
-	 * Cuantas comandas distintas recibieron al menos un pago en la jornada.
+	 * Recaudacion dia por dia del rango, para la serie del Balance.
+	 *
+	 * <p>Se agrupa con las funciones {@code YEAR}/{@code MONTH}/{@code DAY} de
+	 * JPQL y no con SQL nativo: asi la consulta no depende del nombre fisico de
+	 * la columna ni del dialecto. Cada fila llega como
+	 * {@code [anio, mes, dia, total, cantidad]}.</p>
+	 */
+	@Query("""
+			SELECT YEAR(p.fechaHora), MONTH(p.fechaHora), DAY(p.fechaHora),
+			       COALESCE(SUM(p.monto), 0), COUNT(p)
+			FROM Pago p
+			WHERE p.fechaHora >= :desde AND p.fechaHora < :hasta
+			GROUP BY YEAR(p.fechaHora), MONTH(p.fechaHora), DAY(p.fechaHora)
+			ORDER BY YEAR(p.fechaHora) ASC, MONTH(p.fechaHora) ASC, DAY(p.fechaHora) ASC
+			""")
+	List<Object[]> totalesPorDiaEnRango(@Param("desde") LocalDateTime desde,
+			@Param("hasta") LocalDateTime hasta);
+
+	/**
+	 * Cuantas comandas distintas recibieron al menos un pago en el rango.
 	 *
 	 * <p>{@code COUNT(DISTINCT)} y no el tamano de la lista de pagos: una
 	 * comanda saldada con efectivo y transferencia es una sola comanda cobrada,
@@ -102,7 +121,7 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 			FROM Pago p
 			WHERE p.fechaHora >= :desde AND p.fechaHora < :hasta
 			""")
-	long contarComandasCobradas(@Param("desde") LocalDateTime desde,
+	long contarComandasCobradasEnRango(@Param("desde") LocalDateTime desde,
 			@Param("hasta") LocalDateTime hasta);
 
 	/** ¿El tutor pago alguna comanda como pagador? Bloquea su borrado. */

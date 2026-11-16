@@ -19,6 +19,7 @@ import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.PagoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorDelDiaResponseDTO;
+import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.service.CajaService;
 
 import jakarta.validation.Valid;
@@ -58,11 +59,30 @@ public class CajaController {
 		return ResponseEntity.ok(cajaService.pagosDe(comandaId));
 	}
 
-	/** GET /api/v1/caja/cierre?fecha=2026-09-30 */
+	/**
+	 * GET /api/v1/caja/cierre?fecha=2026-09-30
+	 * GET /api/v1/caja/cierre?desde=2026-10-12&hasta=2026-10-19
+	 *
+	 * <p>Las dos formas no se mezclan: {@code fecha} es el corte de una jornada y
+	 * {@code desde}/{@code hasta} el de un periodo. Aceptar los tres parametros
+	 * juntos dejaria la duda de cual gana, y en un cierre de caja esa duda se
+	 * traduce en numeros distintos para la misma consulta.</p>
+	 */
 	@GetMapping("/cierre")
 	public ResponseEntity<CierreCajaResponseDTO> cerrarJornada(
-			@RequestParam(required = false) LocalDate fecha) {
-		return ResponseEntity.ok(cajaService.cerrarJornada(fecha));
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+		boolean pidePeriodo = desde != null || hasta != null;
+
+		if (!pidePeriodo) {
+			return ResponseEntity.ok(cajaService.cerrarJornada(fecha));
+		}
+		if (fecha != null) {
+			throw new BadRequestException(
+					"Usa 'fecha' para una jornada o 'desde' y 'hasta' para un periodo, no las dos cosas.");
+		}
+		return ResponseEntity.ok(cajaService.cerrarPeriodo(desde, hasta));
 	}
 
 	/**

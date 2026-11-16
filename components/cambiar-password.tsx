@@ -20,7 +20,8 @@ import { KeyRound, Loader2, LogOut } from "lucide-react"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ErrorBox, TOQUE_MINIMO } from "@/lib/vista"
-import { Field, TextInput } from "@/components/ui/field"
+import { Field } from "@/components/ui/field"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { cn } from "@/lib/utils"
@@ -66,9 +67,9 @@ function FormCambiarPassword({
     <form onSubmit={enviar} className="flex flex-col gap-4">
       {encabezado}
       <Field label="Contraseña actual">
-        <TextInput
-          type="password"
+        <PasswordInput
           autoComplete="current-password"
+          maxLength={72}
           value={actual}
           onChange={(e) => setActual(e.target.value)}
           className={TOQUE_MINIMO}
@@ -76,9 +77,9 @@ function FormCambiarPassword({
         />
       </Field>
       <Field label={`Contraseña nueva (mínimo ${MINIMO} caracteres)`}>
-        <TextInput
-          type="password"
+        <PasswordInput
           autoComplete="new-password"
+          maxLength={72}
           value={nueva}
           onChange={(e) => setNueva(e.target.value)}
           className={TOQUE_MINIMO}
@@ -86,9 +87,9 @@ function FormCambiarPassword({
         />
       </Field>
       <Field label="Repetir contraseña nueva">
-        <TextInput
-          type="password"
+        <PasswordInput
           autoComplete="new-password"
+          maxLength={72}
           value={repetida}
           onChange={(e) => setRepetida(e.target.value)}
           className={TOQUE_MINIMO}

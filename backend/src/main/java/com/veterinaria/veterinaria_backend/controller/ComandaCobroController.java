@@ -22,6 +22,8 @@ import com.veterinaria.veterinaria_backend.dto.ComandaCobroResponseDTO;
 import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * API REST de las comandas de cobro.
@@ -99,7 +101,7 @@ public class ComandaCobroController {
 	@PutMapping("/tarifas/{concepto}")
 	public ResponseEntity<TarifaActualizadaDTO> actualizarTarifa(
 			@PathVariable String concepto,
-			@RequestBody TarifaRequestDTO request) {
+			@Valid @RequestBody TarifaRequestDTO request) {
 		BigDecimal monto = comandaService.actualizarTarifa(concepto, request.monto());
 		return ResponseEntity.ok(new TarifaActualizadaDTO(concepto.toUpperCase(), monto));
 	}
@@ -111,7 +113,10 @@ public class ComandaCobroController {
 	 * una comanda de guarderia por varios dias lo define el mostrador con otra
 	 * via cuando haga falta, no esta.</p>
 	 */
-	public record TarifaRequestDTO(BigDecimal monto) {
+	public record TarifaRequestDTO(
+			@NotNull(message = "El monto es obligatorio")
+			@DecimalMin(value = "0.00", message = "El monto no puede ser negativo")
+			BigDecimal monto) {
 	}
 
 	/** Confirmacion de la tarifa vigente tras el cambio. */

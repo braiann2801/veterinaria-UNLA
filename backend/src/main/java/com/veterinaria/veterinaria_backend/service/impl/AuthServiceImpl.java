@@ -54,6 +54,12 @@ public class AuthServiceImpl implements AuthService {
 	@Override
 	public LoginResponseDTO login(LoginRequestDTO request, String ip) {
 		String username = normalizarUsername(request.username());
+		// BCrypt solo mira los primeros 72 bytes: con acentos, una clave de 72
+		// caracteres puede superarlos y perder el final en silencio. Se rechaza
+		// antes de la consulta y del hash, en lugar de aceptar una clave recortada.
+		if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+			throw new BadRequestException("La contraseña es demasiado larga");
+		}
 		// El limite va por el usuario pedido, exista o no: asi el 429 no revela que cuentas existen.
 		String clave = LimitadorIntentosLogin.clave(username, ip);
 		limitador.verificar(clave);

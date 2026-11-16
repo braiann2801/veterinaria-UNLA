@@ -22,6 +22,7 @@ import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.CredencialesInvalidasException;
 import com.veterinaria.veterinaria_backend.exception.DemasiadosIntentosException;
+import com.veterinaria.veterinaria_backend.exception.MensajePublicoException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -141,12 +142,53 @@ public class GlobalExceptionHandler {
 						mensaje, request.getRequestURI(), detalles));
 	}
 
-	/** 400: id o query param con tipo invalido, o body ilegible. */
-	@ExceptionHandler({ MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class })
-	public ResponseEntity<ApiErrorResponse> handleUnreadable(Exception ex, HttpServletRequest request) {
+	/**
+	 * 400: body ilegible.
+	 *
+	 * <p>El mensaje de Jackson trae nombres de clases, paquetes y a veces el
+	 * fragmento del JSON: es informacion interna que no le sirve al cliente.
+	 * El detalle queda en el log y la respuesta es generica, salvo que el error
+	 * venga de un deserializador propio que ya armo un mensaje para el usuario
+	 * ({@link MensajePublicoException}).</p>
+	 */
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<ApiErrorResponse> handleUnreadable(HttpMessageNotReadableException ex,
+			HttpServletRequest request) {
+		log.warn("Body ilegible en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+		// El cuerpo arranca como HttpMessageNotReadableException y envuelve al
+		// deserializador que falló; se busca en toda la cadena.
+		String mensaje = mensajePublico(ex)
+				.orElse("La peticion no pudo interpretarse: revise el formato del cuerpo.");
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Bad Request", mensaje,
+						request.getRequestURI()));
+	}
+
+	@ExceptionHandler(MensajePublicoException.class)
+	public ResponseEntity<ApiErrorResponse> handleMensajePublico(MensajePublicoException ex,
+			HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Bad Request", ex.getMessage(),
+						request.getRequestURI()));
+	}
+
+	/** Busca un mensaje propio en la cadena de causas; devuelve vacio si no hay. */
+	private static java.util.Optional<String> mensajePublico(Throwable error) {
+		for (Throwable actual = error; actual != null; actual = actual.getCause()) {
+			if (actual instanceof MensajePublicoException publico) {
+				return java.util.Optional.ofNullable(publico.getMessage());
+			}
+		}
+		return java.util.Optional.empty();
+	}
+
+	/** 400: path variable o query param con un tipo que no corresponde. */
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+			HttpServletRequest request) {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 				.body(ApiErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Bad Request",
-						"La peticion no pudo interpretarse: " + ex.getMessage(),
+						"El valor de '" + ex.getName() + "' no tiene el formato esperado.",
 						request.getRequestURI()));
 	}
 

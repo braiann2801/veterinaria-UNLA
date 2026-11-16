@@ -11,7 +11,8 @@ import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.ValueDeserializer;
-import tools.jackson.databind.exc.InvalidFormatException;
+
+import com.veterinaria.veterinaria_backend.exception.MensajePublicoException;
 
 /**
  * Lee un {@code LocalDateTime} aceptando tambien los formatos que emite un
@@ -101,10 +102,10 @@ public class FlexibleLocalDateTimeDeserializer extends ValueDeserializer<LocalDa
 
 		// Ningun formato sirvio. Se informa que formatos se aceptan en vez de dejar
 		// el "could not be parsed at index N" de Jackson, que no le dice nada util a
-		// quien esta tipeando el dato.
-		throw new InvalidFormatException(p,
-				"Se esperaba 'YYYY-MM-DDTHH:mm:ss', 'YYYY-MM-DDTHH:mm' o 'YYYY-MM-DD'",
-				texto, LocalDateTime.class);
+		// quien esta tipeando el dato. La excepcion es propia para que el mensaje
+		// llegue al cliente y el resto de los errores de parseo no lo hagan.
+		throw new MensajePublicoException(
+				"Se esperaba 'YYYY-MM-DDTHH:mm:ss', 'YYYY-MM-DDTHH:mm' o 'YYYY-MM-DD'");
 	}
 
 	/**

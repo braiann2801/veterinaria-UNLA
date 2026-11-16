@@ -46,13 +46,17 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 	BigDecimal sumarDeudaPendiente(@Param("tutorId") Long tutorId);
 
 	/**
-	 * Saldo por cobrar de las comandas emitidas en una jornada.
+	 * Saldo por cobrar de las comandas emitidas en un rango.
 	 *
-	 * <p>Alimenta la tarjeta "saldos pendientes" del cierre: de lo facturado ese
-	 * dia, cuanto quedo sin cobrar. Se suman solo PENDIENTE y PARCIAL porque una
-	 * comanda CANCELADA no debe nada y una PAGADA esta saldada. Igual que
-	 * {@code findDelDia}, filtra por {@code fechaEmision} (la unica fecha de la
-	 * comanda) y con rango semiabierto {@code [inicio, fin)}.</p>
+	 * <p>Alimenta la tarjeta "saldos pendientes" del cierre: de lo facturado en
+	 * el periodo, cuanto quedo sin cobrar. Se suman solo PENDIENTE y PARCIAL
+	 * porque una comanda CANCELADA no debe nada y una PAGADA esta saldada. Igual
+	 * que {@code findDelDia}, filtra por {@code fechaEmision} (la unica fecha de
+	 * la comanda) y con rango semiabierto {@code [inicio, fin)}.</p>
+	 *
+	 * <p>Es el saldo <b>actual</b> de esas comandas, no una foto historica: el
+	 * sistema no guarda snapshots de deuda. Un periodo pasado puede mostrar 0 si
+	 * esas comandas se cobraron despues.</p>
 	 */
 	@Query("""
 			SELECT COALESCE(SUM(c.saldoPendiente), 0)
@@ -61,7 +65,27 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 			  AND c.estado IN (com.veterinaria.veterinaria_backend.entity.ComandaCobro$EstadoComanda.PENDIENTE,
 			                   com.veterinaria.veterinaria_backend.entity.ComandaCobro$EstadoComanda.PARCIAL)
 			""")
-	BigDecimal sumarSaldoPendienteDelDia(@Param("inicio") LocalDateTime inicio, @Param("fin") LocalDateTime fin);
+	BigDecimal sumarSaldoPendienteEnRango(@Param("inicio") LocalDateTime inicio, @Param("fin") LocalDateTime fin);
+
+	/**
+	 * Total facturado en un rango: suma del monto de las comandas emitidas.
+	 *
+	 * <p>Es la otra mitad del Balance por periodo. Cobrado responde "cuanta plata
+	 * entro"; facturado responde "cuanta plata se genero". La diferencia entre
+	 * los dos es la cobranza pendiente, y compararlos en un periodo es lo que
+	 * deja ver si el negocio viene creciendo o solo cobrando deuda vieja.</p>
+	 *
+	 * <p>Las comandas CANCELADAS quedan afuera: se emitieron y se anularon, no
+	 * representan ingreso generado. Se filtra por {@code fechaEmision} con el
+	 * mismo rango semiabierto que el resto del cierre.</p>
+	 */
+	@Query("""
+			SELECT COALESCE(SUM(c.montoTotal), 0)
+			FROM ComandaCobro c
+			WHERE c.fechaEmision >= :inicio AND c.fechaEmision < :fin
+			  AND c.estado <> com.veterinaria.veterinaria_backend.entity.ComandaCobro$EstadoComanda.CANCELADA
+			""")
+	BigDecimal sumarFacturadoEnRango(@Param("inicio") LocalDateTime inicio, @Param("fin") LocalDateTime fin);
 
 	/** Comanda emitida para una ficha clinica, si ya existe. */
 	Optional<ComandaCobro> findByConsultaMedicaId(Long consultaMedicaId);
