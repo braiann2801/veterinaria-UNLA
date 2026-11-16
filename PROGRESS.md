@@ -19,10 +19,15 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 - **Harness:** tsc limpio, Next.js build OK, 311 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 - **Importación histórica de Huellitas:** aplicada sobre `veterinaria_db`
-  local (2026-11-04). Se cargaron las 3 hojas del Excel: 9 tutores, 11
-  mascotas, 11 vínculos, 2 profesionales placeholder, 10 consultas, 10
-  estadías, 20 comandas y 18 pagos. Reportes en `datos/` (gitignored):
-  `*-simulacion.md` (revisión previa) y `*-aplicado.md` (constancia).
+  local y sobre **producción (Aiven + Render)** el 2026-11-04. Antes de cargar
+  se respaldó Aiven en `datos/backup-aiven-20261104-223149.sql` (gitignored) y
+  se limpiaron solo las tablas de datos; se conservaron `usuario`, `tarifa`,
+  `tarifa_guarderia` y `extra`. Resultado en Aiven: 9 tutores, 11 mascotas, 11
+  vínculos, 2 profesionales placeholder, 10 consultas, 10 estadías, 20 comandas
+  y 18 pagos. Verificado por JDBC y por la API de Render; el frontend de Vercel
+  ya apunta a `https://veterinaria-unla.onrender.com/api/v1` y CORS responde OK.
+  Reportes en `datos/` (gitignored): `*-simulacion.md` (revisión previa) y
+  `*-aplicado.md` (constancia).
 
 ## Hitos completados
 
