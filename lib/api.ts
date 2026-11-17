@@ -426,6 +426,16 @@ export interface DeudaTutor {
   comandasPendientes: ComandaPendiente[]
 }
 
+/** Saldo pendiente de una mascota, con el detalle y la fecha de cada comanda. */
+export interface DeudaMascota {
+  mascotaId: number
+  nombreMascota: string
+  tieneDeuda: boolean
+  totalDeuda: number
+  cantidadComandas: number
+  comandasPendientes: ComandaPendiente[]
+}
+
 export interface MovimientoCaja {
   id: number
   fechaHora: string
@@ -637,6 +647,12 @@ export const mascotas = {
     get<{ tutorId: number; mascotaId: number; autorizadoRetiro: boolean }[]>(
       `/mascotas/${mascotaId}/tutores`,
     ),
+  /**
+   * Deuda de una mascota: saldo de sus comandas pendientes, de cualquier fecha.
+   * Es el mismo cálculo que bloquea el egreso, así la caja y el checkout no
+   * pueden mostrar números distintos.
+   */
+  deuda: (mascotaId: number) => get<DeudaMascota>(`/mascotas/${mascotaId}/deuda`),
 }
 
 // ------------------------------------------------------------ profesionales
@@ -777,6 +793,14 @@ export const comandas = {
     get<ComandaCobro[]>(
       `/comandas/dia?${query({ fecha, tutorId, estado })}`,
     ),
+  /**
+   * Todas las comandas de una mascota, de cualquier fecha.
+   *
+   * Es el filtro alternativo a la jornada: permite encontrar la deuda de una
+   * mascota sin recorrer día por día. El estado es opcional.
+   */
+  listarPorMascota: (mascotaId: number, estado?: EstadoComanda) =>
+    get<ComandaCobro[]>(`/comandas/mascota/${mascotaId}?${query({ estado })}`),
   buscarPorId: (id: number) => get<ComandaCobro>(`/comandas/${id}`),
   emitir: (body: { concepto: ConceptoCobro; tutorId: number; mascotaId?: number; descripcion?: string }) =>
     post<ComandaCobro>("/comandas", body),

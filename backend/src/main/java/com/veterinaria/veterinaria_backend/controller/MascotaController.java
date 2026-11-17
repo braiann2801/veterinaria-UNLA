@@ -13,9 +13,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.veterinaria.veterinaria_backend.dto.DeudaMascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResumenDTO;
+import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.MascotaService;
 
 import jakarta.validation.Valid;
@@ -28,9 +30,11 @@ import jakarta.validation.Valid;
 public class MascotaController {
 
 	private final MascotaService mascotaService;
+	private final ComandaCobroService comandaService;
 
-	public MascotaController(MascotaService mascotaService) {
+	public MascotaController(MascotaService mascotaService, ComandaCobroService comandaService) {
 		this.mascotaService = mascotaService;
+		this.comandaService = comandaService;
 	}
 
 	/** GET /api/v1/mascotas */
@@ -75,5 +79,17 @@ public class MascotaController {
 	@GetMapping("/{mascotaId}/tutores")
 	public ResponseEntity<List<TutorResumenDTO>> listarTutores(@PathVariable Long mascotaId) {
 		return ResponseEntity.ok(mascotaService.listarTutores(mascotaId));
+	}
+
+	/**
+	 * GET /api/v1/mascotas/{mascotaId}/deuda
+	 *
+	 * <p>Saldo pendiente de la mascota con el detalle de cada comanda y su fecha
+	 * de emision. Es el mismo calculo que bloquea el egreso: mostrarlo en la caja
+	 * evita que el mostrador tenga que sumar a mano lo que ve en pantalla.</p>
+	 */
+	@GetMapping("/{mascotaId}/deuda")
+	public ResponseEntity<DeudaMascotaResponseDTO> consultarDeuda(@PathVariable Long mascotaId) {
+		return ResponseEntity.ok(comandaService.consultarDeudaDeMascota(mascotaId));
 	}
 }

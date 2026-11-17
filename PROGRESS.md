@@ -16,7 +16,7 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 326 tests de Spring Boot en verde
+- **Harness:** tsc limpio, Next.js build OK, 361 tests de Spring Boot en verde
   (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
 - **Importación histórica de Huellitas:** aplicada sobre `veterinaria_db`
   local y sobre **producción (Aiven + Render)** el 2026-11-04. Antes de cargar
@@ -183,6 +183,14 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       en vivo: cargas SQLi → `401`, cuerpos gigantes → `400`, CORS deja pasar
       solo los orígenes configurados.
 
+- [x] **Caja: filtro por mascota y fecha de la deuda** — `GET
+      /comandas/mascota/{id}` lista las comandas de una mascota de cualquier
+      fecha (estado opcional) y `GET /mascotas/{id}/deuda` expone el total con
+      la fecha de cada comanda. En la UI, elegir una mascota reemplaza al
+      filtro por jornada y el modal de cobro muestra `Deuda del dd/mm/aaaa`
+      con aviso cuando es de otro día. 361 tests backend
+      (`ComandasPorMascotaTest`).
+
 ## Decisiones Críticas de Arquitectura
 
 1. **Rutas:** frontend en `app/` + `components/` + `lib/` (sin `frontend/src/`);
@@ -250,7 +258,8 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   mascotas, profesionales, turnos, guarderia, egreso (`/egreso/validar`,
   `/egreso/pacientes-hoy`), caja (`/comandas/dia`, `/caja/pagos/{id}`,
   `/caja/tutores-del-dia`, `/caja/cierre` (día con `fecha` o período con
-  `desde`/`hasta`), `/comandas/tarifas/{concepto}`),
+  `desde`/`hasta`), `/comandas/tarifas/{concepto}`, `/comandas/mascota/{id}`
+  (todas las fechas, estado opcional) y `/mascotas/{id}/deuda`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta` y
   `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`).
 - **Tests backend:** 350 en verde. Cobertura clave: aforo concurrente (lock

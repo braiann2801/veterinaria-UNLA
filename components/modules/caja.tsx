@@ -32,17 +32,25 @@ import {
 } from "@/lib/api"
 import type {
   ComandaCobro,
+  DeudaMascota,
   DeudaTutor,
   EstadoComanda,
   Mascota,
   MetodoPago,
   TutorDelDia,
 } from "@/lib/api"
-import { useApi } from "@/lib/use-api"
+import { useApi, type EstadoApi } from "@/lib/use-api"
 import { Panel, Select } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { DatePicker } from "@/components/ui/date-picker"
-import { Recurso, Semforo, TOQUE_MINIMO, formatearDni, money } from "@/lib/vista"
+import {
+  Recurso,
+  Semforo,
+  TOQUE_MINIMO,
+  fechaCorta,
+  formatearDni,
+  money,
+} from "@/lib/vista"
 
 const METODOS: { valor: MetodoPago; etiqueta: string }[] = [
   { valor: "EFECTIVO", etiqueta: "Efectivo" },
@@ -71,7 +79,15 @@ export function Caja() {
   const [fecha, setFecha] = useState(hoyLocal())
   const [filtro, setFiltro] = useState<EstadoComanda | "TODAS">("TODAS")
   const [tutorId, setTutorId] = useState<number | null>(null)
+  const [mascotaId, setMascotaId] = useState<number | null>(null)
   const [aCobrar, setACobrar] = useState<ComandaCobro | null>(null)
+
+  // Con una mascota elegida, la fecha deja de mandar: se listan todas sus
+  // comandas, de cualquier día. Es el atajo para encontrar su deuda sin
+  // recorrer las jornadas una por una.
+  const modoMascota = mascotaId !== null
+
+  const mascotas = useApi<Mascota[]>(() => apiMascotas.listar())
 
   // La fecha viaja como clave: sin esto el hook pediria una sola vez y la pantalla
   // seguiria mostrando las comandas del dia con el que se abrio.
@@ -81,33 +97,46 @@ export function Caja() {
     fecha,
   )
   const comandas = useApi<ComandaCobro[]>(
-    () => apiComandas.listarDelDia(fecha, tutorId ?? undefined, filtro === "TODAS" ? undefined : filtro),
+    () =>
+      mascotaId !== null
+        ? apiComandas.listarPorMascota(
+            mascotaId,
+            filtro === "TODAS" ? undefined : filtro,
+          )
+        : apiComandas.listarDelDia(fecha, tutorId ?? undefined, filtro === "TODAS" ? undefined : filtro),
     true,
-    `${fecha}|${tutorId ?? ""}|${filtro}`,
+    mascotaId !== null ? `mascota|${mascotaId}|${filtro}` : `dia|${fecha}|${tutorId ?? ""}|${filtro}`,
   )
-  // La deuda se consulta solo con un tutor elegido: sin seleccion no hay a quien
-  // alertarle, y pedirla "para todos" no existe en la API.
-  const deuda = useApi<DeudaTutor>(
+  // La deuda se consulta solo con un tutor o una mascota elegidos: sin selección
+  // no hay a quién alertarle, y pedirla "para todos" no existe en la API.
+  const deudaTutor = useApi<DeudaTutor>(
     () => apiTutores.deuda(tutorId as number),
-    tutorId !== null,
+    !modoMascota && tutorId !== null,
     tutorId ?? undefined,
+  )
+  const deudaMascota = useApi<DeudaMascota>(
+    () => apiMascotas.deuda(mascotaId as number),
+    modoMascota,
+    mascotaId ?? undefined,
   )
 
   const tutorElegido = (tutoresDelDia.datos ?? []).find((t) => t.tutorId === tutorId) ?? null
+  const mascotaElegida = (mascotas.datos ?? []).find((m) => m.id === mascotaId) ?? null
 
   async function refrescar() {
     await Promise.all([comandas.recargar(), tutoresDelDia.recargar()])
-    if (tutorId !== null) await deuda.recargar()
+    if (modoMascota) await deudaMascota.recargar()
+    else if (tutorId !== null) await deudaTutor.recargar()
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <Panel title="Caja del día" bodyClassName="p-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+      <Panel title="Caja" bodyClassName="p-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <DatePicker
-            className="flex-1"
             label="Jornada"
             value={fecha}
+            disabled={modoMascota}
             onChange={(nueva) => {
               // Cambiar de dia descarta la seleccion de tutor: el de ayer no
               // tiene por que ser el de hoy, y dejarlo puesto mandaria un
@@ -117,13 +146,60 @@ export function Caja() {
             }}
           />
 
-          <label className="flex flex-1 flex-col gap-1.5 text-sm">
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="text-xs font-medium text-muted-foreground">Mascota</span>
+            <Select
+              value={mascotaId ?? ""}
+              onChange={(e) => {
+                const nueva = e.target.value ? Number(e.target.value) : null
+                setMascotaId(nueva)
+                // Mascota y tutor son dos formas de acotar lo mismo: se elige
+                // una u otra para que el filtro visible sea el que se aplica.
+                if (nueva !== null) setTutorId(null)
+              }}
+              className={TOQUE_MINIMO}
+            >
+              <option value="">Todas las mascotas</option>
+              {(mascotas.datos ?? []).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                  {/* El nombre del tutor desambigua dos mascotas homónimas:
+                      con el listado por mascota, elegir la equivocada muestra
+                      la deuda de otra persona. */}
+                  {m.tutores.length > 0
+                    ? ` · ${m.tutores[0].nombre} ${m.tutores[0].apellido}`
+                    : ""}
+                  {m.activo ? "" : " · inactiva"}
+                </option>
+              ))}
+            </Select>
+            {mascotas.cargando && (mascotas.datos ?? []).length === 0 && (
+              <span className="text-xs text-muted-foreground" role="status">
+                Cargando mascotas…
+              </span>
+            )}
+            {mascotas.error && (
+              <span className="text-xs text-destructive" role="alert">
+                No se pudieron cargar las mascotas.{" "}
+                <button
+                  type="button"
+                  onClick={() => void mascotas.recargar()}
+                  className="underline underline-offset-2"
+                >
+                  Reintentar
+                </button>
+              </span>
+            )}
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-xs font-medium text-muted-foreground">
               Tutor con actividad
             </span>
             <Select
               value={tutorId ?? ""}
               onChange={(e) => setTutorId(e.target.value ? Number(e.target.value) : null)}
+              disabled={modoMascota}
               className={TOQUE_MINIMO}
             >
               <option value="">Todos los tutores de la jornada</option>
@@ -138,12 +214,12 @@ export function Caja() {
                 y tenía que adivinar, mientras que la lista de comandas de abajo sí
                 informaba su error: dos controles de la misma pantalla con criterios
                 distintos. */}
-            {tutoresDelDia.cargando && (tutoresDelDia.datos ?? []).length === 0 && (
+            {!modoMascota && tutoresDelDia.cargando && (tutoresDelDia.datos ?? []).length === 0 && (
               <span className="text-xs text-muted-foreground" role="status">
                 Cargando tutores de la jornada…
               </span>
             )}
-            {tutoresDelDia.error && (
+            {!modoMascota && tutoresDelDia.error && (
               <span className="text-xs text-destructive" role="alert">
                 No se pudieron cargar los tutores de la jornada.{" "}
                 <button
@@ -157,7 +233,7 @@ export function Caja() {
             )}
           </label>
 
-          <label className="flex flex-1 flex-col gap-1.5 text-sm">
+          <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-xs font-medium text-muted-foreground">Estado</span>
             <Select
               value={filtro}
@@ -173,12 +249,23 @@ export function Caja() {
           </label>
         </div>
 
-        {tutorElegido && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {tutorElegido.nombreCompleto} · DNI {formatearDni(tutorElegido.dni)} ·{" "}
-            {tutorElegido.mascotas.length} mascota{tutorElegido.mascotas.length === 1 ? "" : "s"} en la
-            jornada.
+        {modoMascota ? (
+          <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Mostrando todas las comandas de{" "}
+            <strong className="text-foreground">
+              {mascotaElegida?.nombre ?? "la mascota"}
+            </strong>{" "}
+            sin importar la fecha. La jornada y el tutor no aplican mientras haya una
+            mascota elegida.
           </p>
+        ) : (
+          tutorElegido && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {tutorElegido.nombreCompleto} · DNI {formatearDni(tutorElegido.dni)} ·{" "}
+              {tutorElegido.mascotas.length} mascota{tutorElegido.mascotas.length === 1 ? "" : "s"} en la
+              jornada.
+            </p>
+          )
         )}
       </Panel>
 
@@ -188,72 +275,40 @@ export function Caja() {
           mismo criterio que el de morosidad del tablero del Mostrador (TANDA 2):
           un falso "todo en orden" informado antes de tiempo es peor que dejar
           un hueco visible. */}
-      {tutorId !== null && deuda.cargando && deuda.datos === null && (
-        <p
-          className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground"
-          role="status"
-        >
-          Consultando la deuda de {tutorElegido?.nombreCompleto ?? "este tutor"}…
-        </p>
+      {modoMascota ? (
+        <AlertaDeuda
+          titulo="MASCOTA CON DEUDA"
+          nombre={deudaMascota.datos?.nombreMascota ?? mascotaElegida?.nombre ?? "la mascota"}
+          detalle="La mascota no puede retirarse hasta saldar sus comandas."
+          estado={deudaMascota}
+          mostrarMascota={false}
+        />
+      ) : (
+        tutorId !== null && (
+          <AlertaDeuda
+            titulo="TUTOR MOROSO"
+            nombre={deudaTutor.datos?.nombreTutor ?? tutorElegido?.nombreCompleto ?? "este tutor"}
+            detalle="Cada mascota queda retenida hasta saldar sus propias comandas."
+            estado={deudaTutor}
+          />
+        )
       )}
 
-      {tutorId !== null && deuda.error && deuda.datos === null && (
-        <div
-          className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 p-4"
-          role="alert"
-        >
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
-          <div>
-            <p className="text-sm font-semibold text-amber-900">DEUDA SIN VERIFICAR</p>
-            <p className="mt-1 text-sm text-amber-800">
-              No se pudo consultar si {tutorElegido?.nombreCompleto ?? "este tutor"} debe.
-              No asumás que está al día: el egreso se valida recién en el checkout.
-            </p>
-            <button
-              type="button"
-              onClick={() => void deuda.recargar()}
-              className={`mt-2 rounded-md border border-amber-400 px-3 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 ${TOQUE_MINIMO}`}
-            >
-              Reintentar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {tutorId !== null && deuda.datos && deuda.datos.tieneDeuda && (
-        <div
-          className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 p-4"
-          role="alert"
-        >
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-700" aria-hidden />
-          <div>
-            <p className="text-sm font-semibold text-red-900">TUTOR MOROSO</p>
-            <p className="mt-1 text-sm text-red-800">
-              {deuda.datos.nombreTutor} debe {money(deuda.datos.totalDeuda)} en{" "}
-              {deuda.datos.cantidadComandas} comanda
-              {deuda.datos.cantidadComandas === 1 ? "" : "s"} pendiente
-              {deuda.datos.cantidadComandas === 1 ? "" : "s"}. Cada mascota queda retenida
-              hasta saldar sus propias comandas.
-            </p>
-            <ul className="mt-2 flex flex-col gap-0.5">
-              {deuda.datos.comandasPendientes.map((c) => (
-                <li key={c.id} className="text-xs text-red-800">
-                  #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto}
-                  {c.nombreMascota ? ` de ${c.nombreMascota}` : ""} ·{" "}
-                  {money(c.saldoPendiente)} · {c.diasDeAntiguedad} día
-                  {c.diasDeAntiguedad === 1 ? "" : "s"} de atraso
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      <Panel title={`Comandas del ${fecha.split("-").reverse().join("/")}`}>
+      <Panel
+        title={
+          modoMascota
+            ? `Comandas de ${mascotaElegida?.nombre ?? "la mascota"}`
+            : `Comandas del ${fecha.split("-").reverse().join("/")}`
+        }
+      >
         <Recurso
           estado={comandas}
           textoCarga="Cargando comandas"
-          textoVacio="No se emitió ninguna comanda en esa jornada"
+          textoVacio={
+            modoMascota
+              ? "La mascota no tiene comandas con ese filtro"
+              : "No se emitió ninguna comanda en esa jornada"
+          }
           onReintentar={comandas.recargar}
         >
           {(lista) => (
@@ -266,7 +321,8 @@ export function Caja() {
                         {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        #{c.id} · {c.fechaEmision.slice(11, 16)} · {c.nombreTutor ?? "Urgencia sin datos"}
+                        #{c.id} · {fechaCorta(c.fechaEmision)} {c.fechaEmision.slice(11, 16)} ·{" "}
+                        {c.nombreTutor ?? "Urgencia sin datos"}
                         {c.nombreMascota ? ` · ${c.nombreMascota}` : ""}
                       </p>
                       <DetalleComanda comanda={c} />
@@ -354,6 +410,94 @@ export function Caja() {
 }
 
 /**
+ * Aviso de deuda compartido por tutor y mascota.
+ *
+ * El cargando y el error forman parte del aviso a proposito: un banner que solo
+ * aparece cuando hay deuda convierte "todavia no consulté" en un "está al día"
+ * falso. El detalle muestra la fecha de cada comanda para que el mostrador
+ * sepa desde cuándo se debe.
+ */
+function AlertaDeuda({
+  titulo,
+  nombre,
+  detalle,
+  estado,
+  mostrarMascota = true,
+}: {
+  titulo: string
+  nombre: string
+  detalle: string
+  estado: Pick<EstadoApi<DeudaTutor | DeudaMascota>, "datos" | "cargando" | "error" | "recargar">
+  mostrarMascota?: boolean
+}) {
+  if (estado.cargando && estado.datos === null) {
+    return (
+      <p
+        className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground"
+        role="status"
+      >
+        Consultando la deuda de {nombre}…
+      </p>
+    )
+  }
+
+  if (estado.error && estado.datos === null) {
+    return (
+      <div
+        className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 p-4"
+        role="alert"
+      >
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
+        <div>
+          <p className="text-sm font-semibold text-amber-900">DEUDA SIN VERIFICAR</p>
+          <p className="mt-1 text-sm text-amber-800">
+            No se pudo consultar si {nombre} debe. No asumás que está al día: el egreso
+            se valida recién en el checkout.
+          </p>
+          <button
+            type="button"
+            onClick={() => void estado.recargar()}
+            className={`mt-2 rounded-md border border-amber-400 px-3 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 ${TOQUE_MINIMO}`}
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!estado.datos || !estado.datos.tieneDeuda) return null
+  const deuda = estado.datos
+
+  return (
+    <div
+      className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 p-4"
+      role="alert"
+    >
+      <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-700" aria-hidden />
+      <div>
+        <p className="text-sm font-semibold text-red-900">{titulo}</p>
+        <p className="mt-1 text-sm text-red-800">
+          {deuda.cantidadComandas} comanda
+          {deuda.cantidadComandas === 1 ? "" : "s"} pendiente
+          {deuda.cantidadComandas === 1 ? "" : "s"} por {money(deuda.totalDeuda)}. {detalle}
+        </p>
+        <ul className="mt-2 flex flex-col gap-0.5">
+          {deuda.comandasPendientes.map((c) => (
+            <li key={c.id} className="text-xs text-red-800">
+              #{c.id} {ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto}
+              {mostrarMascota && c.nombreMascota ? ` de ${c.nombreMascota}` : ""} ·{" "}
+              {money(c.saldoPendiente)} · {fechaCorta(c.fechaEmision)} · {c.diasDeAntiguedad} día
+              {c.diasDeAntiguedad === 1 ? "" : "s"} de atraso
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Modal de cobro mixto.
  *
  * Varios medios en una misma operación: es el caso real del mostrador (parte en
@@ -399,6 +543,9 @@ function ModalCobro({
   const total = lineas.reduce((acc, l) => acc + (Number(l.monto) || 0), 0)
   const restante = Math.max(0, comanda.saldoPendiente - total)
   const excede = total > comanda.saldoPendiente
+  // La comanda puede ser de una jornada anterior. Quien cobra tiene que verlo
+  // al lado del saldo, no descubrirlo después revisando el cierre.
+  const esDeudaAnterior = comanda.fechaEmision.slice(0, 10) < hoyLocal()
 
   // Sin selección se manda undefined y el backend asume al deudor. Es el mismo
   // camino que el de siempre, no una excepcion: la mayoria de los cobros la paga
@@ -441,6 +588,17 @@ function ModalCobro({
     <Modal open={abierto} onClose={onCerrar} title={`Cobrar comanda #${comanda.id}`}>
       <div className="flex flex-col gap-4 p-4">
         <div className="rounded-lg border border-border p-3 text-sm">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+            <span className="text-xs font-medium text-muted-foreground">Deuda del</span>
+            <span className="inline-flex items-center gap-2 text-sm font-medium">
+              {fechaCorta(comanda.fechaEmision)}
+              {esDeudaAnterior && (
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  de otro día
+                </span>
+              )}
+            </span>
+          </div>
           <DetalleComanda comanda={comanda} />
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Total</span>

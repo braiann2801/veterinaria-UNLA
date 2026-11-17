@@ -34,6 +34,18 @@ public interface ComandaCobroService {
 	 */
 	List<ComandaCobroResponseDTO> listarDelDia(LocalDate fecha, Long tutorId, String estado);
 
+	/**
+	 * Comandas de una mascota, de cualquier fecha.
+	 *
+	 * <p>Es el filtro alternativo al de jornada: sirve para encontrar la deuda
+	 * de una mascota sin recorrer los dias uno por uno. El estado es opcional y
+	 * se valida igual que en el resto del servicio.</p>
+	 *
+	 * @param mascotaId mascota a listar; debe existir
+	 * @param estado    estado a acotar, o null para todos
+	 */
+	List<ComandaCobroResponseDTO> listarPorMascota(Long mascotaId, String estado);
+
 	ComandaCobroResponseDTO buscarPorId(Long id);
 
 	/**

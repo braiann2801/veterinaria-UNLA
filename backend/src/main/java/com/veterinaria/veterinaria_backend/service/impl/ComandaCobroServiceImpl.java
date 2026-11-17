@@ -114,6 +114,23 @@ public class ComandaCobroServiceImpl implements ComandaCobroService {
 	}
 
 	@Override
+	public List<ComandaCobroResponseDTO> listarPorMascota(Long mascotaId, String estado) {
+		// Se valida la mascota primero: un id inexistente tiene que ser 404, no
+		// una lista vacia que se confunda con "no debe nada".
+		obtenerMascota(mascotaId);
+
+		ComandaCobro.EstadoComanda estadoFiltro = estado == null || estado.isBlank()
+				? null
+				: parseEstado(estado);
+
+		List<ComandaCobro> comandas = estadoFiltro == null
+				? comandaRepository.findByMascotaIdOrderByFechaEmisionDesc(mascotaId)
+				: comandaRepository.findByMascotaIdAndEstadoOrderByFechaEmisionDesc(mascotaId, estadoFiltro);
+
+		return mapper.toComandaResponseList(comandas);
+	}
+
+	@Override
 	public ComandaCobroResponseDTO buscarPorId(Long id) {
 		return mapper.toResponse(obtenerComanda(id));
 	}

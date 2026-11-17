@@ -78,6 +78,20 @@ public class ComandaCobroController {
 		return ResponseEntity.ok(comandaService.buscarPorId(id));
 	}
 
+	/**
+	 * GET /api/v1/comandas/mascota/{mascotaId}?estado=PENDIENTE
+	 *
+	 * <p>La alternativa a la caja del dia: todas las comandas de una mascota, de
+	 * cualquier fecha. Es lo que permite encontrar su deuda sin recorrer las
+	 * jornadas una por una. El estado es opcional.</p>
+	 */
+	@GetMapping("/mascota/{mascotaId}")
+	public ResponseEntity<List<ComandaCobroResponseDTO>> listarPorMascota(
+			@PathVariable Long mascotaId,
+			@RequestParam(required = false) String estado) {
+		return ResponseEntity.ok(comandaService.listarPorMascota(mascotaId, estado));
+	}
+
 	/** POST /api/v1/comandas -> 201. Emite una comanda manual (guarderia, insumos). */
 	@PostMapping
 	public ResponseEntity<ComandaCobroResponseDTO> emitir(

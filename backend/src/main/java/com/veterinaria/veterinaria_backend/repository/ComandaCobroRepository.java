@@ -30,6 +30,19 @@ public interface ComandaCobroRepository extends JpaRepository<ComandaCobro, Long
 			List<ComandaCobro.EstadoComanda> estados);
 
 	/**
+	 * Historial de una mascota, de cualquier fecha.
+	 *
+	 * <p>La caja del dia obliga a recorrer fechas para encontrar la deuda de una
+	 * mascota. Este listado responde la otra pregunta: "que debe esta mascota",
+	 * sin acotar por jornada. El orden es por emision descendente para que la
+	 * deuda mas reciente quede arriba.</p>
+	 */
+	List<ComandaCobro> findByMascotaIdOrderByFechaEmisionDesc(Long mascotaId);
+
+	List<ComandaCobro> findByMascotaIdAndEstadoOrderByFechaEmisionDesc(Long mascotaId,
+			ComandaCobro.EstadoComanda estado);
+
+	/**
 	 * Deuda consolidada de un tutor.
 	 *
 	 * <p>{@code COALESCE} a cero porque {@code SUM} sobre un conjunto vacio
