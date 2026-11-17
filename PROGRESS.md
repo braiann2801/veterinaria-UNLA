@@ -179,7 +179,9 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       Los campos sensibles (`rol`, `activo`, `debeCambiarPassword`,
       `passwordHash`) se ignoran si el cliente los manda; el rol siempre sale
       de la base. Tests en `EntradaSeguraTest`; detalle en
-      `odd/tasks/seguridad-entradas.md`.
+      `odd/tasks/seguridad-entradas.md`. Verificado además contra el backend
+      en vivo: cargas SQLi → `401`, cuerpos gigantes → `400`, CORS deja pasar
+      solo los orígenes configurados.
 
 ## Decisiones Críticas de Arquitectura
 

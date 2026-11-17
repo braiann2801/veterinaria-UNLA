@@ -117,4 +117,24 @@ permisos usan tokens reales, no `@WithMockUser`.
   `PUT /usuarios` con campos sensibles, tarifa, body ilegible y query param
   inválido.
 - `.\test-harness.ps1` completo: `tsc --noEmit`, `next build --webpack` y toda
-  la suite de backend.
+  la suite de backend (357 tests, 0 fallos).
+
+### Contra el backend corriendo (`:8080`)
+
+| Request | Resultado |
+|---|---|
+| `{"username":"' OR 1=1--","password":"x"}` | `401` |
+| `{"username":"a\"; DROP TABLE usuario; --","password":"x"}` | `401` |
+| contraseña de 200 caracteres | `400` "no puede superar los 72 caracteres" |
+| usuario de 5000 caracteres | `400` "no puede superar los 40 caracteres" |
+| body `{ esto no es json` | `400` genérico, sin clases internas |
+| preflight desde `localhost:3000`, `127.0.0.1:3000` y `*.vercel.app` | `200` con el origen ecoado y **sin** `Allow-Credentials` |
+| preflight desde `http://evil.example.com` | `403`, sin cabecera CORS |
+
+La tabla `usuario` quedó intacta después de todas las cargas.
+
+> Nota de entorno: la cuenta `duenio` ya no responde a `cambiar1234` porque la
+> contraseña se cambió desde la app después del reset (el hash guardado no
+> coincide, verificado con `BCrypt.checkpw`, y `token_version` está en 5 con
+> `debe_cambiar_password = 0`). No es una regresión del endurecimiento: los
+> tests de login autentican correctamente contra la base real.
