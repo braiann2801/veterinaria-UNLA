@@ -146,6 +146,27 @@ public final class NormalizadorAr {
 		return limpio.isEmpty() ? null : limpio;
 	}
 
+	/**
+	 * Clave de comparacion para catálogos: minusculas sin diacriticos y solo
+	 * caracteres alfanumericos separados por un espacio. Así "Amoxicilina 500mg",
+	 * "AMOXICILINA 500 MG" y "amoxicilina-500mg" dan la misma clave y no se
+	 * pueden dar de alta dos veces. Un valor vacio devuelve {@code ""} (nunca
+	 * {@code null}) para poder usarse en un constraint único de MySQL.
+	 */
+	public static String clave(String valor) {
+		if (valor == null) {
+			return "";
+		}
+		String sinAcentos = java.text.Normalizer.normalize(valor, java.text.Normalizer.Form.NFD)
+				.replaceAll("\\p{InCombiningDiacriticalMarks}", "");
+		String minusculas = sinAcentos.toLowerCase(Locale.ROOT)
+				// "500mg" y "500 mg" deben dar la misma clave: el rubro escribe
+				// la dosis pegada o separada segun el laboratorio.
+				.replaceAll("([a-z])([0-9])", "$1 $2")
+				.replaceAll("([0-9])([a-z])", "$1 $2");
+		return minusculas.replaceAll("[^a-z0-9]+", " ").trim();
+	}
+
 	/** Mayuscula inicial en la palabra y en cada parte despues de un guion o apostrofo. */
 	private static String capitalizarPartes(String palabra) {
 		StringBuilder resultado = new StringBuilder(palabra.length());

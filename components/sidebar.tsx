@@ -24,6 +24,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Pill,
   UserCog,
   Users,
   Wallet,
@@ -42,6 +43,7 @@ export type TabId =
   | "cobros"
   | "balance"
   | "egreso"
+  | "medicamentos"
   | "fichas"
   | "usuarios"
   | "tarifas"
@@ -90,6 +92,8 @@ export const TABS: TabDef[] = [
   { id: "agenda", label: "Agenda clínica", icon: CalendarDays, roles: EMPLEADOS, seccion: "operacion" },
   { id: "guarderia", label: "Agenda guardería", icon: Dog, roles: EMPLEADOS, seccion: "operacion" },
   { id: "egreso", label: "Egreso", icon: LogOut, roles: EMPLEADOS, seccion: "operacion" },
+  // Catálogo operativo: los cuatro roles lo consultan y cargan stock (IGUAL que el backend).
+  { id: "medicamentos", label: "Medicamentos", icon: Pill, roles: EMPLEADOS, seccion: "operacion" },
   { id: "padron", label: "Padrón", icon: Users, roles: EMPLEADOS, seccion: "clientes" },
   { id: "fichas", label: "Historial", icon: FileText, roles: EMPLEADOS, seccion: "clientes" },
   { id: "cobros", label: "Caja", icon: Wallet, roles: EMPLEADOS, seccion: "clientes" },

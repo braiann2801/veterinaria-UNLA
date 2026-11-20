@@ -26,6 +26,7 @@ import { Balance } from "@/components/modules/balance"
 import { Caja } from "@/components/modules/caja"
 import { Egreso } from "@/components/modules/egreso"
 import { Fichas } from "@/components/modules/fichas"
+import { Medicamentos } from "@/components/modules/medicamentos"
 import { Mostrador } from "@/components/modules/mostrador"
 import { Padron } from "@/components/modules/padron"
 import { Profesionales } from "@/components/modules/profesionales"
@@ -74,6 +75,7 @@ function Shell({ role }: { role: Role }) {
             {active === "padron" && <Padron />}
             {active === "cobros" && <Caja />}
             {active === "egreso" && <Egreso />}
+            {active === "medicamentos" && <Medicamentos />}
             {active === "fichas" && (
               <Fichas key={fichaMascotaId} initialMascotaId={fichaMascotaId} />
             )}

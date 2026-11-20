@@ -16,7 +16,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 380 tests de Spring Boot en verde.
+- **Fase en curso (2026-11-20):** módulo **Medicamentos e insumos** full-stack
+  terminado y verificado, todavía **sin commitear** en el working tree (19
+  archivos nuevos + 7 modificados, incluido este `PROGRESS.md`). Detalle en el
+  hito más abajo.
+- **Harness:** tsc limpio, Next.js build OK, 404 tests de Spring Boot en verde.
 - **Endurecimiento agnóstico al hosting (2026-11-19):** CSP en
   `Report-Only` + `Permissions-Policy` en `next.config.mjs`; `iss` del JWT
   validado y configurable (`JWT_ISSUER`); `Cache-Control: no-store` en login,
@@ -249,6 +253,33 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `RateLimitingExtendidoTest`. Sin DB pasan compile, tests unitarios, tsc,
       build, docker compose y suites de integración (48 tests, 0 fallos).
 
+- [x] **Medicamentos e insumos (2026-11-20)** — catálogo con stock atómico para
+      los cuatro roles. Backend: entidades `Medicamento` y
+      `MovimientoStockMedicamento` (historial inmutable), repositorios, DTOs
+      `record`, `MedicamentoService`/`Impl` y `MedicamentoController`. Endpoints
+      bajo `/api/v1/medicamentos`: `GET` (búsqueda case-insensitive por nombre,
+      principio activo y laboratorio; paginado server-side; solo activos; orden
+      alfabético), `GET /{id}`, `POST` (alta), `POST /{id}/stock` (suma) y
+      `GET /{id}/movimientos` (historial paginado). Unicidad por
+      `(nombre, presentación)` normalizados con `NormalizadorAr.clave` → 409;
+      `clave` separa letras de dígitos para que `500mg` y `500 mg` colisionen.
+      Stock con `SELECT ... FOR UPDATE` en SQL nativo (mismo motivo que el
+      aforo: Hibernate 7 emite `FOR UPDATE OF` y MariaDB lo rechaza); `cantidad
+      > 0` validada; cada alta con stock inicial y cada carga dejan un
+      `INGRESO`. `MovimientoStockMedicamento.usuario` es snapshot del username
+      (sin FK: las cuentas se borran) y `referenciaId` es un `Long` sin FK
+      listo para el id de ficha. `registrarConsumo(...)` ya descuenta con lock,
+      valida stock y escribe `EGRESO_FICHA` — **todavía no lo invoca
+      `ConsultaMedicaService`**. `SecurityConfig` da acceso a los cuatro roles.
+      Frontend: pestaña "Medicamentos" (sección Operación; no en la barra
+      inferior del móvil), tabla en desktop / cards en celular, buscador con
+      debounce de 350 ms + `AbortController`, alta, carga de stock con
+      historial compacto y paginación con el total del backend. Sin sistema de
+      toasts: el feedback es inline (`role="status"` / `role="alert"`).
+      Verificado: 19 tests nuevos (normalización, endpoints, permisos por rol,
+      12 cargas concurrentes), suite completa 404 tests, `tsc --noEmit`,
+      `next build --webpack` y `docker compose config --quiet`.
+
 ## Decisiones Críticas de Arquitectura
 
 1. **Rutas:** frontend en `app/` + `components/` + `lib/` (sin `frontend/src/`);
@@ -326,6 +357,14 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 12. **CSP en `Report-Only`:** no bloquea todavía. Siguiente bloque: nonce vía
     `middleware.ts`, revisar reportes y pasar a `enforce`, quitando
     `'unsafe-inline'` cuando los estilos inline se migren a variables CSS.
+13. **Descuento de stock desde ficha clínica:** `MedicamentoService.registrarConsumo(...)`
+    ya está listo (lock, validación de stock y `EGRESO_FICHA` con
+    `referenciaId`), pero `ConsultaMedicaService` todavía no lo invoca. Falta
+    decidir qué insumos se descuentan (extras actuales son solo conceptos de
+    cobro, sin vínculo con `Medicamento`) y cablear la transacción para que
+    alta de consulta y egreso de inventario sean atómicos. Sin edición ni
+    desactivación de medicamentos en este bloque: el campo `activo` existe pero
+    el listado solo muestra activos y no hay endpoint para cambiarlo.
 
 ## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
 
@@ -335,14 +374,19 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `/caja/tutores-del-dia`, `/caja/cierre` (día con `fecha` o período con
   `desde`/`hasta`), `/comandas/tarifas/{concepto}`, `/comandas/mascota/{id}`
   (todas las fechas, estado opcional) y `/mascotas/{id}/deuda`),
-  consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta` y
-  `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`).
-- **Tests backend:** 350 en verde. Cobertura clave: aforo concurrente (lock
+  consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta`,
+  `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`) y
+  `/medicamentos` (catálogo + `POST /{id}/stock` + `GET /{id}/movimientos`;
+  los cuatro roles en `SecurityConfig`).
+- **Tests backend:** 404 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`), balance por período (rango
-  inclusivo, serie diaria completa, facturado ≠ cobrado, límite de 366 días) y
-  parsers/conciliación de la importación histórica.
+  inclusivo, serie diaria completa, facturado ≠ cobrado, límite de 366 días),
+  12 cargas de stock simultáneas sobre la misma fila (lock real en MySQL:
+  `medicamento` con `SELECT ... FOR UPDATE`, sin `@Transactional` en la clase
+  de test para no enmascarar el lock) y parsers/conciliación de la importación
+  histórica.
 - **Importación histórica:** vive en `importacion/` (`ImportacionRunner`,
   `ConstructorPlan`, `ConciliacionHistorica`, `ImportacionService`,
   `ReporteImportacion`). Es una vía única de consola: no hay endpoint, no hay

@@ -87,6 +87,10 @@ public class SecurityConfig {
 						// El catalogo de extras lo lee cualquier empleado; lo modifica solo el Duenio.
 						.requestMatchers(HttpMethod.POST, "/api/v1/extras", "/api/v1/extras/**").hasRole("DUENIO")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/extras/**").hasRole("DUENIO")
+						// Los cuatro roles consultan el catálogo y cargan stock. Se explicita
+						// aunque la regla general de /api/** ya lo cubra: el inventario es
+						// de acceso operativo, no una administración reservada al Duenio.
+						.requestMatchers("/api/v1/medicamentos/**").hasAnyRole(EMPLEADOS)
 						// La plaza de urgencia de guarderia la consulta cualquier empleado;
 						// la habilita, deshabilita u ocupa solo el Veterinario (ni el Duenio).
 						.requestMatchers(HttpMethod.PUT, "/api/v1/guarderia/urgencia/**").hasRole("VETERINARIO")

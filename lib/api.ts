@@ -111,6 +111,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`
   const token = obtenerSesion()?.token
 
+  // Un debounce aborta la request anterior: esa cancelación es un flujo normal,
+  // no una falla de red. Se relanza tal cual para que el hook la descarte.
+  if (init?.signal?.aborted) {
+    throw new DOMException("Petición abortada", "AbortError")
+  }
+
   let respuesta: Response
   try {
     respuesta = await fetch(url, {
@@ -126,6 +132,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       cache: "no-store",
     })
   } catch (causa) {
+    if (
+      (typeof DOMException !== "undefined" && causa instanceof DOMException && causa.name === "AbortError") ||
+      (typeof causa === "object" && causa !== null && "name" in causa && causa.name === "AbortError")
+    ) {
+      throw causa
+    }
     throw new ApiConnectionError(causa)
   }
 
@@ -151,7 +163,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await respuesta.json()) as T
 }
 
-const get = <T,>(path: string) => request<T>(path)
+const get = <T,>(path: string, init?: RequestInit) => request<T>(path, init)
 const post = <T,>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) })
 const put = <T,>(path: string, body?: unknown) =>
@@ -761,6 +773,82 @@ export const extras = {
   /** Solo el Dueño: el backend responde 403 al resto. */
   crear: (body: ExtraInput) => post<Extra>("/extras", body),
   actualizar: (id: number, body: ExtraInput) => put<Extra>(`/extras/${id}`, body),
+}
+
+// ------------------------------------------------------------ medicamentos
+
+/** Respuesta paginada del backend (`PaginaResponseDTO`). */
+export interface Pagina<T> {
+  contenido: T[]
+  pagina: number
+  tamanio: number
+  totalElementos: number
+  totalPaginas: number
+}
+
+/** DTO del catálogo; `bajoStock` lo calcula el backend — no se duplica la regla acá. */
+export interface Medicamento {
+  id: number
+  nombre: string
+  presentacion: string | null
+  principioActivo: string | null
+  laboratorio: string | null
+  stockActual: number
+  stockMinimo: number
+  bajoStock: boolean
+  activo: boolean
+  fechaActualizacion: string
+}
+
+export interface MedicamentoInput {
+  nombre: string
+  presentacion?: string | null
+  principioActivo?: string | null
+  laboratorio?: string | null
+  stockInicial: number
+  stockMinimo: number
+}
+
+export interface AgregarStockInput {
+  cantidad: number
+  observacion?: string | null
+}
+
+export type TipoMovimientoStock = "INGRESO" | "EGRESO_FICHA" | "AJUSTE"
+
+/** Historial de inventario. `referenciaId` es el id de la ficha cuando se descuenta. */
+export interface MovimientoStock {
+  id: number
+  tipo: TipoMovimientoStock
+  cantidad: number
+  stockResultante: number
+  observacion: string | null
+  referenciaId: number | null
+  usuario: string
+  fechaHora: string
+}
+
+export interface ListarMedicamentos {
+  q?: string
+  page?: number
+  size?: number
+  signal?: AbortSignal
+}
+
+export const medicamentos = {
+  listar: ({ q = "", page = 0, size = 50, signal }: ListarMedicamentos = {}) => {
+    const params = new URLSearchParams({ q, page: String(page), size: String(size) })
+    return get<Pagina<Medicamento>>(`/medicamentos?${params.toString()}`, signal ? { signal } : undefined)
+  },
+  crear: (body: MedicamentoInput) => post<Medicamento>("/medicamentos", body),
+  agregarStock: (id: number, body: AgregarStockInput) =>
+    post<Medicamento>(`/medicamentos/${id}/stock`, body),
+  /** Solo lectura: se muestra dentro del modal de carga de stock. */
+  movimientos: (id: number, page = 0, size = 5, signal?: AbortSignal) =>
+    get<Pagina<MovimientoStock>>(
+      `/medicamentos/${id}/movimientos?page=${page}&size=${size}`,
+      signal ? { signal } : undefined,
+    ),
 }
 
 export const consultas = {

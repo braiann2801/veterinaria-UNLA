@@ -148,7 +148,8 @@ export function Recurso<T>({
   textoVacio,
   onReintentar,
 }: {
-  estado: EstadoApi<T>
+  /** Los hooks con filtros propios no necesitan exponer `mutando`/`ejecutar`. */
+  estado: Pick<EstadoApi<T>, "datos" | "cargando" | "error" | "recargar">
   children: (datos: T) => ReactNode
   textoCarga?: string
   textoVacio?: string
