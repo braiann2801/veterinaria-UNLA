@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.AgregarStockRequestDTO;
+import com.veterinaria.veterinaria_backend.dto.MedicamentoActualizacionRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MovimientoStockResponseDTO;
@@ -92,6 +93,55 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 		if (guardado.getStockActual() > 0) {
 			registrarMovimiento(guardado, TipoMovimiento.INGRESO, guardado.getStockActual(), null,
 					"Stock inicial", usuarioId);
+		}
+		return toResponse(guardado);
+	}
+
+	@Override
+	@Transactional
+	public MedicamentoResponseDTO actualizar(Long id, MedicamentoActualizacionRequestDTO request, Long usuarioId) {
+		Medicamento medicamento = bloquear(id);
+
+		Optional<Medicamento> duplicado = medicamentoRepository
+				.findByNombreNormalizadoAndPresentacionNormalizadaAndIdNot(
+						request.nombreNormalizado(), request.presentacionNormalizada(), id);
+		if (duplicado.isPresent()) {
+			String detalle = request.presentacion() == null || request.presentacion().isBlank()
+					? ""
+					: " (" + request.presentacion() + ")";
+			throw new BusinessConflictException("Ya existe un medicamento llamado '"
+					+ request.nombre() + "'" + detalle + ".");
+		}
+
+		int stockActual = medicamento.getStockActual();
+		int stockDeseado = request.stockActual();
+		boolean cambioStock = stockDeseado != stockActual;
+		if (cambioStock) {
+			if (request.stockActualAnterior() != stockActual) {
+				throw new BusinessConflictException("El stock de " + medicamento.getNombre()
+						+ " cambió mientras editabas (ahora hay " + stockActual
+						+ " unidades). Recargá la pantalla y volvé a intentarlo.");
+			}
+			if (request.observacionStock() == null || request.observacionStock().isBlank()) {
+				throw new BadRequestException("La observación es obligatoria cuando se cambia el stock.");
+			}
+		}
+
+		medicamento.setNombre(request.nombre());
+		medicamento.setNombreNormalizado(request.nombreNormalizado());
+		medicamento.setPresentacion(request.presentacion());
+		medicamento.setPresentacionNormalizada(request.presentacionNormalizada());
+		medicamento.setPrincipioActivo(request.principioActivo());
+		medicamento.setLaboratorio(request.laboratorio());
+		medicamento.setPrecio(request.precio());
+		medicamento.setStockMinimo(request.stockMinimo());
+		medicamento.setStockActual(stockDeseado);
+		medicamento.setFechaActualizacion(LocalDateTime.now(reloj));
+
+		Medicamento guardado = medicamentoRepository.save(medicamento);
+		if (cambioStock) {
+			registrarMovimiento(guardado, TipoMovimiento.AJUSTE, stockDeseado - stockActual, null,
+					request.observacionStock(), usuarioId);
 		}
 		return toResponse(guardado);
 	}

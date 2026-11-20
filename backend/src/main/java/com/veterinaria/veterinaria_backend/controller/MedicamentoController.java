@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.veterinaria.veterinaria_backend.dto.AgregarStockRequestDTO;
+import com.veterinaria.veterinaria_backend.dto.MedicamentoActualizacionRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MovimientoStockResponseDTO;
@@ -51,6 +52,18 @@ public class MedicamentoController {
 			@AuthenticationPrincipal Jwt jwt) {
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(medicamentoService.crear(request, usuarioId(jwt)));
+	}
+
+	/**
+	 * Edición completa del catálogo. El stock se registra como ajuste con
+	 * observación; cualquier empleado puede usarlo, igual que el alta.
+	 */
+	@PutMapping("/{id}")
+	public ResponseEntity<MedicamentoResponseDTO> actualizar(
+			@PathVariable Long id,
+			@Valid @RequestBody MedicamentoActualizacionRequestDTO request,
+			@AuthenticationPrincipal Jwt jwt) {
+		return ResponseEntity.ok(medicamentoService.actualizar(id, request, usuarioId(jwt)));
 	}
 
 	@PostMapping("/{id}/stock")

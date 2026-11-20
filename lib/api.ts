@@ -798,6 +798,24 @@ export interface PrecioMedicamentoInput {
   precio: number
 }
 
+/**
+ * Edición completa del catálogo. `stockActual` es el valor deseado (no una
+ * suma) y `stockActualAnterior` es lo que vio el operador al abrir el modal:
+ * el backend responde 409 si otro cambio el stock mientras editaba. Toda
+ * modificación del stock exige `observacionStock` y genera un ajuste auditado.
+ */
+export interface MedicamentoActualizacionInput {
+  nombre: string
+  presentacion?: string | null
+  principioActivo?: string | null
+  laboratorio?: string | null
+  precio: number
+  stockMinimo: number
+  stockActual: number
+  stockActualAnterior: number
+  observacionStock?: string | null
+}
+
 export interface AgregarStockInput {
   cantidad: number
   observacion?: string | null
@@ -830,6 +848,10 @@ export const medicamentos = {
     return get<Pagina<Medicamento>>(`/medicamentos?${params.toString()}`, signal ? { signal } : undefined)
   },
   crear: (body: MedicamentoInput) => post<Medicamento>("/medicamentos", body),
+  /** Edición completa; reemplaza al viejo endpoints de precio en la UI. */
+  actualizar: (id: number, body: MedicamentoActualizacionInput) =>
+    put<Medicamento>(`/medicamentos/${id}`, body),
+  /** Se conserva por compatibilidad; la pantalla ya usa `actualizar`. */
   actualizarPrecio: (id: number, body: PrecioMedicamentoInput) =>
     put<Medicamento>(`/medicamentos/${id}/precio`, body),
   agregarStock: (id: number, body: AgregarStockInput) =>

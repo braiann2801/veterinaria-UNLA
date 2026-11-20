@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.service;
 
 import com.veterinaria.veterinaria_backend.dto.AgregarStockRequestDTO;
+import com.veterinaria.veterinaria_backend.dto.MedicamentoActualizacionRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MovimientoStockResponseDTO;
@@ -15,6 +16,9 @@ public interface MedicamentoService {
 	MedicamentoResponseDTO obtener(Long id);
 
 	MedicamentoResponseDTO crear(MedicamentoRequestDTO request, Long usuarioId);
+
+	/** Edita todos los datos del catálogo; el stock se registra como ajuste. */
+	MedicamentoResponseDTO actualizar(Long id, MedicamentoActualizacionRequestDTO request, Long usuarioId);
 
 	MedicamentoResponseDTO agregarStock(Long id, AgregarStockRequestDTO request, Long usuarioId);
 

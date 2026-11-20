@@ -10,8 +10,10 @@
  *
  * <p>El precio de cada medicamento se fija acá (alta o edición) y se copia a
  * la comanda cuando el profesional lo usa en una atención. Cambiarlo no altera
- * comandas ya emitidas. El historial de movimientos se consulta dentro del
- * modal de stock, incluidos los egresos por ficha clínica.</p>
+ * comandas ya emitidas. El modal "Editar" corrige todos los datos del catálogo:
+ * si se modifica el stock, exige una observación y deja un movimiento AJUSTE
+ * (positivo o negativo) en el historial, que se consulta desde "Agregar stock",
+ * junto con los egresos por ficha clínica.</p>
  */
 
 import { useEffect, useState } from "react"
@@ -20,7 +22,7 @@ import { CheckCircle2, History, PackagePlus, Pencil, Plus, Search } from "lucide
 import { ApiError, medicamentos as apiMedicamentos, type Medicamento, type MovimientoStock, type Pagina } from "@/lib/api"
 import { useMedicamentos } from "@/lib/use-medicamentos"
 import { mensajeDeError } from "@/lib/use-api"
-import { Field, Panel, TextInput } from "@/components/ui/field"
+import { Field, Panel, TextArea, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { PaginadoServidor } from "@/components/ui/paginado-servidor"
 import { Cargando, fechaCorta, money, Recurso, Semforo, soloDecimal, soloDigitos, TOQUE_MINIMO, Vacio } from "@/lib/vista"
@@ -68,7 +70,7 @@ function detalle(medicamento: Medicamento): string {
 
 export function Medicamentos() {
   const catalogo = useMedicamentos()
-  const [modal, setModal] = useState<"nuevo" | "stock" | "precio" | null>(null)
+  const [modal, setModal] = useState<"nuevo" | "stock" | "editar" | null>(null)
   const [seleccionado, setSeleccionado] = useState<Medicamento | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
 
@@ -77,9 +79,9 @@ export function Medicamentos() {
     setModal("stock")
   }
 
-  function abrirPrecio(medicamento: Medicamento) {
+  function abrirEditar(medicamento: Medicamento) {
     setSeleccionado(medicamento)
-    setModal("precio")
+    setModal("editar")
   }
 
   return (
@@ -160,12 +162,12 @@ export function Medicamentos() {
                             <div className="flex flex-wrap justify-end gap-2">
                               <button
                                 type="button"
-                                onClick={() => abrirPrecio(medicamento)}
+                                onClick={() => abrirEditar(medicamento)}
                                 className={BOTON_SECUNDARIO}
-                                aria-label={`Cambiar precio de ${medicamento.nombre}`}
+                                aria-label={`Editar ${medicamento.nombre}`}
                               >
                                 <Pencil className="size-4" aria-hidden />
-                                Precio
+                                Editar
                               </button>
                               <button
                                 type="button"
@@ -198,12 +200,12 @@ export function Medicamentos() {
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
-                            onClick={() => abrirPrecio(medicamento)}
+                            onClick={() => abrirEditar(medicamento)}
                             className={BOTON_SECUNDARIO}
-                            aria-label={`Cambiar precio de ${medicamento.nombre}`}
+                            aria-label={`Editar ${medicamento.nombre}`}
                           >
                             <Pencil className="size-4" aria-hidden />
-                            Precio
+                            Editar
                           </button>
                           <button
                             type="button"
@@ -267,15 +269,19 @@ export function Medicamentos() {
       )}
 
       {seleccionado && (
-        <CambiarPrecio
+        <EditarMedicamento
           medicamento={seleccionado}
-          open={modal === "precio"}
+          open={modal === "editar"}
           onClose={() => setModal(null)}
-          onGuardado={async (precio) => {
-            const nombre = seleccionado.nombre
+          onGuardado={async (actualizado) => {
+            const conAjuste = actualizado.stockActual !== seleccionado.stockActual
             setModal(null)
             await catalogo.recargar()
-            setAviso(`Precio de "${nombre}" actualizado a ${money(precio)}. Rige para atenciones nuevas.`)
+            setAviso(
+              conAjuste
+                ? `Se guardaron los cambios de "${actualizado.nombre}". Stock corregido a ${actualizado.stockActual} unidades.`
+                : `Se guardaron los cambios de "${actualizado.nombre}".`,
+            )
           }}
         />
       )}
@@ -584,7 +590,7 @@ function CargarStock({
   )
 }
 
-function CambiarPrecio({
+function EditarMedicamento({
   medicamento,
   open,
   onClose,
@@ -593,31 +599,75 @@ function CambiarPrecio({
   medicamento: Medicamento
   open: boolean
   onClose: () => void
-  onGuardado: (precio: number) => Promise<void>
+  onGuardado: (actualizado: Medicamento) => Promise<void>
 }) {
+  const [nombre, setNombre] = useState("")
+  const [presentacion, setPresentacion] = useState("")
+  const [principioActivo, setPrincipioActivo] = useState("")
+  const [laboratorio, setLaboratorio] = useState("")
   const [precio, setPrecio] = useState("")
+  const [stockMinimo, setStockMinimo] = useState("")
+  const [stockActual, setStockActual] = useState("")
+  const [stockAnterior, setStockAnterior] = useState(medicamento.stockActual)
+  const [observacion, setObservacion] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      setPrecio(String(medicamento.precio))
-      setError(null)
-    }
-  }, [open, medicamento.id, medicamento.precio])
+    if (!open) return
+    setNombre(medicamento.nombre)
+    setPresentacion(medicamento.presentacion ?? "")
+    setPrincipioActivo(medicamento.principioActivo ?? "")
+    setLaboratorio(medicamento.laboratorio ?? "")
+    setPrecio(String(medicamento.precio))
+    setStockMinimo(String(medicamento.stockMinimo))
+    setStockActual(String(medicamento.stockActual))
+    // Se congela lo que vio el operador. Si otro cambia el stock mientras edita,
+    // el backend lo detecta y responde 409 en vez de sobrescribirlo.
+    setStockAnterior(medicamento.stockActual)
+    setObservacion("")
+    setError(null)
+  }, [
+    open,
+    medicamento.id,
+    medicamento.nombre,
+    medicamento.presentacion,
+    medicamento.principioActivo,
+    medicamento.laboratorio,
+    medicamento.precio,
+    medicamento.stockActual,
+    medicamento.stockMinimo,
+  ])
 
-  const nuevo = parsearPrecio(precio)
+  const minimo = parsearEntero(stockMinimo)
+  const actual = parsearEntero(stockActual)
+  const precioUnitario = parsearPrecio(precio)
+  const hayAjuste = actual !== null && actual !== stockAnterior
+  const observacionLista = observacion.trim()
+  const puedeGuardar =
+    nombre.trim() !== "" &&
+    minimo !== null &&
+    actual !== null &&
+    precioUnitario !== null &&
+    (!hayAjuste || observacionLista !== "")
 
   async function guardar() {
-    if (nuevo === null) {
-      setError("Ingresá un precio mayor o igual a cero.")
-      return
-    }
+    if (!puedeGuardar || minimo === null || actual === null || precioUnitario === null) return
     setGuardando(true)
     setError(null)
     try {
-      await apiMedicamentos.actualizarPrecio(medicamento.id, { precio: nuevo })
-      await onGuardado(nuevo)
+      const actualizado = await apiMedicamentos.actualizar(medicamento.id, {
+        nombre: nombre.trim(),
+        presentacion: presentacion.trim() || null,
+        principioActivo: principioActivo.trim() || null,
+        laboratorio: laboratorio.trim() || null,
+        precio: precioUnitario,
+        stockMinimo: minimo,
+        stockActual: actual,
+        stockActualAnterior: stockAnterior,
+        observacionStock: hayAjuste ? observacionLista : null,
+      })
+      await onGuardado(actualizado)
     } catch (e) {
       setError(textoError(e))
     } finally {
@@ -626,9 +676,46 @@ function CambiarPrecio({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={`Cambiar precio · ${medicamento.nombre}`}>
+    <Modal open={open} onClose={onClose} title={`Editar · ${medicamento.nombre}`}>
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">{detalle(medicamento) || "Sin datos adicionales"}</p>
+        <p className="text-sm text-muted-foreground">
+          Corregí los datos del catálogo. Para arreglar el stock, cargá el valor real y explicá el motivo.
+        </p>
+        <Field label="Nombre">
+          <TextInput
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            maxLength={120}
+            className={TOQUE_MINIMO}
+          />
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Presentación">
+            <TextInput
+              value={presentacion}
+              onChange={(e) => setPresentacion(e.target.value)}
+              placeholder="Comprimidos, frasco…"
+              maxLength={120}
+              className={TOQUE_MINIMO}
+            />
+          </Field>
+          <Field label="Laboratorio">
+            <TextInput
+              value={laboratorio}
+              onChange={(e) => setLaboratorio(e.target.value)}
+              maxLength={120}
+              className={TOQUE_MINIMO}
+            />
+          </Field>
+        </div>
+        <Field label="Principio activo">
+          <TextInput
+            value={principioActivo}
+            onChange={(e) => setPrincipioActivo(e.target.value)}
+            maxLength={120}
+            className={TOQUE_MINIMO}
+          />
+        </Field>
         <Field label="Precio unitario">
           <TextInput
             inputMode="decimal"
@@ -636,10 +723,46 @@ function CambiarPrecio({
             onChange={(e) => setPrecio(soloDecimal(e.target.value))}
             className={TOQUE_MINIMO}
           />
+          <span className="text-xs text-muted-foreground">
+            Rige para las atenciones nuevas. Las comandas ya emitidas conservan el precio con el que se cobraron.
+          </span>
         </Field>
-        <p className="text-xs text-muted-foreground">
-          Rige para las atenciones nuevas. Las comandas ya emitidas conservan el precio con el que se cobraron.
-        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Stock mínimo (alerta)">
+            <TextInput
+              inputMode="numeric"
+              value={stockMinimo}
+              onChange={(e) => setStockMinimo(soloDigitos(e.target.value, 9))}
+              className={TOQUE_MINIMO}
+            />
+          </Field>
+          <Field label="Stock actual">
+            <TextInput
+              inputMode="numeric"
+              value={stockActual}
+              onChange={(e) => setStockActual(soloDigitos(e.target.value, 9))}
+              className={TOQUE_MINIMO}
+            />
+          </Field>
+        </div>
+        {hayAjuste ? (
+          <Field label="Observación del ajuste (obligatoria)">
+            <TextArea
+              value={observacion}
+              onChange={(e) => setObservacion(e.target.value)}
+              placeholder="Ej: faltaban 3 unidades en el conteo real"
+              maxLength={500}
+            />
+            <span className="text-xs text-muted-foreground">
+              Queda en el historial como ajuste{" "}
+              {actual !== null && actual < stockAnterior ? "negativo" : "positivo"} con tu usuario.
+            </span>
+          </Field>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Stock sin cambios: no se registra ningún movimiento.
+          </p>
+        )}
         {error && (
           <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
             {error}
@@ -650,10 +773,10 @@ function CambiarPrecio({
           <button
             type="button"
             onClick={guardar}
-            disabled={guardando || nuevo === null}
+            disabled={guardando || !puedeGuardar}
             className={BOTON_PRIMARIO}
           >
-            {guardando ? "Guardando…" : "Guardar precio"}
+            {guardando ? "Guardando…" : "Guardar cambios"}
           </button>
         </div>
       </div>

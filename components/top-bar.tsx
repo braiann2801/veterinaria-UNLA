@@ -18,11 +18,15 @@
  * por el animal o por el dueno — y el filtrado es de texto parcial sobre un
  * padron chico (un consultorio, no un padrón nacional), asi que no se dispara una
  * request por tecla.</p>
+ *
+ * <p>El resultado ya no tiene un botón "Fichas": la fila completa es un botón
+ * que abre la ficha de la mascota. Así el área táctil cubre el nombre y todos
+ * los datos del tutor, sin obligar a apuntar a un control chico.</p>
  */
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, KeyRound, Loader2, LogOut, Search } from "lucide-react"
+import { ChevronRight, KeyRound, Loader2, LogOut, Search } from "lucide-react"
 
 import { ModalCambiarPassword } from "@/components/cambiar-password"
 
@@ -93,32 +97,30 @@ export function TopBar({
         {resultados.length > 0 && (
           <ul className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
             {resultados.map(({ mascota, tutor }) => (
-              <li
-                key={`${tutor.id}-${mascota.id}`}
-                className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-sm last:border-b-0"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{mascota.nombre}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {tutor.nombre} {tutor.apellido} · DNI {formatearDni(tutor.dni)}
-                    {tutor.telefono ? ` · ${tutor.telefono}` : ""}
-                  </p>
-                </div>
+              <li key={`${tutor.id}-${mascota.id}`} className="border-b border-border last:border-b-0">
                 {/*
-                  El acceso rápido al historial se muestra siempre: los tres roles
-                  operativos tienen el Historial (ver `TABS` en `sidebar.tsx`), así
-                  que ocultarlo para alguno dejaría un resultado de búsqueda sin
-                  salida para un rol que sí puede leer la ficha.
+                  Toda la fila es el acceso a la ficha: no hace falta un botón
+                  "Fichas" aparte. Los roles operativos tienen Historial (ver
+                  `TABS` en `sidebar.tsx`), así que el resultado siempre tiene
+                  una salida válida. La flecha solo sugiere que la fila navega.
                 */}
                 <button
+                  type="button"
                   onClick={() => {
                     onVerFichas(mascota.id)
                     setQuery("")
                   }}
-                  className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-xl border border-border px-3 text-xs transition-colors hover:bg-muted"
+                  aria-label={`Ver ficha de ${mascota.nombre} · ${tutor.nombre} ${tutor.apellido}`}
+                  className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                 >
-                  <FileText className="h-3 w-3" aria-hidden />
-                  Fichas
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{mascota.nombre}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {tutor.nombre} {tutor.apellido} · DNI {formatearDni(tutor.dni)}
+                      {tutor.telefono ? ` · ${tutor.telefono}` : ""}
+                    </p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 </button>
               </li>
             ))}

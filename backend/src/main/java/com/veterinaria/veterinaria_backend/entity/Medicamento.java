@@ -16,9 +16,9 @@ import lombok.Setter;
 
 /**
  * Insumo del consultorio con stock controlado (vacunas, medicamentos,
- * materiales). El alta y la carga de stock son las únicas escrituras de este
- * bloque: no se edita ni se desactiva, pero el campo {@code activo} ya está
- * modelado y el listado solo devuelve los activos.
+ * materiales). Se da de alta, se edita y se ajusta el stock con auditoría;
+ * el campo {@code activo} ya está modelado y el listado solo devuelve los
+ * activos, aunque todavía no hay endpoints para dar de baja un medicamento.
  *
  * <p>La identidad del catálogo es el par (nombre, presentación) normalizado.
  * "Amoxicilina" en comprimidos y "Amoxicilina" en suspensión son dos productos

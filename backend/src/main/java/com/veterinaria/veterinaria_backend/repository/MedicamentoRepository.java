@@ -38,6 +38,13 @@ public interface MedicamentoRepository extends JpaRepository<Medicamento, Long> 
 			String nombreNormalizado, String presentacionNormalizada);
 
 	/**
+	 * Igual que la búsqueda de duplicados del alta, pero excluyendo al propio
+	 * medicamento: al editar, seguir llamándose igual no es un conflicto.
+	 */
+	Optional<Medicamento> findByNombreNormalizadoAndPresentacionNormalizadaAndIdNot(
+			String nombreNormalizado, String presentacionNormalizada, Long id);
+
+	/**
 	 * Bloqueo pesimista de la fila para serializar cargas y consumos concurrentes.
 	 *
 	 * <p>SQL nativo y no {@code @Lock(PESSIMISTIC_WRITE)}: Hibernate 7 genera

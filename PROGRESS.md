@@ -6,6 +6,17 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
+- **Tarea completada (2026-11-20):** **edición de medicamentos + búsqueda
+  superior clickeable**. Implementada y revisada; detalle en
+  `odd/tasks/edicion-medicamentos-busqueda-clickeable.md`. Sin commit, a la
+  espera de revisión. Bloqueantes: ninguno. No se modifica `AGENTS.md`.
+- **Incidente resuelto (2026-11-20 18:03):** "Editar" devolvía el 500 genérico
+  porque el backend en vivo se había iniciado a las 17:27, antes de que se
+  compilara el `PUT /medicamentos/{id}` (17:45). El PUT a una ruta inexistente
+  caía en el handler de recursos estáticos → `HttpRequestMethodNotSupportedException`
+  → catch-all `Exception` → "Ocurrio un error inesperado". No era un bug del
+  service. Se reinició `spring-boot:run` (PID 14532) y arrancó limpio. Ojo: sin
+  `JWT_SECRET` la clave es aleatoria, así que hay que volver a iniciar sesión.
 - **Fase en curso:** rama `feat/urgencias` (detalle en
   `odd/tasks/urgencias.md`): turno de urgencia sin datos y plaza extra de
   guardería para urgencia clínica (solo Veterinario). Implementada; e2e y
@@ -16,13 +27,15 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Fase en curso (2026-11-20):** **medicamentos con precio en la atención**.
+- **Fase completada (2026-11-20):** **medicamentos con precio en la atención**.
   Reemplaza al módulo de extras (código, API y UI borrados; comandas históricas
-  intactas). Backend, frontend y docs terminados, todavía **sin commitear** en
-  el working tree. Detalle en `odd/tasks/medicamentos-precio-atencion.md`.
+  intactas). Backend, frontend y docs terminados y commiteados en `b84892c`.
+  Detalle en `odd/tasks/medicamentos-precio-atencion.md`.
 - **Harness:** `tsc --noEmit` limpio, `next build --webpack` OK, 402 tests de
-  Spring Boot en verde contra el datadir temporal de MySQL, `docker compose
-  config --quiet` OK. Todo sin commitear.
+  Spring Boot en verde. Tras la recuperación de XAMPP se volvió a correr el
+  harness completo contra el datadir recuperado en `C:\xampp\mysql\data`
+  (puerto 3306, `innodb_force_recovery=0`, `veterinaria_test` aislada): todo en
+  verde. `docker compose config --quiet` OK.
 - **Endurecimiento agnóstico al hosting (2026-11-19):** CSP en
   `Report-Only` + `Permissions-Policy` en `next.config.mjs`; `iss` del JWT
   validado y configurable (`JWT_ISSUER`); `Cache-Control: no-store` en login,
@@ -302,6 +315,20 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `next build --webpack` y `docker compose config --quiet`. Detalle en
       `odd/tasks/medicamentos-precio-atencion.md`.
 
+- [x] **Edición de medicamentos + búsqueda superior clickeable (2026-11-20)** —
+      "Precio" pasa a ser "Editar" en tabla y cards. `PUT /api/v1/medicamentos/{id}`
+      con `MedicamentoActualizacionRequestDTO` edita nombre, presentación,
+      principio activo, laboratorio, precio, stock mínimo y stock actual. El
+      stock es **valor deseado**: admite bajas, exige observación y deja un
+      movimiento `AJUSTE` con cantidad firmada; "Agregar stock" sigue sumando
+      como `INGRESO`. Control optimista con `stockActualAnterior` → 409 si otro
+      cambió el stock; `FOR UPDATE` y duplicados excluyendo el propio id.
+      `PUT /{id}/precio` se conserva por compatibilidad, la UI ya no lo usa.
+      TopBar: cada resultado es un único botón que ocupa toda la fila, sin
+      botón "Fichas" ni ícono. Verificado con harness completo: **409 tests,
+      0 fallos** y `tsc --noEmit` limpio. Detalle en
+      `odd/tasks/edicion-medicamentos-busqueda-clickeable.md`. Sin commit.
+
 ## Decisiones Críticas de Arquitectura
 
 1. **Rutas:** frontend en `app/` + `components/` + `lib/` (sin `frontend/src/`);
@@ -385,13 +412,37 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
     escribe `EGRESO_FICHA` con `referenciaId` de la ficha; sin stock, 409 con
     rollback de ficha, comanda y movimientos. Los extras (conceptos de cobro sin
     vínculo con `Medicamento`) se eliminaron y reemplazaron por esta lista.
-    Sigue sin haber edición ni desactivación de medicamentos: el campo `activo`
-    existe, el listado solo muestra activos y no hay endpoint para cambiarlo.
+    Ya hay edición completa (`PUT /{id}`, ver tarea del 2026-11-20); sigue sin
+    haber desactivación: el campo `activo` existe, el listado solo muestra
+    activos y no hay endpoint para cambiarlo.
 14. **Precio congelado:** `ComandaItem` guarda descripción, cantidad, precio
     unitario y subtotal como escalares, sin FK a `Medicamento` ni a `Extra`.
     Así las comandas históricas (incluidas las de extras) sobreviven a cambios
     de catálogo. La tabla `extra` y su FK quedan en la BD: `ddl-auto=update`
     no las dropea y no se quiso reescribir datos históricos.
+15. **[RESUELTO] Corrupción InnoDB de XAMPP (2026-11-20):** el datadir original
+    crasheaba por `space=118, page=1` (pertenecía a `veterinaria_test`, no a la
+    BD real). Se rescató `veterinaria_db` sobre una copia en frío con
+    `innodb_force_recovery=1` + `mysqldump --force` (19 tablas, conteos
+    idénticos), se importó en un datadir limpio y se hizo el swap: el original
+    quedó en `C:\xampp\mysql\data-corrupt-20261120` (cuarentena, reversible) y
+    el recuperado está activo en `C:\xampp\mysql\data` sin force recovery.
+    Dump verificado en `datos/backup-recuperado-20261120.sql` (gitignored).
+    Usuario `pma` de phpMyAdmin recreado. `mysqlcheck --check --all-databases`
+    y el harness completo pasaron después del swap.
+ 16. **Rate limiter y tests (2026-11-20):** `verificarLogin` consume cupo por IP
+     incluso en logins exitosos y `registrarExitoLogin` no limpia esa clave. Los
+     tests que hacen login en el contexto compartido pueden agotar el umbral de
+     20 y hacer fallar `UsuarioAbmTest` con 429. `MedicamentoControllerTest`
+     quedó aislado con `@TestPropertySource` (límites altos); **no se tocó la
+     seguridad de producción**. Pendiente: limpiar la clave de IP al login
+     exitoso o inyectar un almacén de test, y revertir el aislamiento.
+ 17. **Método HTTP no soportado se reporta como 500:** no hay handler para
+     `HttpRequestMethodNotSupportedException`. Un PUT a una ruta que solo existe
+     en el frontend nuevo (backend desactualizado) cae en el catch-all y muestra
+     "Ocurrio un error inesperado" en vez de un 405 claro. Dificultó el
+     diagnóstico del incidente de edición de medicamentos. Sugerido: agregar
+     handler 405.
 
 ## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
 
@@ -402,10 +453,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `desde`/`hasta`), `/comandas/tarifas/{concepto}`, `/comandas/mascota/{id}`
   (todas las fechas, estado opcional) y `/mascotas/{id}/deuda`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta`,
-  `/medicamentos` (catálogo + `POST` con precio + `PUT /{id}/precio` +
-  `POST /{id}/stock` + `GET /{id}/movimientos`; los cuatro roles en
-  `SecurityConfig`). Ya no existe `/extras`.
-- **Tests backend:** 402 en verde. Cobertura clave: aforo concurrente (lock
+  `/medicamentos` (catálogo + `POST` con precio + `PUT /{id}` (edición) +
+  `PUT /{id}/precio` (legacy) + `POST /{id}/stock` + `GET /{id}/movimientos`;
+  los cuatro roles en `SecurityConfig`). Ya no existe `/extras`.
+- **Tests backend:** 409 en verde (harness completo del 2026-11-20). Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`), balance por período (rango

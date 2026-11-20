@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,14 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+// Contexto propio: cada test hace login y el limitador de IP no se resetea en un
+// login exitoso. Compartir el almacen del contexto por defecto agotaba el cupo
+// de 20 y hacia fallar UsuarioAbmTest con 429 sin relacion con este modulo.
+@TestPropertySource(properties = {
+		"veterinaria.auth.login-intentos-maximos=1000",
+		"veterinaria.auth.login-ip-intentos-maximos=1000",
+		"veterinaria.auth.login-usuario-intentos-maximos=1000"
+})
 class MedicamentoControllerTest {
 
 	private static final String USUARIO = "farmacia-test";
@@ -295,6 +305,166 @@ class MedicamentoControllerTest {
 				.header(HttpHeaders.AUTHORIZATION, autorizacion)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(json(Map.of("precio", 100))))
+				.andExpect(status().isNotFound());
+	}
+
+	private Map<String, Object> cuerpoEdicion(String nombre, String presentacion, String principio, String laboratorio,
+			double precio, int minimo, int stockActual, int stockAnterior, String observacion) {
+		// HashMap y no Map.of: los campos opcionales se envian como null a proposito.
+		Map<String, Object> cuerpo = new HashMap<>();
+		cuerpo.put("nombre", nombre);
+		cuerpo.put("presentacion", presentacion);
+		cuerpo.put("principioActivo", principio);
+		cuerpo.put("laboratorio", laboratorio);
+		cuerpo.put("precio", precio);
+		cuerpo.put("stockMinimo", minimo);
+		cuerpo.put("stockActual", stockActual);
+		cuerpo.put("stockActualAnterior", stockAnterior);
+		cuerpo.put("observacionStock", observacion);
+		return cuerpo;
+	}
+
+	@Test
+	@DisplayName("Editar cambia todos los datos del catálogo sin generar movimientos si el stock no se toca")
+	void editarDatos() throws Exception {
+		Medicamento medicamento = crearMedicamento("Amoxicilina", "Comprimidos", "Amoxicilina", "Lab A", 5, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("AMOXICILINA 500 MG", "Comprimidos 500mg", "Amoxicilina", "Lab B",
+						5000.50, 3, 5, 5, ""))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nombre").value("AMOXICILINA 500 MG"))
+				.andExpect(jsonPath("$.presentacion").value("Comprimidos 500mg"))
+				.andExpect(jsonPath("$.principioActivo").value("Amoxicilina"))
+				.andExpect(jsonPath("$.laboratorio").value("Lab B"))
+				.andExpect(jsonPath("$.precio").value(5000.50))
+				.andExpect(jsonPath("$.stockMinimo").value(3))
+				.andExpect(jsonPath("$.stockActual").value(5));
+
+		Medicamento guardado = medicamentoRepository.findById(medicamento.getId()).orElseThrow();
+		assertThat(guardado.getNombreNormalizado()).isEqualTo(NormalizadorAr.clave("AMOXICILINA 500 MG"));
+		assertThat(guardado.getPresentacionNormalizada()).isEqualTo(NormalizadorAr.clave("Comprimidos 500mg"));
+		assertThat(guardado.getPrecio()).isEqualByComparingTo("5000.50");
+		assertThat(movimientoRepository.count()).isZero();
+	}
+
+	@Test
+	@DisplayName("Editar disminuye el stock y deja un AJUSTE negativo con la observación del operador")
+	void editarDisminuyeStock() throws Exception {
+		Medicamento medicamento = crearMedicamento("Gasa", "Paquete", null, null, 10, 2);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("Gasa", "Paquete", null, null, 0, 2, 7, 10,
+						"Conteo mal cargado: faltaban 3 unidades"))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.stockActual").value(7));
+
+		assertThat(movimientoRepository.countByMedicamentoIdAndTipo(medicamento.getId(), TipoMovimiento.AJUSTE))
+				.isEqualTo(1);
+		var movimiento = movimientoRepository.findAll().stream()
+				.filter(m -> m.getMedicamento().getId().equals(medicamento.getId()))
+				.findFirst().orElseThrow();
+		assertThat(movimiento.getTipo()).isEqualTo(TipoMovimiento.AJUSTE);
+		assertThat(movimiento.getCantidad()).isEqualTo(-3);
+		assertThat(movimiento.getStockResultante()).isEqualTo(7);
+		assertThat(movimiento.getObservacion()).isEqualTo("Conteo mal cargado: faltaban 3 unidades");
+		assertThat(movimiento.getUsuario()).isEqualTo(USUARIO);
+	}
+
+	@Test
+	@DisplayName("Editar aumenta el stock y deja un AJUSTE positivo")
+	void editarAumentaStock() throws Exception {
+		Medicamento medicamento = crearMedicamento("Suero", "Frasco", null, null, 4, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("Suero", "Frasco", null, null, 0, 0, 6, 4,
+						"Corrección de inventario: sobraban 2"))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.stockActual").value(6));
+
+		var movimiento = movimientoRepository.findAll().stream()
+				.filter(m -> m.getMedicamento().getId().equals(medicamento.getId()))
+				.findFirst().orElseThrow();
+		assertThat(movimiento.getTipo()).isEqualTo(TipoMovimiento.AJUSTE);
+		assertThat(movimiento.getCantidad()).isEqualTo(2);
+		assertThat(movimiento.getStockResultante()).isEqualTo(6);
+	}
+
+	@Test
+	@DisplayName("Cambiar el stock sin observación responde 400 y no altera el inventario")
+	void editarStockSinObservacion() throws Exception {
+		Medicamento medicamento = crearMedicamento("Jeringa", "Unidad", null, null, 8, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("Jeringa", "Unidad", null, null, 0, 0, 5, 8, ""))))
+				.andExpect(status().isBadRequest());
+
+		assertThat(medicamentoRepository.findById(medicamento.getId()).orElseThrow().getStockActual()).isEqualTo(8);
+		assertThat(movimientoRepository.count()).isZero();
+	}
+
+	@Test
+	@DisplayName("Editar con un stock anterior desactualizado responde 409")
+	void editarStockObsoleto() throws Exception {
+		Medicamento medicamento = crearMedicamento("Venda", "Rollo", null, null, 9, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("Venda", "Rollo", null, null, 0, 0, 6, 12,
+						"Otro operador cambió el stock"))))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.mensaje").value(
+						org.hamcrest.Matchers.containsString("cambió mientras editabas")));
+
+		assertThat(medicamentoRepository.findById(medicamento.getId()).orElseThrow().getStockActual()).isEqualTo(9);
+		assertThat(movimientoRepository.count()).isZero();
+	}
+
+	@Test
+	@DisplayName("Editar hacia un nombre ya usado por otro responde 409; conservar el propio nombre es válido")
+	void editarDuplicado() throws Exception {
+		Medicamento primero = crearMedicamento("Paracetamol", "Comprimidos", null, null, 5, 0);
+		crearMedicamento("Ibuprofeno", "Comprimidos", null, null, 5, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", primero.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("Ibuprofeno", "comprimidos", null, null, 0, 0, 5, 5, ""))))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.mensaje").value(
+						org.hamcrest.Matchers.containsString("Ya existe un medicamento")));
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", primero.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("PARACETAMOL", "COMPRIMIDOS", null, null, 0, 0, 5, 5, ""))))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("Editar con stock negativo responde 400; editar un inexistente responde 404")
+	void editarInvalido() throws Exception {
+		Medicamento medicamento = crearMedicamento("Alcohol", "Frasco", null, null, 3, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("Alcohol", "Frasco", null, null, 0, 0, -1, 3, "Error de conteo"))))
+				.andExpect(status().isBadRequest());
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}", 99999999)
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(cuerpoEdicion("Alcohol", "Frasco", null, null, 0, 0, 3, 3, ""))))
 				.andExpect(status().isNotFound());
 	}
 
