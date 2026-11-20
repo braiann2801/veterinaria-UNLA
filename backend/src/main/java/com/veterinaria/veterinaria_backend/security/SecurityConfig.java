@@ -84,9 +84,6 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/caja/cierre").hasRole("DUENIO")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/comandas/tarifas/**").hasRole("DUENIO")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/guarderia/tarifas").hasRole("DUENIO")
-						// El catalogo de extras lo lee cualquier empleado; lo modifica solo el Duenio.
-						.requestMatchers(HttpMethod.POST, "/api/v1/extras", "/api/v1/extras/**").hasRole("DUENIO")
-						.requestMatchers(HttpMethod.PUT, "/api/v1/extras/**").hasRole("DUENIO")
 						// Los cuatro roles consultan el catálogo y cargan stock. Se explicita
 						// aunque la regla general de /api/** ya lo cubra: el inventario es
 						// de acceso operativo, no una administración reservada al Duenio.

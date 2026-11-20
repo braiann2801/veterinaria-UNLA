@@ -108,8 +108,10 @@ public class ComandaCobro {
 	private List<Pago> pagos = new ArrayList<>();
 
 	/**
-	 * Detalle de la comanda (consulta y extras). Las comandas anteriores al
-	 * detalle, y las de guarderia u OTRO, no tienen lineas: su monto es uno solo.
+	 * Detalle de la comanda (consulta y medicamentos). Las comandas anteriores
+	 * al detalle, y las de guarderia u OTRO, no tienen lineas: su monto es uno
+	 * solo. Las lineas guardan descripcion y precio como escalares para que las
+	 * comandas historicas sobrevivan a cambios en el catalogo.
 	 */
 	@OneToMany(mappedBy = "comanda", cascade = CascadeType.ALL, orphanRemoval = true)
 	@OrderBy("id ASC")

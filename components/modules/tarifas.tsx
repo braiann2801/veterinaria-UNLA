@@ -6,8 +6,8 @@
  * <p>Guardería: precio por hora (estadías que entran y salen el mismo día) y por
  * noche (si pasa al menos una). Con esos dos valores se calcula el monto de cada
  * reserva y su comanda. Consulta clínica: el precio de la comanda que emite la
- * atención desde la Agenda. Extras: el catálogo de vacunas, urgencias e insumos que el
- * profesional suma a la atención.</p>
+ * atención desde la Agenda. El precio de cada medicamento se fija en el módulo
+ * Medicamentos y se copia a la comanda cuando se usa en una atención.</p>
  *
  * <p>Un cambio rige para lo que se emita desde ahora: las comandas ya emitidas
  * conservan su monto.</p>
@@ -26,7 +26,6 @@ import { useApi, mensajeDeError } from "@/lib/use-api"
 import { Field, Panel, TextInput } from "@/components/ui/field"
 import { Recurso, TOQUE_MINIMO, money, soloDecimal } from "@/lib/vista"
 import { cn } from "@/lib/utils"
-import { CatalogoExtras } from "./tarifas/catalogo-extras"
 
 const BOTON = cn(
   "inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60",
@@ -48,7 +47,6 @@ export function Tarifas() {
     <div className="flex flex-col gap-4">
       <TarifasGuarderia />
       <TarifaConsulta />
-      <CatalogoExtras />
     </div>
   )
 }

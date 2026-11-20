@@ -16,10 +16,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Linea de detalle de una comanda: la consulta o un extra usado en la atencion.
+ * Linea de detalle de una comanda: la consulta o un medicamento usado en la
+ * atencion.
  *
- * <p>Descripcion y precio se copian al emitir: si el Duenio cambia el precio
- * del extra despues, la comanda ya emitida no se mueve.</p>
+ * <p>Descripcion y precio se copian al emitir: si cambia el precio de catalogo
+ * despues, la comanda ya emitida no se mueve. No hay relacion JPA con el
+ * medicamento: el historial vive en estos escalares, aunque se borre del
+ * catalogo.</p>
  */
 @Entity
 @Table(name = "comanda_item")
@@ -35,11 +38,6 @@ public class ComandaItem {
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "comanda_id", nullable = false)
 	private ComandaCobro comanda;
-
-	/** Extra del catalogo, o {@code null} para la linea de la consulta. */
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "extra_id")
-	private Extra extra;
 
 	@Column(name = "descripcion", nullable = false, length = 80)
 	private String descripcion;

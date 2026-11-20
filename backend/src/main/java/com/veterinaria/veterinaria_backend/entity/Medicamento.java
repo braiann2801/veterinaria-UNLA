@@ -1,5 +1,6 @@
 package com.veterinaria.veterinaria_backend.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -68,9 +69,23 @@ public class Medicamento {
 	@Column(name = "stock_minimo", nullable = false)
 	private int stockMinimo = 0;
 
+	/**
+	 * Precio unitario que se cobra al cliente junto con la consulta. Se copia a
+	 * la comanda al emitir: cambiarlo aca nunca altera una comanda ya emitida.
+	 * La columna se agrega con {@code ddl-auto=update}, asi que las filas
+	 * anteriores llegan nulas y se interpretan como cero.
+	 */
+	@Column(name = "precio", precision = 12, scale = 2)
+	private BigDecimal precio = BigDecimal.ZERO;
+
 	@Column(nullable = false)
 	private boolean activo = true;
 
 	@Column(name = "fecha_actualizacion", nullable = false)
 	private LocalDateTime fechaActualizacion;
+
+	/** Precio con dos decimales; cero para los medicamentos cargados antes del campo. */
+	public BigDecimal precioCobrable() {
+		return precio == null ? BigDecimal.ZERO.setScale(2) : precio.setScale(2, java.math.RoundingMode.HALF_UP);
+	}
 }

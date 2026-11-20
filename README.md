@@ -129,8 +129,8 @@ El frontend todavía no tiene test runner.
   - El cobro se genera como comanda para el mostrador.
   - La atención se registra solo desde la Agenda clínica: cada turno pendiente tiene el botón **Atender**, que abre la ficha ya vinculada al turno. Al finalizar, el turno queda como **Atendido**.
   - Un turno pendiente se puede **Cancelar** desde el panel del día de la Agenda clínica, con confirmación. Queda en la agenda tachado y su horario se libera para otro turno. Un turno atendido no se cancela (el backend responde 409): ya tiene ficha y comanda.
-  - El profesional puede sumar **extras** (vacunas, urgencias, insumos) del catálogo que arma el Dueño en **Tarifas**. No ve precios: la comanda suma la consulta más los extras, y Caja muestra el detalle de cada línea.
-  - Cambiar el precio de un extra rige para las atenciones nuevas; las comandas ya emitidas conservan su precio. Un extra no se borra, se desactiva.
+  - El profesional puede sumar **medicamentos e insumos** del catálogo del módulo **Medicamentos**: busca por nombre con la misma barra de búsqueda y los agrega con un click. El precio de catálogo se muestra solo como referencia; la comanda suma la consulta más los medicamentos y Caja muestra el detalle de cada línea.
+  - El precio se carga al dar de alta el medicamento o se cambia desde la lista ("Precio"). Cualquier empleado puede fijarlo. Al guardar la ficha se descuenta el stock y se congela el precio vigente en la comanda: cambiar el catálogo no altera comandas ya emitidas. Sin stock suficiente, la atención se rechaza.
 - **Tutores y mascotas:** la relación es N:M. Cada vínculo indica si ese tutor está autorizado a retirar a la mascota.
 - **Los registros no se borran:**
   - Tutores, mascotas y profesionales se **desactivan**: sus fichas, turnos, cobros y deudas quedan guardados.

@@ -21,9 +21,10 @@ public interface ConsultaMedicaService {
 	 * <p>Ambas escrituras ocurren en la misma transaccion: si la comanda no se
 	 * puede emitir, la ficha tampoco queda registrada.</p>
 	 *
+	 * @param usuarioId id del operador, para la auditoria del descuento de stock
 	 * @throws com.veterinaria.veterinaria_backend.exception.BadRequestException si el turno ya tiene ficha
 	 */
-	ConsultaMedicaResponseDTO registrar(ConsultaMedicaRequestDTO request);
+	ConsultaMedicaResponseDTO registrar(ConsultaMedicaRequestDTO request, Long usuarioId);
 
 	ConsultaMedicaResponseDTO buscarPorId(Long id);
 

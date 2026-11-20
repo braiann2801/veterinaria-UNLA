@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,9 +44,15 @@ public class ConsultaMedicaController {
 	/** POST /api/v1/consultas -> 201 */
 	@PostMapping
 	public ResponseEntity<ConsultaMedicaResponseDTO> registrar(
-			@Valid @RequestBody ConsultaMedicaRequestDTO request) {
+			@Valid @RequestBody ConsultaMedicaRequestDTO request,
+			@AuthenticationPrincipal Jwt jwt) {
 		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(consultaService.registrar(request));
+				.body(consultaService.registrar(request, usuarioId(jwt)));
+	}
+
+	/** El JWT solo lleva {@code sub}; con tests MockMvc no hay principal y la auditoria queda como "sistema". */
+	private static Long usuarioId(Jwt jwt) {
+		return jwt == null ? null : Long.valueOf(jwt.getSubject());
 	}
 
 	/** GET /api/v1/consultas/{id} */

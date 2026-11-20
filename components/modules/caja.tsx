@@ -734,7 +734,7 @@ function ModalCobro({
 }
 
 /**
- * Detalle de la comanda (consulta y extras usados) con el precio congelado al
+ * Detalle de la comanda (consulta y medicamentos usados) con el precio congelado al
  * emitir. Las comandas de guardería y las anteriores al detalle no tienen
  * líneas: ahí no se muestra nada y el total habla solo.
  */

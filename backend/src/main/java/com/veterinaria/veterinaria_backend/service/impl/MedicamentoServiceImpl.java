@@ -1,5 +1,7 @@
 package com.veterinaria.veterinaria_backend.service.impl;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -14,6 +16,7 @@ import com.veterinaria.veterinaria_backend.dto.MedicamentoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MovimientoStockResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PrecioMedicamentoRequestDTO;
 import com.veterinaria.veterinaria_backend.entity.Medicamento;
 import com.veterinaria.veterinaria_backend.entity.MovimientoStockMedicamento;
 import com.veterinaria.veterinaria_backend.entity.MovimientoStockMedicamento.TipoMovimiento;
@@ -79,6 +82,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 		medicamento.setPresentacionNormalizada(request.presentacionNormalizada());
 		medicamento.setPrincipioActivo(request.principioActivo());
 		medicamento.setLaboratorio(request.laboratorio());
+		medicamento.setPrecio(request.precio());
 		medicamento.setStockActual(request.stockInicial());
 		medicamento.setStockMinimo(request.stockMinimo());
 		medicamento.setActivo(true);
@@ -110,6 +114,16 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 		registrarMovimiento(guardado, TipoMovimiento.INGRESO, request.cantidad(), null,
 				request.observacion(), usuarioId);
 		return toResponse(guardado);
+	}
+
+	@Override
+	@Transactional
+	public MedicamentoResponseDTO actualizarPrecio(Long id, PrecioMedicamentoRequestDTO request) {
+		Medicamento medicamento = buscar(id);
+		BigDecimal precio = request.precio().setScale(2, RoundingMode.HALF_UP);
+		medicamento.setPrecio(precio);
+		medicamento.setFechaActualizacion(LocalDateTime.now(reloj));
+		return toResponse(medicamentoRepository.save(medicamento));
 	}
 
 	@Override
@@ -181,6 +195,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 				medicamento.getPresentacion(),
 				medicamento.getPrincipioActivo(),
 				medicamento.getLaboratorio(),
+				medicamento.precioCobrable(),
 				medicamento.getStockActual(),
 				medicamento.getStockMinimo(),
 				medicamento.getStockMinimo() > 0 && medicamento.getStockActual() < medicamento.getStockMinimo(),

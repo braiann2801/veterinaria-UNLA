@@ -2,12 +2,13 @@
 
 /**
  * Cierra la atención de un turno desde la Agenda: el profesional carga la ficha
- * clínica y los extras usados sin cambiar de pestaña ni buscar el turno.
+ * clínica y los medicamentos usados sin cambiar de pestaña ni buscar el turno.
  *
  * <p>El turno ya trae la mascota, el profesional y la fecha, así que no se
  * vuelven a pedir. Al guardar, el backend registra la ficha, pasa el turno a
- * ATENDIDO y emite la comanda (consulta + extras) en una sola transacción.
- * No hay montos ni medios de pago acá (regla 3 de AGENTS.md).</p>
+ * ATENDIDO y emite la comanda (consulta + medicamentos) en una sola transacción.
+ * No hay montos ni medios de pago acá (regla 3 de AGENTS.md): el precio que se
+ * ve en el buscador es informativo y se congela en la comanda.</p>
  */
 
 import { useState } from "react"
@@ -27,7 +28,7 @@ import { Field, Select, TextArea, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { TOQUE_MINIMO, soloDecimal } from "@/lib/vista"
 import { CONDUCTAS, CONDUCTAS_CON_ALERTA } from "@/components/modules/ficha/conductas"
-import { SelectorExtras, type ExtraElegido } from "@/components/modules/ficha/selector-extras"
+import { SelectorMedicamentos, type MedicamentoElegido } from "@/components/modules/ficha/selector-medicamentos"
 
 export function AtenderTurnoModal({
   turno,
@@ -46,7 +47,7 @@ export function AtenderTurnoModal({
   const [tratamiento, setTratamiento] = useState("")
   const [peso, setPeso] = useState("")
   const [conducta, setConducta] = useState<ConductaObservada>("TRANQUILO")
-  const [extras, setExtras] = useState<ExtraElegido[]>([])
+  const [medicamentos, setMedicamentos] = useState<MedicamentoElegido[]>([])
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
@@ -66,7 +67,7 @@ export function AtenderTurnoModal({
         tratamiento: tratamiento.trim() || undefined,
         conductaObservada: conducta,
         pesoKg: peso.trim() === "" ? undefined : Number(peso),
-        extras,
+        medicamentos,
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la atención")
@@ -164,7 +165,7 @@ export function AtenderTurnoModal({
           )}
         </Field>
 
-        <SelectorExtras valor={extras} onChange={setExtras} />
+        <SelectorMedicamentos valor={medicamentos} onChange={setMedicamentos} />
 
         {error && (
           <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
@@ -189,7 +190,7 @@ export function AtenderTurnoModal({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Al finalizar, el turno queda como atendido y la comanda (consulta + extras) pasa al mostrador.
+          Al finalizar, el turno queda como atendido y la comanda (consulta + medicamentos) pasa al mostrador.
         </p>
       </div>
     </Modal>

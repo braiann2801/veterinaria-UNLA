@@ -8,13 +8,14 @@
  * puede crecer y no queremos traer miles de-insumos al navegador para mostrar
  * cincuenta.</p>
  *
- * <p>El historial de movimientos se consulta dentro del modal de stock. Es
- * solo lectura y preparado para el id de la ficha clínica que se descontará
- * en el siguiente bloque.</p>
+ * <p>El precio de cada medicamento se fija acá (alta o edición) y se copia a
+ * la comanda cuando el profesional lo usa en una atención. Cambiarlo no altera
+ * comandas ya emitidas. El historial de movimientos se consulta dentro del
+ * modal de stock, incluidos los egresos por ficha clínica.</p>
  */
 
 import { useEffect, useState } from "react"
-import { CheckCircle2, History, PackagePlus, Plus, Search } from "lucide-react"
+import { CheckCircle2, History, PackagePlus, Pencil, Plus, Search } from "lucide-react"
 
 import { ApiError, medicamentos as apiMedicamentos, type Medicamento, type MovimientoStock, type Pagina } from "@/lib/api"
 import { useMedicamentos } from "@/lib/use-medicamentos"
@@ -22,7 +23,7 @@ import { mensajeDeError } from "@/lib/use-api"
 import { Field, Panel, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { PaginadoServidor } from "@/components/ui/paginado-servidor"
-import { Cargando, fechaCorta, Recurso, Semforo, soloDigitos, TOQUE_MINIMO, Vacio } from "@/lib/vista"
+import { Cargando, fechaCorta, money, Recurso, Semforo, soloDecimal, soloDigitos, TOQUE_MINIMO, Vacio } from "@/lib/vista"
 import { cn } from "@/lib/utils"
 
 const BOTON_PRIMARIO = cn(
@@ -44,6 +45,13 @@ function parsearEntero(valor: string): number | null {
   return Number.isInteger(numero) && numero >= 0 ? numero : null
 }
 
+/** Precio opcional: vacío significa 0 (no se cobra). Acepta coma decimal. */
+function parsearPrecio(valor: string): number | null {
+  if (valor.trim() === "") return 0
+  const numero = Number(valor.replace(",", "."))
+  return Number.isFinite(numero) && numero >= 0 ? numero : null
+}
+
 function EstadoStock({ medicamento }: { medicamento: Medicamento }) {
   if (medicamento.stockActual === 0) return <Semforo tono="rojo">Sin stock</Semforo>
   if (medicamento.bajoStock) {
@@ -60,13 +68,18 @@ function detalle(medicamento: Medicamento): string {
 
 export function Medicamentos() {
   const catalogo = useMedicamentos()
-  const [modal, setModal] = useState<"nuevo" | "stock" | null>(null)
+  const [modal, setModal] = useState<"nuevo" | "stock" | "precio" | null>(null)
   const [seleccionado, setSeleccionado] = useState<Medicamento | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
 
   function abrirStock(medicamento: Medicamento) {
     setSeleccionado(medicamento)
     setModal("stock")
+  }
+
+  function abrirPrecio(medicamento: Medicamento) {
+    setSeleccionado(medicamento)
+    setModal("precio")
   }
 
   return (
@@ -131,6 +144,7 @@ export function Medicamentos() {
                       <tr>
                         <th scope="col" className="px-3 py-2">Medicamento</th>
                         <th scope="col" className="px-3 py-2">Presentación / laboratorio</th>
+                        <th scope="col" className="px-3 py-2 text-right">Precio</th>
                         <th scope="col" className="px-3 py-2">Stock</th>
                         <th scope="col" className="px-3 py-2 text-right">Acciones</th>
                       </tr>
@@ -140,17 +154,29 @@ export function Medicamentos() {
                         <tr key={medicamento.id} className="transition-colors hover:bg-muted/40">
                           <td className="px-3 py-2 font-medium">{medicamento.nombre}</td>
                           <td className="px-3 py-2 text-muted-foreground">{detalle(medicamento) || "—"}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{money(medicamento.precio)}</td>
                           <td className="px-3 py-2"><EstadoStock medicamento={medicamento} /></td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              type="button"
-                              onClick={() => abrirStock(medicamento)}
-                              className={BOTON_SECUNDARIO}
-                              aria-label={`Agregar stock a ${medicamento.nombre}`}
-                            >
-                              <PackagePlus className="size-4" aria-hidden />
-                              Agregar stock
-                            </button>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => abrirPrecio(medicamento)}
+                                className={BOTON_SECUNDARIO}
+                                aria-label={`Cambiar precio de ${medicamento.nombre}`}
+                              >
+                                <Pencil className="size-4" aria-hidden />
+                                Precio
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => abrirStock(medicamento)}
+                                className={BOTON_SECUNDARIO}
+                                aria-label={`Agregar stock a ${medicamento.nombre}`}
+                              >
+                                <PackagePlus className="size-4" aria-hidden />
+                                Agregar stock
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -162,18 +188,32 @@ export function Medicamentos() {
                 <ul className="flex flex-col gap-3 md:hidden">
                   {pagina.contenido.map((medicamento) => (
                     <li key={medicamento.id} className="rounded-xl border border-border bg-background p-3">
-                      <p className="font-medium">{medicamento.nombre}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium">{medicamento.nombre}</p>
+                        <span className="shrink-0 font-semibold tabular-nums">{money(medicamento.precio)}</span>
+                      </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">{detalle(medicamento) || "Sin datos adicionales"}</p>
                       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                         <EstadoStock medicamento={medicamento} />
-                        <button
-                          type="button"
-                          onClick={() => abrirStock(medicamento)}
-                          className={BOTON_SECUNDARIO}
-                        >
-                          <PackagePlus className="size-4" aria-hidden />
-                          Agregar stock
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => abrirPrecio(medicamento)}
+                            className={BOTON_SECUNDARIO}
+                            aria-label={`Cambiar precio de ${medicamento.nombre}`}
+                          >
+                            <Pencil className="size-4" aria-hidden />
+                            Precio
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => abrirStock(medicamento)}
+                            className={BOTON_SECUNDARIO}
+                          >
+                            <PackagePlus className="size-4" aria-hidden />
+                            Agregar stock
+                          </button>
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -225,6 +265,20 @@ export function Medicamentos() {
           }}
         />
       )}
+
+      {seleccionado && (
+        <CambiarPrecio
+          medicamento={seleccionado}
+          open={modal === "precio"}
+          onClose={() => setModal(null)}
+          onGuardado={async (precio) => {
+            const nombre = seleccionado.nombre
+            setModal(null)
+            await catalogo.recargar()
+            setAviso(`Precio de "${nombre}" actualizado a ${money(precio)}. Rige para atenciones nuevas.`)
+          }}
+        />
+      )}
     </Panel>
   )
 }
@@ -244,15 +298,17 @@ function NuevoMedicamento({
   const [laboratorio, setLaboratorio] = useState("")
   const [stockInicial, setStockInicial] = useState("0")
   const [stockMinimo, setStockMinimo] = useState("0")
+  const [precio, setPrecio] = useState("0")
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
   const inicial = parsearEntero(stockInicial)
   const minimo = parsearEntero(stockMinimo)
+  const precioUnitario = parsearPrecio(precio)
 
   async function guardar() {
-    if (nombre.trim() === "" || inicial === null || minimo === null) {
-      setError("Completá el nombre y revisá los stocks (números enteros mayores o iguales a cero).")
+    if (nombre.trim() === "" || inicial === null || minimo === null || precioUnitario === null) {
+      setError("Completá el nombre y revisá los stocks y el precio (números mayores o iguales a cero).")
       return
     }
     setGuardando(true)
@@ -263,6 +319,7 @@ function NuevoMedicamento({
         presentacion: presentacion.trim() || null,
         principioActivo: principioActivo.trim() || null,
         laboratorio: laboratorio.trim() || null,
+        precio: precioUnitario,
         stockInicial: inicial,
         stockMinimo: minimo,
       })
@@ -270,6 +327,7 @@ function NuevoMedicamento({
       setPresentacion("")
       setPrincipioActivo("")
       setLaboratorio("")
+      setPrecio("0")
       setStockInicial("0")
       setStockMinimo("0")
       await onGuardado(nombre.trim())
@@ -319,6 +377,18 @@ function NuevoMedicamento({
             className={TOQUE_MINIMO}
           />
         </Field>
+        <Field label="Precio unitario">
+          <TextInput
+            inputMode="decimal"
+            value={precio}
+            onChange={(e) => setPrecio(soloDecimal(e.target.value))}
+            placeholder="0"
+            className={TOQUE_MINIMO}
+          />
+          <span className="text-xs text-muted-foreground">
+            Se cobra junto con la consulta cuando se use en una atención. Podés cambiarlo después.
+          </span>
+        </Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Stock inicial">
             <TextInput
@@ -347,7 +417,7 @@ function NuevoMedicamento({
           <button
             type="button"
             onClick={guardar}
-            disabled={guardando || nombre.trim() === "" || inicial === null || minimo === null}
+            disabled={guardando || nombre.trim() === "" || inicial === null || minimo === null || precioUnitario === null}
             className={BOTON_PRIMARIO}
           >
             {guardando ? "Guardando…" : "Guardar"}
@@ -507,6 +577,83 @@ function CargarStock({
             className={BOTON_PRIMARIO}
           >
             {guardando ? "Guardando…" : "Agregar stock"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function CambiarPrecio({
+  medicamento,
+  open,
+  onClose,
+  onGuardado,
+}: {
+  medicamento: Medicamento
+  open: boolean
+  onClose: () => void
+  onGuardado: (precio: number) => Promise<void>
+}) {
+  const [precio, setPrecio] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setPrecio(String(medicamento.precio))
+      setError(null)
+    }
+  }, [open, medicamento.id, medicamento.precio])
+
+  const nuevo = parsearPrecio(precio)
+
+  async function guardar() {
+    if (nuevo === null) {
+      setError("Ingresá un precio mayor o igual a cero.")
+      return
+    }
+    setGuardando(true)
+    setError(null)
+    try {
+      await apiMedicamentos.actualizarPrecio(medicamento.id, { precio: nuevo })
+      await onGuardado(nuevo)
+    } catch (e) {
+      setError(textoError(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Cambiar precio · ${medicamento.nombre}`}>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">{detalle(medicamento) || "Sin datos adicionales"}</p>
+        <Field label="Precio unitario">
+          <TextInput
+            inputMode="decimal"
+            value={precio}
+            onChange={(e) => setPrecio(soloDecimal(e.target.value))}
+            className={TOQUE_MINIMO}
+          />
+        </Field>
+        <p className="text-xs text-muted-foreground">
+          Rige para las atenciones nuevas. Las comandas ya emitidas conservan el precio con el que se cobraron.
+        </p>
+        {error && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className={BOTON_SECUNDARIO}>Cancelar</button>
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={guardando || nuevo === null}
+            className={BOTON_PRIMARIO}
+          >
+            {guardando ? "Guardando…" : "Guardar precio"}
           </button>
         </div>
       </div>

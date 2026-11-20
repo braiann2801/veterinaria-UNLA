@@ -374,8 +374,11 @@ export interface ConsultaMedicaInput {
   conductaObservada?: ConductaObservada
   /** Peso medido en la atención (kg). Actualiza el peso actual de la mascota. */
   pesoKg?: number
-  /** Extras usados en la atención. Sin precio: lo pone el catálogo del Dueño. */
-  extras?: { extraId: number; cantidad: number }[]
+  /**
+   * Medicamentos usados en la atención. Sin precio: el backend lo lee del
+   * catálogo al emitir la comanda (regla 3 de AGENTS.md).
+   */
+  medicamentos?: { medicamentoId: number; cantidad: number }[]
 }
 
 export interface Pago {
@@ -407,7 +410,7 @@ export interface ComandaCobro {
   consultaMedicaId: number | null
   fechaEmision: string
   pagos: Pago[]
-  /** Detalle (consulta y extras) con el precio congelado al emitir. Vacío en comandas sin detalle. */
+  /** Detalle (consulta y medicamentos) con el precio congelado al emitir. Vacío en comandas sin detalle. */
   items: ComandaItem[]
 }
 
@@ -752,29 +755,6 @@ export const guarderia = {
 
 // --------------------------------------------------------------- consultas
 
-// ----------------------------------------------------------------- extras
-
-/** Extra del catálogo (vacuna, urgencia, insumo) con el precio que fija el Dueño. */
-export interface Extra {
-  id: number
-  nombre: string
-  precio: number
-  activo: boolean
-}
-
-export interface ExtraInput {
-  nombre: string
-  precio: number
-  activo?: boolean
-}
-
-export const extras = {
-  listar: (soloActivos = false) => get<Extra[]>(`/extras${soloActivos ? "?soloActivos=true" : ""}`),
-  /** Solo el Dueño: el backend responde 403 al resto. */
-  crear: (body: ExtraInput) => post<Extra>("/extras", body),
-  actualizar: (id: number, body: ExtraInput) => put<Extra>(`/extras/${id}`, body),
-}
-
 // ------------------------------------------------------------ medicamentos
 
 /** Respuesta paginada del backend (`PaginaResponseDTO`). */
@@ -793,6 +773,8 @@ export interface Medicamento {
   presentacion: string | null
   principioActivo: string | null
   laboratorio: string | null
+  /** Precio unitario de catálogo; se copia a la comanda al emitir. */
+  precio: number
   stockActual: number
   stockMinimo: number
   bajoStock: boolean
@@ -805,8 +787,15 @@ export interface MedicamentoInput {
   presentacion?: string | null
   principioActivo?: string | null
   laboratorio?: string | null
+  /** Opcional: por defecto 0. Cualquier empleado puede fijarlo. */
+  precio?: number
   stockInicial: number
   stockMinimo: number
+}
+
+/** Cambio de precio de catálogo: no altera comandas ya emitidas. */
+export interface PrecioMedicamentoInput {
+  precio: number
 }
 
 export interface AgregarStockInput {
@@ -841,6 +830,8 @@ export const medicamentos = {
     return get<Pagina<Medicamento>>(`/medicamentos?${params.toString()}`, signal ? { signal } : undefined)
   },
   crear: (body: MedicamentoInput) => post<Medicamento>("/medicamentos", body),
+  actualizarPrecio: (id: number, body: PrecioMedicamentoInput) =>
+    put<Medicamento>(`/medicamentos/${id}/precio`, body),
   agregarStock: (id: number, body: AgregarStockInput) =>
     post<Medicamento>(`/medicamentos/${id}/stock`, body),
   /** Solo lectura: se muestra dentro del modal de carga de stock. */

@@ -21,10 +21,10 @@ import jakarta.validation.constraints.Size;
  * <p><b>Aca se materializa el desacople clinico-contable (AGENTS.md 2.3).</b>
  * Este record no declara ningun campo de monto, medio de pago, saldo, total ni
  * forma de cobro. No es una omision: es el contrato. La pantalla del
- * veterinario no puede mandar un precio porque el endpoint no tiene donde
- * recibirlo, y no puede mostrar un saldo porque la respuesta tampoco lo
- * incluye. El precio sale de {@code Tarifa} y el cobro se resuelve en el
- * mostrador contra {@link ComandaCobroResponseDTO}.</p>
+ * veterinario puede <i>consultar</i> el precio de catalogo de los medicamentos,
+ * pero no puede mandarlo: el endpoint no tiene donde recibirlo. El precio de la
+ * consulta sale de {@code Tarifa}, el de cada medicamento del catalogo, y el
+ * cobro se resuelve en el mostrador contra {@link ComandaCobroResponseDTO}.</p>
  *
  * <p>El servicio emite la comanda en PENDIENTE al guardar la ficha, con el
  * monto congelado de la tarifa vigente en ese momento.</p>
@@ -71,12 +71,12 @@ public record ConsultaMedicaRequestDTO(
 		/** Peso medido en la atencion (opcional). Actualiza el peso actual de la mascota. */
 		@Positive(message = "El peso debe ser mayor a 0")
 		java.math.BigDecimal pesoKg,
-		/** Extras usados en la atencion (vacunas, urgencias). Sin precio: lo pone el catalogo. */
-		List<@Valid ExtraUsadoDTO> extras) {
+		/** Medicamentos usados en la atencion. Sin precio: lo toma el catalogo al emitir. */
+		List<@Valid MedicamentoUsadoDTO> medicamentos) {
 
-	public record ExtraUsadoDTO(
-			@NotNull(message = "El id del extra es obligatorio")
-			Long extraId,
+	public record MedicamentoUsadoDTO(
+			@NotNull(message = "El id del medicamento es obligatorio")
+			Long medicamentoId,
 			@NotNull(message = "La cantidad es obligatoria")
 			@Min(value = 1, message = "La cantidad debe ser al menos 1")
 			// Mismo tope que la pantalla: evita una comanda desproporcionada por un error de tipeo o de la API.

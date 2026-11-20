@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -172,9 +173,11 @@ class MedicamentoControllerTest {
 						"principioActivo", "Virus inactivado",
 						"laboratorio", "Lab Vet",
 						"stockInicial", 5,
-						"stockMinimo", 2))))
+						"stockMinimo", 2,
+						"precio", 5000))))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.nombre").value("Vacuna antirrábica"))
+				.andExpect(jsonPath("$.precio").value(5000.00))
 				.andExpect(jsonPath("$.stockActual").value(5))
 				.andExpect(jsonPath("$.stockMinimo").value(2))
 				.andExpect(jsonPath("$.activo").value(true))
@@ -199,6 +202,7 @@ class MedicamentoControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(json(Map.of("nombre", "Suero fisiológico"))))
 				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.precio").value(0.00))
 				.andExpect(jsonPath("$.stockActual").value(0));
 		assertThat(movimientoRepository.count()).isZero();
 	}
@@ -243,6 +247,55 @@ class MedicamentoControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(json(Map.of("nombre", "Medicamento inválido", "stockInicial", -1))))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("Un precio negativo en el alta responde 400")
+	void precioNegativo() throws Exception {
+		mockMvc.perform(post("/api/v1/medicamentos")
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(Map.of("nombre", "Precio inválido", "precio", -1))))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("Cualquier empleado puede cambiar el precio; el nuevo valor rige para las comandas nuevas")
+	void cambiarPrecio() throws Exception {
+		Medicamento medicamento = crearMedicamento("Amoxicilina", "Comprimidos", null, null, 5, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}/precio", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(Map.of("precio", 5000.5))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.precio").value(5000.50))
+				.andExpect(jsonPath("$.stockActual").value(5));
+
+		assertThat(medicamentoRepository.findById(medicamento.getId()).orElseThrow().getPrecio())
+				.isEqualByComparingTo("5000.50");
+	}
+
+	@Test
+	@DisplayName("Cambiar el precio con un valor inválido o inexistente responde 400/404")
+	void cambiarPrecioInvalido() throws Exception {
+		Medicamento medicamento = crearMedicamento("Gasa", null, null, null, 5, 0);
+
+		mockMvc.perform(put("/api/v1/medicamentos/{id}/precio", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(put("/api/v1/medicamentos/{id}/precio", medicamento.getId())
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(Map.of("precio", -5))))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(put("/api/v1/medicamentos/{id}/precio", 99999999)
+				.header(HttpHeaders.AUTHORIZATION, autorizacion)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json(Map.of("precio", 100))))
+				.andExpect(status().isNotFound());
 	}
 
 	@Test

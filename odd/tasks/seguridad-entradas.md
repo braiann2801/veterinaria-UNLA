@@ -52,12 +52,14 @@
 | `/api/v1/usuarios/**` | DUENIO |
 | `/api/v1/caja/cierre` | DUENIO (sin restricción de método, para que HEAD no lo saltee) |
 | `PUT /comandas/tarifas/**`, `PUT /guarderia/tarifas` | DUENIO |
-| `POST/PUT /extras/**` | DUENIO |
 | `PUT/DELETE/POST /guarderia/urgencia/**` | VETERINARIO |
 | Resto de `/api/**` | cualquier empleado con la clave cambiada |
 
 `anyRequest().authenticated()` cierra lo que no esté listado. Los tests de
-permisos usan tokens reales, no `@WithMockUser`.
+permisos usan tokens reales, no `@WithMockUser`. La fila anterior incluye
+`POST /medicamentos` y `PUT /medicamentos/{id}/precio`: fijar o cambiar el
+precio de un medicamento puede cualquier empleado, igual que cargar stock.
+Las reglas de `/api/v1/extras` se eliminaron junto con el módulo de extras.
 
 ## Correcciones aplicadas
 

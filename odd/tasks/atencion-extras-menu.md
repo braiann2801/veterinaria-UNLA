@@ -1,5 +1,11 @@
 # Feature: atencion-extras-menu
 
+> **Documento histórico (superado el 2026-11-20).** El catálogo de extras, su
+> API y su UI se eliminaron. Hoy los medicamentos tienen precio propio y se
+> eligen desde la ficha con la misma barra de búsqueda del módulo Medicamentos;
+> ver `odd/tasks/medicamentos-precio-atencion.md`. Las comandas emitidas con
+> extras se conservan íntegras. Lo que sigue describe la feature original.
+
 Finalizar la atención de un turno desde la Agenda, extras con precio del catálogo del Dueño en la comanda, y barra lateral agrupada en secciones.
 Rama: `feat/atencion-extras-menu` (apilada sobre `feat/agenda-mensual-turno-rapido`, PR #3) · Tests: `./mvnw test` contra el contenedor del 3307, `npx tsc --noEmit` + `next build --webpack`.
 

@@ -16,11 +16,13 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Fase en curso (2026-11-20):** módulo **Medicamentos e insumos** full-stack
-  terminado y verificado, todavía **sin commitear** en el working tree (19
-  archivos nuevos + 7 modificados, incluido este `PROGRESS.md`). Detalle en el
-  hito más abajo.
-- **Harness:** tsc limpio, Next.js build OK, 404 tests de Spring Boot en verde.
+- **Fase en curso (2026-11-20):** **medicamentos con precio en la atención**.
+  Reemplaza al módulo de extras (código, API y UI borrados; comandas históricas
+  intactas). Backend, frontend y docs terminados, todavía **sin commitear** en
+  el working tree. Detalle en `odd/tasks/medicamentos-precio-atencion.md`.
+- **Harness:** `tsc --noEmit` limpio, `next build --webpack` OK, 402 tests de
+  Spring Boot en verde contra el datadir temporal de MySQL, `docker compose
+  config --quiet` OK. Todo sin commitear.
 - **Endurecimiento agnóstico al hosting (2026-11-19):** CSP en
   `Report-Only` + `Permissions-Policy` en `next.config.mjs`; `iss` del JWT
   validado y configurable (`JWT_ISSUER`); `Cache-Control: no-store` en login,
@@ -116,11 +118,12 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       `POST /turnos/con-alta` agenda con cliente y/o mascota nuevos en una sola
       transacción. Un único modal de turno (`agendar-turno-modal.tsx`) para
       Agenda y Mostrador. 256 tests backend.
-- [x] **Atención con extras y menú** — `/api/v1/extras` (escritura solo
-      Dueño); la ficha recibe extras, pasa el turno a ATENDIDO y emite una
-      comanda con líneas (`comanda_item`, precio congelado). Botón "Atender" en
-      la Agenda, catálogo en Tarifas, detalle en Caja, barra lateral agrupada.
-      271 tests backend.
+- [x] **Atención con extras y menú** (hito histórico, reemplazado el
+      2026-11-20) — `/api/v1/extras` (escritura solo Dueño); la ficha recibe
+      extras, pasa el turno a ATENDIDO y emite una comanda con líneas
+      (`comanda_item`, precio congelado). Botón "Atender" en la Agenda, catálogo
+      en Tarifas, detalle en Caja, barra lateral agrupada. 271 tests backend.
+      El código y la UI de extras se borraron después; las comandas quedaron.
 - [x] **Correcciones de flujo y registros** — seña como pago SENA en la
       comanda; DELETE desactiva (tutor/mascota/profesional) con reactivar y
       toggle de desactivados; Agenda guardería con calendario y color por
@@ -270,7 +273,8 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       (sin FK: las cuentas se borran) y `referenciaId` es un `Long` sin FK
       listo para el id de ficha. `registrarConsumo(...)` ya descuenta con lock,
       valida stock y escribe `EGRESO_FICHA` — **todavía no lo invoca
-      `ConsultaMedicaService`**. `SecurityConfig` da acceso a los cuatro roles.
+      `ConsultaMedicaService`**; hoy lo invoca al guardar la ficha (hito
+      siguiente). `SecurityConfig` da acceso a los cuatro roles.
       Frontend: pestaña "Medicamentos" (sección Operación; no en la barra
       inferior del móvil), tabla en desktop / cards en celular, buscador con
       debounce de 350 ms + `AbortController`, alta, carga de stock con
@@ -279,6 +283,24 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       Verificado: 19 tests nuevos (normalización, endpoints, permisos por rol,
       12 cargas concurrentes), suite completa 404 tests, `tsc --noEmit`,
       `next build --webpack` y `docker compose config --quiet`.
+
+- [x] **Medicamentos con precio en la atención (2026-11-20)** — se eliminó
+      el módulo de extras (entidad, DTOs, repositorio, service, controller,
+      reglas de `SecurityConfig`, tests y UI) y se reemplazó por medicamentos con
+      precio propio. Regla 3 de `AGENTS.md` actualizada con el diff aprobado.
+      `Medicamento.precio` (`DECIMAL(12,2)`, default 0) y
+      `PUT /api/v1/medicamentos/{id}/precio` para cualquier empleado.
+      `ConsultaMedicaRequestDTO` recibe `medicamentos` (`medicamentoId` +
+      `cantidad` 1..99) sin montos; `ConsultaMedicaServiceImpl` descuenta stock
+      (`EGRESO_FICHA` con `referenciaId` de la ficha) y copia nombre y precio
+      vigente a la comanda. `ComandaItem` guarda escalares, sin FK: las comandas
+      con extras históricas siguen enteras y la tabla `extra` no se tocó.
+      Frontend: `SelectorMedicamentos` (misma barra de búsqueda con debounce y
+      `AbortController`, precio informativo) en Atender; alta y edición de
+      precio en Medicamentos; Tarifas ya no muestra extras. Verificado: 402
+      tests (9 nuevos de atención, 4 de precio), `tsc --noEmit`,
+      `next build --webpack` y `docker compose config --quiet`. Detalle en
+      `odd/tasks/medicamentos-precio-atencion.md`.
 
 ## Decisiones Críticas de Arquitectura
 
@@ -357,14 +379,19 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 12. **CSP en `Report-Only`:** no bloquea todavía. Siguiente bloque: nonce vía
     `middleware.ts`, revisar reportes y pasar a `enforce`, quitando
     `'unsafe-inline'` cuando los estilos inline se migren a variables CSS.
-13. **Descuento de stock desde ficha clínica:** `MedicamentoService.registrarConsumo(...)`
-    ya está listo (lock, validación de stock y `EGRESO_FICHA` con
-    `referenciaId`), pero `ConsultaMedicaService` todavía no lo invoca. Falta
-    decidir qué insumos se descuentan (extras actuales son solo conceptos de
-    cobro, sin vínculo con `Medicamento`) y cablear la transacción para que
-    alta de consulta y egreso de inventario sean atómicos. Sin edición ni
-    desactivación de medicamentos en este bloque: el campo `activo` existe pero
-    el listado solo muestra activos y no hay endpoint para cambiarlo.
+13. **Descuento de stock desde ficha clínica (resuelto 2026-11-20):**
+    `ConsultaMedicaServiceImpl.registrar` invoca `registrarConsumo(...)` dentro
+    de la misma transacción: resuelve medicamentos activos, valida stock y
+    escribe `EGRESO_FICHA` con `referenciaId` de la ficha; sin stock, 409 con
+    rollback de ficha, comanda y movimientos. Los extras (conceptos de cobro sin
+    vínculo con `Medicamento`) se eliminaron y reemplazaron por esta lista.
+    Sigue sin haber edición ni desactivación de medicamentos: el campo `activo`
+    existe, el listado solo muestra activos y no hay endpoint para cambiarlo.
+14. **Precio congelado:** `ComandaItem` guarda descripción, cantidad, precio
+    unitario y subtotal como escalares, sin FK a `Medicamento` ni a `Extra`.
+    Así las comandas históricas (incluidas las de extras) sobreviven a cambios
+    de catálogo. La tabla `extra` y su FK quedan en la BD: `ddl-auto=update`
+    no las dropea y no se quiso reescribir datos históricos.
 
 ## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
 
@@ -375,18 +402,19 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `desde`/`hasta`), `/comandas/tarifas/{concepto}`, `/comandas/mascota/{id}`
   (todas las fechas, estado opcional) y `/mascotas/{id}/deuda`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta`,
-  `/extras` (catálogo; POST/PUT solo Dueño en `SecurityConfig`) y
-  `/medicamentos` (catálogo + `POST /{id}/stock` + `GET /{id}/movimientos`;
-  los cuatro roles en `SecurityConfig`).
-- **Tests backend:** 404 en verde. Cobertura clave: aforo concurrente (lock
+  `/medicamentos` (catálogo + `POST` con precio + `PUT /{id}/precio` +
+  `POST /{id}/stock` + `GET /{id}/movimientos`; los cuatro roles en
+  `SecurityConfig`). Ya no existe `/extras`.
+- **Tests backend:** 402 en verde. Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`), balance por período (rango
   inclusivo, serie diaria completa, facturado ≠ cobrado, límite de 366 días),
   12 cargas de stock simultáneas sobre la misma fila (lock real en MySQL:
   `medicamento` con `SELECT ... FOR UPDATE`, sin `@Transactional` en la clase
-  de test para no enmascarar el lock) y parsers/conciliación de la importación
-  histórica.
+  de test para no enmascarar el lock), precio congelado en comanda, stock
+  insuficiente con rollback y movimientos `EGRESO_FICHA` con `referenciaId` de
+  la ficha, y parsers/conciliación de la importación histórica.
 - **Importación histórica:** vive en `importacion/` (`ImportacionRunner`,
   `ConstructorPlan`, `ConciliacionHistorica`, `ImportacionService`,
   `ReporteImportacion`). Es una vía única de consola: no hay endpoint, no hay

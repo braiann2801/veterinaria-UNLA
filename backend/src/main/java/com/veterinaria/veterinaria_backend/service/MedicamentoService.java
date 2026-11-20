@@ -5,6 +5,7 @@ import com.veterinaria.veterinaria_backend.dto.MedicamentoRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MovimientoStockResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PrecioMedicamentoRequestDTO;
 
 /** Catálogo, stock e historial de medicamentos. Accesible a los cuatro roles. */
 public interface MedicamentoService {
@@ -17,11 +18,14 @@ public interface MedicamentoService {
 
 	MedicamentoResponseDTO agregarStock(Long id, AgregarStockRequestDTO request, Long usuarioId);
 
+	/** Cambia el precio de catálogo. Solo afecta a las comandas emitidas desde ahora. */
+	MedicamentoResponseDTO actualizarPrecio(Long id, PrecioMedicamentoRequestDTO request);
+
 	PaginaResponseDTO<MovimientoStockResponseDTO> movimientos(Long id, int page, int size);
 
 	/**
-	 * Descuento de stock para una ficha clínica. Preparado para el siguiente
-	 * bloque: {@code ConsultaMedicaService} todavía no lo invoca.
+	 * Descuento de stock para una ficha clínica, invocado por
+	 * {@code ConsultaMedicaService} dentro de la misma transacción de la ficha.
 	 *
 	 * @param referenciaId id de la ficha/consulta que se guardará en el movimiento
 	 */
