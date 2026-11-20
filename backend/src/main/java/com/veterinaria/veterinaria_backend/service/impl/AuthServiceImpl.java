@@ -14,10 +14,10 @@ import com.veterinaria.veterinaria_backend.dto.UsuarioResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.Usuario;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.CredencialesInvalidasException;
-import com.veterinaria.veterinaria_backend.security.LimitadorIntentosLogin;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
 import com.veterinaria.veterinaria_backend.repository.UsuarioRepository;
+import com.veterinaria.veterinaria_backend.security.LimitadorIntentosLogin;
 import com.veterinaria.veterinaria_backend.security.TokenService;
 import com.veterinaria.veterinaria_backend.service.AuthService;
 
@@ -61,17 +61,17 @@ public class AuthServiceImpl implements AuthService {
 			throw new BadRequestException("La contraseña es demasiado larga");
 		}
 		// El limite va por el usuario pedido, exista o no: asi el 429 no revela que cuentas existen.
-		String clave = LimitadorIntentosLogin.clave(username, ip);
-		limitador.verificar(clave);
+		// Aplica las 3 reglas combinadas: par (usuario, IP), IP (anti-spraying) y usuario (anti-distribuido).
+		limitador.verificarLogin(username, ip);
 
 		Usuario usuario = usuarioRepository.findByUsername(username).orElse(null);
 		boolean claveOk = passwordEncoder.matches(request.password(),
 				usuario != null ? usuario.getPasswordHash() : hashSenuelo);
 		if (usuario == null || !claveOk || !usuario.isActivo()) {
-			limitador.registrarFallo(clave);
+			limitador.registrarFalloLogin(username, ip);
 			throw new CredencialesInvalidasException();
 		}
-		limitador.registrarExito(clave);
+		limitador.registrarExitoLogin(username, ip);
 		return tokenService.emitir(usuario);
 	}
 
@@ -82,9 +82,21 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	@Transactional
-	public LoginResponseDTO cambiarPassword(Long usuarioId, CambioPasswordRequestDTO request) {
+	public void logout(Long usuarioId) {
+		Usuario usuario = buscar(usuarioId);
+		usuario.invalidarSesiones();
+		usuarioRepository.saveAndFlush(usuario);
+	}
+
+	@Override
+	@Transactional
+	public LoginResponseDTO cambiarPassword(Long usuarioId, CambioPasswordRequestDTO request, String ip) {
+		// Control de intentos para evitar fuerza bruta sobre la contrasena actual
+		limitador.verificarCambioPassword(usuarioId, ip);
+
 		Usuario usuario = buscar(usuarioId);
 		if (!passwordEncoder.matches(request.actual(), usuario.getPasswordHash())) {
+			limitador.registrarFalloCambioPassword(usuarioId, ip);
 			throw new BadRequestException("La contraseña actual no es correcta");
 		}
 		if (request.actual().equals(request.nueva())) {
@@ -95,6 +107,7 @@ public class AuthServiceImpl implements AuthService {
 		if (request.nueva().getBytes(StandardCharsets.UTF_8).length > 72) {
 			throw new BadRequestException("La contraseña nueva es demasiado larga");
 		}
+		limitador.registrarExitoCambioPassword(usuarioId, ip);
 		usuario.setPasswordHash(passwordEncoder.encode(request.nueva()));
 		usuario.setDebeCambiarPassword(false);
 		usuario.invalidarSesiones();

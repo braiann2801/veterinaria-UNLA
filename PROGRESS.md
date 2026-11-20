@@ -16,8 +16,20 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   reescriba `AGENTS.md`.
 - **`backend/mvnw`:** versionado con permiso de ejecución (`+x`), así
   `./mvnw` corre en macOS/Linux sin `chmod`.
-- **Harness:** tsc limpio, Next.js build OK, 361 tests de Spring Boot en verde
-  (en macOS contra el contenedor `veterinaria-db-local` del 3307; ver README).
+- **Harness:** tsc limpio, Next.js build OK, 380 tests de Spring Boot en verde.
+- **Endurecimiento agnóstico al hosting (2026-11-19):** CSP en
+  `Report-Only` + `Permissions-Policy` en `next.config.mjs`; `iss` del JWT
+  validado y configurable (`JWT_ISSUER`); `Cache-Control: no-store` en login,
+  logout y cambio de contraseña; revocación inmediata de sesiones en
+  `POST /api/v1/auth/logout` (`tokenVersion++`); TTL de JWT configurable en 4 h
+  (`JWT_HORAS`); rate limiting extensible (`AlmacenRateLimit`, memoria por
+  defecto y soporte Redis vía `REDIS_URL` / `RATE_LIMIT_STORAGE=memory|redis`);
+  reglas agregadas por par, por IP (anti-spraying) y por usuario
+  (anti-distribuido); throttle en `/auth/cambiar-password`; `SanitizadorLog`
+  anti-log injection y enmascaramiento de PII; `show-sql` apagado por defecto
+  (`JPA_SHOW_SQL`); CORS sin comodín de Vercel por defecto (`CORS_ORIGENES` exacto);
+  `PORT` configurable; helper `lib/url-segura.ts` aplicado a la landing.
+  Verificado: compile backend, 48 tests (unitarios e integración: AutenticacionTest, LoginThrottlingTest, LogoutRevocacionTest, RateLimitingExtendidoTest), `tsc --noEmit`, `next build --webpack` y `docker compose config`. MySQL de XAMPP reiniciado para las suites `@SpringBootTest`. Pendiente: quitar `typescript.ignoreBuildErrors`.
 - **Importación histórica de Huellitas:** aplicada sobre `veterinaria_db`
   local y sobre **producción (Aiven + Render)** el 2026-11-04. Antes de cargar
   se respaldó Aiven en `datos/backup-aiven-20261104-223149.sql` (gitignored) y
@@ -191,6 +203,52 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       con aviso cuando es de otro día. 361 tests backend
       (`ComandasPorMascotaTest`).
 
+- [x] **CORS estricto y cabeceras de seguridad** — al definir `CORS_ORIGENES`,
+      la lista reemplaza al default y los comodines amplios
+      (`https://*.vercel.app`) se descartan con aviso en el log: se exige la
+      URL exacta de cada deploy. Sin la variable se conservan 3000 local +
+      comodín (AGENTS.md §1). En `next.config.mjs`, `headers()` agrega
+      `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y
+      `Referrer-Policy: strict-origin-when-cross-origin` a todas las rutas.
+      Test unitario `CorsConfigTest`; verificado con `tsc --noEmit`,
+      `next build --webpack` y headers reales con `next start`.
+
+- [x] **Endurecimiento de seguridad agnóstico al hosting** — `next.config.mjs`
+      suma `Permissions-Policy` restrictiva (cámara, micrófono, geolocalización,
+      pagos, USB y sensores) y `Content-Security-Policy-Report-Only` con
+      orígenes locales, el backend de `NEXT_PUBLIC_API_URL` y los dominios de
+      `@vercel/analytics`; se mantiene `'unsafe-inline'` en scripts/estilos
+      hasta el refactor a nonce y no se fuerza HSTS. Backend: `iss` validado
+      con `JwtValidators.createDefaultWithIssuer` y emitido desde
+      `JWT_ISSUER` (default `veterinaria-unla`), `Cache-Control: no-store` en
+      `/auth/login` y `/auth/cambiar-password`, `JPA_SHOW_SQL`/`JPA_FORMAT_SQL`
+      con default `false`, `PORT` configurable y CORS por defecto solo local
+      (sin `*.vercel.app`). Frontend: `lib/url-segura.ts` permite solo
+      `http/https/mailto/tel` y rutas relativas, y la landing lo usa para
+      `whatsapp`, `telefono`, `mapa` y `email`. `.env.example`,
+      `docker-compose.yml` y README actualizados.
+
+- [x] **Revocación de sesión en logout y Rate Limiting extensible (Seguridad)** —
+      TTL del JWT reducido a 4 h por defecto (configurable con `JWT_HORAS`);
+      endpoint `POST /api/v1/auth/logout` con `Cache-Control: no-store` e
+      invalidación inmediata (`tokenVersion++` persistente); frontend
+      (`lib/auth.tsx` y `lib/api.ts`) con logout asíncrono y tolerancia a fallos de
+      red. Rate limiting refactorizado con abstracción `AlmacenRateLimit` /
+      `RateLimiterService`: implementación en memoria por defecto
+      (`AlmacenRateLimitMemoria`) para dev local sin dependencias y soporte
+      opcional para Redis (`AlmacenRateLimitRedis`, `REDIS_URL`,
+      `RATE_LIMIT_STORAGE=memory|redis`); reglas agregadas en login por par
+      `(usuario, IP)`, por `IP` (anti-password spraying) y por `usuario`
+      (anti-ataque distribuido) sin revelar existencia de cuentas; límite de
+      intentos en `POST /api/v1/auth/cambiar-password` con `429` y `Retry-After`;
+      `SanitizadorLog` previene log injection (CRLF) y enmascara PII. Se reforzó
+      `sanitizarUrl` (credenciales ofuscadas aun con CRLF inyectado), Redis con
+      scripts Lua atómicos (`INCR`+`EXPIRE` y `GET`+`SET`) y `rediss://` en puerto
+      6379 por defecto. Nuevos tests: `SanitizadorLogTest`,
+      `AlmacenRateLimitRedisTest`, `LogoutRevocacionTest` y
+      `RateLimitingExtendidoTest`. Sin DB pasan compile, tests unitarios, tsc,
+      build, docker compose y suites de integración (48 tests, 0 fallos).
+
 ## Decisiones Críticas de Arquitectura
 
 1. **Rutas:** frontend en `app/` + `components/` + `lib/` (sin `frontend/src/`);
@@ -251,6 +309,23 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 8. **Datos previos sin normalizar:** tutores con teléfono que no tenga 10
    dígitos o DNI de 9-10 dígitos dan 400 al editarlos hasta corregir el dato.
    No se reescribió la base existente.
+9. **[RESUELTO] Rate limiting extensible:** refactorizado detrás de
+   `AlmacenRateLimit` / `RateLimiterService`. Memoria por defecto en dev local
+   (`AlmacenRateLimitMemoria`) y soporte para Redis (`AlmacenRateLimitRedis`,
+   `REDIS_URL`, `RATE_LIMIT_STORAGE=memory|redis`). Reglas multi-dimensión: por
+   par `(usuario, IP)`, por `IP` (anti-spraying) y por `usuario`
+   (anti-distribuido), más throttle en `/auth/cambiar-password` y sanitización
+   de logs (`SanitizadorLog`).
+10. **[RESUELTO] Revocación de sesión en logout:** endpoint
+    `POST /api/v1/auth/logout` con `tokenVersion++` persistente y
+    `Cache-Control: no-store`; frontend invoca endpoint antes de limpiar storage
+    con tolerancia a fallos; TTL de JWT reducido a 4 h por defecto (`JWT_HORAS`).
+11. **`typescript.ignoreBuildErrors: true`:** el build de Next no falla por
+    errores de tipos; el harness lo compensa con `tsc --noEmit`. Siguiente
+    bloque: quitarlo y dejar que `next build` también valide.
+12. **CSP en `Report-Only`:** no bloquea todavía. Siguiente bloque: nonce vía
+    `middleware.ts`, revisar reportes y pasar a `enforce`, quitando
+    `'unsafe-inline'` cuando los estilos inline se migren a variables CSS.
 
 ## Registro Técnico Clave (solo lo que condiciona trabajo futuro)
 
@@ -290,7 +365,12 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 - **Contrato de error uniforme:** todas las respuestas de error usan
   `ApiErrorResponse` (`{timestamp,status,error,mensaje,ruta,detalles}`), con
   `status` **numérico**. Rutas inexistentes → **404** (handler dedicado), no 500.
-- **CORS:** `CorsConfig` (`WebMvcConfigurer`) aplica sobre `/api/**` para
-  localhost:3000, 127.0.0.1:3000 y `*.vercel.app`; métodos
-  GET/POST/PUT/DELETE/OPTIONS/**PATCH**; `allowCredentials=true`. Spring Security
+- **CORS:** `CorsConfig` (`WebMvcConfigurer`) aplica sobre `/api/**`. Sin
+  `CORS_ORIGENES` solo acepta `http://localhost:3000` y
+  `http://127.0.0.1:3000` (sin hosting atado); si la variable está definida, su
+  lista manda y los comodines `*.vercel.app` se descartan. Métodos
+  GET/POST/PUT/DELETE/OPTIONS/PATCH; `allowCredentials=false`. Spring Security
   (JWT) toma esta misma configuración CORS.
+- **JWT:** `iss` configurable por `JWT_ISSUER` (default `veterinaria-unla`) y
+  validado en el decoder; `exp` obligatorio; `ver` contra `tokenVersion`.
+  Cambiar `JWT_ISSUER` invalida las sesiones abiertas.

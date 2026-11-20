@@ -9,12 +9,20 @@ public interface AuthService {
 
 	/**
 	 * Ingreso con usuario y clave. {@code ip} identifica el origen para el limite
-	 * de intentos fallidos: 429 si el par usuario/IP esta bloqueado.
+	 * de intentos fallidos: 429 si el par usuario/IP, la IP o el usuario estan bloqueados.
 	 */
 	LoginResponseDTO login(LoginRequestDTO request, String ip);
 
 	UsuarioResponseDTO me(Long usuarioId);
 
+	/** Cierra las sesiones del usuario invalidando inmediatamente los tokens vigentes. */
+	void logout(Long usuarioId);
+
 	/** Cambia la propia clave, cierra las demas sesiones y devuelve un token nuevo. */
-	LoginResponseDTO cambiarPassword(Long usuarioId, CambioPasswordRequestDTO request);
+	default LoginResponseDTO cambiarPassword(Long usuarioId, CambioPasswordRequestDTO request) {
+		return cambiarPassword(usuarioId, request, "127.0.0.1");
+	}
+
+	/** Cambia la propia clave con control de tasa de intentos por usuario e IP. */
+	LoginResponseDTO cambiarPassword(Long usuarioId, CambioPasswordRequestDTO request, String ip);
 }

@@ -43,8 +43,8 @@ export function TopBar({
   const router = useRouter()
   const [cambiandoClave, setCambiandoClave] = useState(false)
 
-  const salir = () => {
-    logout()
+  const salir = async () => {
+    await logout()
     router.replace("/login")
   }
 

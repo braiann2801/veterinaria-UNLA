@@ -36,6 +36,7 @@ import {
   type IconoServicio,
 } from "@/lib/negocio"
 import { cn } from "@/lib/utils"
+import { urlSegura } from "@/lib/url-segura"
 
 export const metadata: Metadata = {
   title: `${NEGOCIO.nombreCorto} · Clínica y guardería canina`,
@@ -77,8 +78,13 @@ const BOTON_CONTORNO_CLARO = cn(
 
 export default function Landing() {
   const { contacto } = NEGOCIO
-  const whatsapp = `https://wa.me/${contacto.whatsapp}`
-  const telefono = `tel:${contacto.telefono.replace(/[^+\d]/g, "")}`
+  // `urlSegura` deja pasar solo http/https/mailto/tel y rutas relativas. Si un
+  // valor de configuración trae `javascript:` o `data:`, el enlace queda sin
+  // `href` en vez de ejecutar código.
+  const whatsapp = urlSegura(`https://wa.me/${contacto.whatsapp}`)
+  const telefono = urlSegura(`tel:${contacto.telefono.replace(/[^+\d]/g, "")}`)
+  const mapa = urlSegura(contacto.mapa)
+  const email = urlSegura(`mailto:${contacto.email}`)
 
   return (
     <div className="landing min-h-screen bg-paper text-navy">
@@ -99,7 +105,7 @@ export default function Landing() {
             <p className="mx-auto mb-8 max-w-[420px] text-base text-ink-muted sm:text-lg md:mx-0">
               {NEGOCIO.descripcion}
             </p>
-            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={BOTON_PRIMARIO}>
+            <a href={whatsapp ?? undefined} target="_blank" rel="noopener noreferrer" className={BOTON_PRIMARIO}>
               <MessageCircle className="h-4 w-4" aria-hidden />
               Reservar turno
             </a>
@@ -185,7 +191,7 @@ export default function Landing() {
           </div>
 
           <div className="mt-12 text-center">
-            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={BOTON_PRIMARIO}>
+            <a href={whatsapp ?? undefined} target="_blank" rel="noopener noreferrer" className={BOTON_PRIMARIO}>
               Reservar turno
             </a>
           </div>
@@ -219,7 +225,7 @@ export default function Landing() {
           </ul>
 
           <div className="text-center">
-            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={BOTON_PRIMARIO}>
+            <a href={whatsapp ?? undefined} target="_blank" rel="noopener noreferrer" className={BOTON_PRIMARIO}>
               Reservar turno
             </a>
           </div>
@@ -239,11 +245,11 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={BOTON_CLARO}>
+            <a href={whatsapp ?? undefined} target="_blank" rel="noopener noreferrer" className={BOTON_CLARO}>
               <MessageCircle className="h-4 w-4" aria-hidden />
               Pedir turno por WhatsApp
             </a>
-            <a href={telefono} className={BOTON_CONTORNO_CLARO}>
+            <a href={telefono ?? undefined} className={BOTON_CONTORNO_CLARO}>
               <Phone className="h-4 w-4" aria-hidden />
               Llamar
             </a>
@@ -271,9 +277,9 @@ export default function Landing() {
                 Dirección
               </h3>
               <address className="text-sm not-italic text-white/70">{contacto.direccion}</address>
-              {contacto.mapa && (
+              {mapa && (
                 <a
-                  href={contacto.mapa}
+                  href={mapa}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-2 inline-flex min-h-[44px] items-center gap-2 text-sm text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
@@ -290,12 +296,12 @@ export default function Landing() {
               </h3>
               <ul className="flex flex-col text-sm text-white/70">
                 <li>
-                  <a href={`mailto:${contacto.email}`} className="inline-flex min-h-[44px] items-center break-all hover:text-white">
+                  <a href={email ?? undefined} className="inline-flex min-h-[44px] items-center break-all hover:text-white">
                     {contacto.email}
                   </a>
                 </li>
                 <li>
-                  <a href={telefono} className="inline-flex min-h-[44px] items-center hover:text-white">
+                  <a href={telefono ?? undefined} className="inline-flex min-h-[44px] items-center hover:text-white">
                     {contacto.telefono}
                   </a>
                 </li>

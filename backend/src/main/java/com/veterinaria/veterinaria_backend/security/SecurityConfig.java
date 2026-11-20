@@ -76,6 +76,7 @@ public class SecurityConfig {
 						// Disponibles aun con el cambio de clave pendiente (autoridad PASSWORD_CHANGE).
 						.requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
 						.requestMatchers(HttpMethod.POST, "/api/v1/auth/cambiar-password").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
 						// Solo el Duenio.
 						.requestMatchers("/api/v1/usuarios/**").hasRole("DUENIO")
 						// Sin metodo a proposito: con HttpMethod.GET, un HEAD no matchea esta regla,
@@ -141,12 +142,15 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey jwtSecretKey) {
+	JwtDecoder jwtDecoder(SecretKey jwtSecretKey,
+			@Value("${veterinaria.auth.jwt-issuer:veterinaria-unla}") String issuer) {
 		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(MacAlgorithm.HS256).build();
 		// El validador por defecto revisa exp solo si viene: un token sin vencimiento
-		// valdria para siempre. Se exige el claim ademas de chequearlo.
+		// valdria para siempre. Se exige el claim ademas de chequearlo. Tambien se
+		// valida el issuer: un token firmado con la misma clave pero de otro emisor
+		// no debe servir.
 		decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-				JwtValidators.createDefault(),
+				JwtValidators.createDefaultWithIssuer(issuer),
 				new JwtClaimValidator<Instant>(JwtClaimNames.EXP, exp -> exp != null)));
 		return decoder;
 	}

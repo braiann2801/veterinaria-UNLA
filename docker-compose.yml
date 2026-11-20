@@ -62,6 +62,18 @@ services:
       # sin ella el backend usaria una clave aleatoria y cada reinicio cerraria
       # todas las sesiones. Generar con: openssl rand -base64 48
       JWT_SECRET: "${JWT_SECRET:?Definir JWT_SECRET en .env (minimo 32 caracteres)}"
+      # Emisor (iss) del JWT. El mismo valor se usa al emitir y al validar.
+      JWT_ISSUER: "${JWT_ISSUER:-veterinaria-unla}"
+      # Vigencia del JWT en horas (default 4) y almacen de rate limiting.
+      # 'memory' no requiere servicios extra; 'redis' necesita REDIS_URL valida.
+      JWT_HORAS: "${JWT_HORAS:-4}"
+      RATE_LIMIT_STORAGE: "${RATE_LIMIT_STORAGE:-memory}"
+      REDIS_URL: "${REDIS_URL:-}"
+      # Origenes CORS exactos del frontend. Sin la variable solo se aceptan los
+      # locales de desarrollo; en un deploy hay que fijar la URL real.
+      CORS_ORIGENES: "${CORS_ORIGENES:-http://localhost:3000,http://127.0.0.1:3000}"
+      # Logs SQL: apagados por defecto para no filtrar datos en produccion.
+      JPA_SHOW_SQL: "${JPA_SHOW_SQL:-false}"
       # Cuenta inicial del Dueno: se crea solo si no hay ningun Dueno activo y
       # nace con cambio de contrasena obligatorio. Obligatoria para no exponer
       # en la red la clave por defecto del codigo.

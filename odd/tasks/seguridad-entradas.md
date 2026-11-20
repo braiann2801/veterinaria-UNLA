@@ -91,8 +91,9 @@ permisos usan tokens reales, no `@WithMockUser`.
 - **Token en `localStorage`**: un XSS podría robarlo. Mitigación real: CSP
   estricta y, si se quiere eliminar el vector, pasar a cookie `httpOnly`
   + CSRF token.
-- **Sin CSP ni cabeceras de seguridad** en Next.js (`X-Content-Type-Options`,
-  `X-Frame-Options`, `Referrer-Policy`).
+- **Sin CSP** en Next.js. Las cabeceras `X-Content-Type-Options`,
+  `X-Frame-Options` y `Referrer-Policy` ya se emiten desde
+  `next.config.mjs`; una CSP estricta sigue pendiente.
 - **`JWT_SECRET` sin definir en local**: clave aleatoria por arranque (sesiones
   caen al reiniciar). En producción es obligatoria (el arranque falla si mide
   menos de 32 bytes).

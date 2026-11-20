@@ -54,8 +54,15 @@ export function useAuth() {
     return renovada
   }, [])
 
-  const logout = useCallback(() => {
-    borrarSesion()
+  const logout = useCallback(async () => {
+    try {
+      await apiAuth.logout()
+    } catch {
+      // Tolerancia a fallos de red: si el servidor no responde o la sesión ya venció,
+      // se limpia la sesión local de todas formas para no dejar al usuario bloqueado.
+    } finally {
+      borrarSesion()
+    }
   }, [])
 
   return {

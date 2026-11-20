@@ -26,9 +26,14 @@ Necesitás Docker con Compose.
    | `JWT_SECRET` | Firma de los tokens de sesión. Tiene que tener al menos 32 caracteres; podés generarlo con `openssl rand -base64 48`. |
    | `OWNER_PASSWORD` | Clave inicial de la cuenta del Dueño. El Dueño la cambia en su primer ingreso. |
 
-   Hay dos variables opcionales:
+   Hay cinco variables opcionales:
    - `DB_PORT`: puerto del host donde se publica MySQL. Por defecto es `3306`; usá `3307` si ya tenés otro MySQL en el 3306.
-   - `NEXT_PUBLIC_API_URL`: URL de la API que usa el navegador. Por defecto es `http://localhost:8080/api/v1`.
+   - `NEXT_PUBLIC_API_URL`: URL de la API que usa el navegador. Por defecto es `http://localhost:8080/api/v1`. También define el origen del backend que la CSP del frontend permite en `connect-src`.
+   - `CORS_ORIGENES`: lista separada por comas con los orígenes exactos del frontend. Sin ella solo se aceptan los locales (`http://localhost:3000`, `http://127.0.0.1:3000`); en cualquier despliegue hay que fijar la URL real.
+   - `JWT_ISSUER`: emisor (`iss`) de los tokens. Por defecto `veterinaria-unla`. Cambiarlo invalida las sesiones abiertas, porque los tokens viejos dejan de coincidir.
+   - `JPA_SHOW_SQL`: logs SQL de Hibernate. Por defecto `false`; poner `true` solo para depurar en local.
+
+   El backend también acepta `PORT` para el puerto HTTP (por defecto `8080`), útil en hostings que lo inyectan.
 
 3. Levantá todo:
 
@@ -52,9 +57,27 @@ Necesitás Docker con Compose.
    - Cada cuenta nueva recibe una clave temporal que se muestra una sola vez.
    - Desactivar una cuenta, resetear su clave o cambiarle el rol cierra al instante las sesiones abiertas de esa persona.
 
-**Límite de intentos:** tras 5 contraseñas incorrectas para el mismo usuario desde la misma IP, el login queda bloqueado 15 minutos para ese par (responde 429, aun con la clave correcta). Un ingreso exitoso reinicia el contador. Se ajusta con `LOGIN_INTENTOS_MAXIMOS` y `LOGIN_BLOQUEO_MINUTOS`. El bloqueo vive en memoria: reiniciar el backend lo limpia. Detrás de un proxy o balanceador, todos los pedidos llegan con la IP del proxy: en ese caso hay que configurar Spring para que lea la IP real del cliente (`server.forward-headers-strategy=native`), y solo si el proxy es de confianza, porque esa cabecera se puede falsificar.
+**Límite de intentos y Rate Limiting:** control de tasa extensible detrás de `AlmacenRateLimit` (`RATE_LIMIT_STORAGE=memory|redis`, con `REDIS_URL`).
+- **Par (usuario, IP):** tras 5 contraseñas incorrectas para el mismo usuario desde la misma IP, el par queda bloqueado 15 minutos (responde 429, aun con la clave correcta). Se ajusta con `LOGIN_INTENTOS_MAXIMOS` y `LOGIN_BLOQUEO_MINUTOS`.
+- **Por IP (anti-password spraying):** tras 20 intentos fallidos desde una misma IP sobre distintos usuarios, la IP queda bloqueada 15 minutos (`LOGIN_IP_INTENTOS_MAXIMOS` y `LOGIN_IP_BLOQUEO_MINUTOS`).
+- **Por usuario (anti-ataque distribuido):** tras 15 intentos fallidos sobre la misma cuenta desde IPs distintas, el usuario queda bloqueado 15 minutos (`LOGIN_USUARIO_INTENTOS_MAXIMOS` y `LOGIN_USUARIO_BLOQUEO_MINUTOS`).
+- **Cambio de contraseña:** `POST /api/v1/auth/cambiar-password` limita a 5 intentos fallidos de clave actual (`CAMBIO_PASSWORD_INTENTOS_MAXIMOS` y `CAMBIO_PASSWORD_BLOQUEO_MINUTOS`).
+- **Sanitización de logs:** `SanitizadorLog` previene log injection neutralizando saltos de línea (`\r`, `\n`) y enmascara identificadores (usuarios, emails, IPs) para no exponer PII en claro.
 
 Balance, Usuarios, cierre de caja y tarifas son solo para el Dueño, y el backend responde 403 al resto. La matriz de permisos vive en `backend/src/main/java/com/veterinaria/veterinaria_backend/security/SecurityConfig.java`.
+
+## Seguridad
+
+- **Cabeceras del frontend** (`next.config.mjs`): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` y una `Permissions-Policy` que deshabilita cámara, micrófono, geolocalización, pagos, USB y sensores.
+- **CSP en modo reporte**: se emite `Content-Security-Policy-Report-Only` con orígenes locales, el backend de `NEXT_PUBLIC_API_URL` y los dominios de `@vercel/analytics`. No bloquea todavía: se deja así mientras la UI usa estilos inline y Next inyecta scripts de arranque. El siguiente paso es pasar a `enforce` con nonce (`middleware.ts`) y quitar `'unsafe-inline'`.
+- **HSTS**: no se fuerza `Strict-Transport-Security` desde la app para no romper HTTP local ni migraciones de hosting; conviene configurarlo en el proxy/CDN cuando el dominio ya sea HTTPS.
+- **JWT y Revocación de Sesión**: firma HS256 con `JWT_SECRET` de al menos 32 bytes (sin la variable se genera una clave aleatoria por arranque), `exp` obligatorio con vigencia por defecto de 4 horas (configurable con `JWT_HORAS`), `iss` validado contra `JWT_ISSUER` y `ver` comparado con el `tokenVersion` del usuario.
+- **Cierre de Sesión (Logout)**: `POST /api/v1/auth/logout` invalida inmediatamente todos los tokens vigentes del usuario incrementando su `tokenVersion` en la base de datos (stateless, persistente entre reinicios y sin dependencias de memoria), respondiendo con `Cache-Control: no-store`. El frontend invoca este endpoint con tolerancia a fallos antes de limpiar el storage local.
+- **Respuestas de autenticación**: `/api/v1/auth/login`, `/api/v1/auth/logout` y `/api/v1/auth/cambiar-password` envían `Cache-Control: no-store` para que tokens y respuestas no queden en cachés intermedias.
+- **URLs de contacto**: la landing pasa `whatsapp`, `telefono`, `mapa` y `email` por `lib/url-segura.ts`, que solo admite `http:`, `https:`, `mailto:`, `tel:` o rutas relativas y descarta `javascript:`/`data:`.
+- **CORS**: por defecto solo orígenes locales; en producción se fija `CORS_ORIGENES` con la URL exacta. Sin credenciales (el token viaja en `Authorization`).
+
+Pendiente para el próximo bloque: pasar CSP a enforce y quitar `typescript.ignoreBuildErrors` de `next.config.mjs`.
 
 ## Desarrollo local sin Docker
 

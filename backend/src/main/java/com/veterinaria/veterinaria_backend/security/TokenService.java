@@ -18,9 +18,10 @@ import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
 /**
  * Emite los JWT de sesion (HS256).
  *
- * <p>Claims: {@code sub} = id del usuario y {@code ver} = su {@code tokenVersion}.
- * El rol NO se usa desde el token: {@link UsuarioJwtConverter} lo lee de la base
- * en cada request, asi un cambio de rol rige al instante.</p>
+ * <p>Claims: {@code sub} = id del usuario, {@code ver} = su {@code tokenVersion}
+ * e {@code iss} = emisor configurable (por defecto {@link #ISSUER}). El rol NO
+ * se usa desde el token: {@link UsuarioJwtConverter} lo lee de la base en cada
+ * request, asi un cambio de rol rige al instante.</p>
  */
 @Service
 public class TokenService {
@@ -31,21 +32,24 @@ public class TokenService {
 	private final JwtEncoder jwtEncoder;
 	private final EntityMapper mapper;
 	private final long horasDeVigencia;
+	private final String issuer;
 
 	public TokenService(
 			JwtEncoder jwtEncoder,
 			EntityMapper mapper,
-			@Value("${veterinaria.auth.token-horas:8}") long horasDeVigencia) {
+			@Value("${veterinaria.auth.token-horas:4}") long horasDeVigencia,
+			@Value("${veterinaria.auth.jwt-issuer:veterinaria-unla}") String issuer) {
 		this.jwtEncoder = jwtEncoder;
 		this.mapper = mapper;
 		this.horasDeVigencia = horasDeVigencia;
+		this.issuer = issuer;
 	}
 
 	public LoginResponseDTO emitir(Usuario usuario) {
 		Instant ahora = Instant.now();
 		Instant vence = ahora.plus(horasDeVigencia, ChronoUnit.HOURS);
 		JwtClaimsSet claims = JwtClaimsSet.builder()
-				.issuer(ISSUER)
+				.issuer(issuer)
 				.subject(usuario.getId().toString())
 				.issuedAt(ahora)
 				.expiresAt(vence)

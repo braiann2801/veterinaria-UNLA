@@ -100,7 +100,7 @@ interface ApiErrorBody {
  * que mostrar el formulario, no redirigir.
  */
 function sesionCaducada(path: string) {
-  if (path === "/auth/login") return
+  if (path === "/auth/login" || path === "/auth/logout") return
   borrarSesion()
   if (typeof window !== "undefined" && window.location.pathname !== "/login") {
     window.location.assign("/login?motivo=sesion")
@@ -881,6 +881,8 @@ export const egreso = {
 
 export const auth = {
   login: (username: string, password: string) => post<Sesion>("/auth/login", { username, password }),
+  /** Cierra la sesion en el backend invalidando inmediatamente los tokens vigentes. */
+  logout: () => post<void>("/auth/logout"),
   me: () => get<UsuarioSesion>("/auth/me"),
   /** Devuelve una sesion nueva: el cambio de clave invalida el token anterior. */
   cambiarPassword: (actual: string, nueva: string) => post<Sesion>("/auth/cambiar-password", { actual, nueva }),
