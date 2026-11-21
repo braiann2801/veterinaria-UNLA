@@ -4,8 +4,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -26,6 +30,7 @@ import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.BusinessConflictException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.repository.MedicamentoRepository;
+import com.veterinaria.veterinaria_backend.repository.MedicamentoUsadoFichaRepository;
 import com.veterinaria.veterinaria_backend.repository.MovimientoStockMedicamentoRepository;
 import com.veterinaria.veterinaria_backend.repository.UsuarioRepository;
 import com.veterinaria.veterinaria_backend.service.MedicamentoService;
@@ -42,11 +47,12 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 
 	private final MedicamentoRepository medicamentoRepository;
 	private final MovimientoStockMedicamentoRepository movimientoRepository;
+	private final MedicamentoUsadoFichaRepository medicamentoUsadoRepository;
 	private final UsuarioRepository usuarioRepository;
 	private final Clock reloj;
 
 	@Override
-	public PaginaResponseDTO<MedicamentoResponseDTO> listar(String q, int page, int size) {
+	public PaginaResponseDTO<MedicamentoResponseDTO> listar(String q, boolean incluirInactivos, int page, int size) {
 		String filtro = q == null ? "" : q.trim();
 		if (filtro.length() > FILTRO_MAXIMO) {
 			filtro = filtro.substring(0, FILTRO_MAXIMO);
@@ -55,12 +61,29 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 				Math.max(page, 0),
 				Math.min(Math.max(size, 1), TAMANIO_MAXIMO),
 				Sort.by("nombre").ascending().and(Sort.by("id").ascending()));
-		return PaginaResponseDTO.desde(medicamentoRepository.buscar(filtro, pagina), MedicamentoServiceImpl::toResponse);
+		Page<Medicamento> encontrados = medicamentoRepository.buscar(filtro, incluirInactivos, pagina);
+		Set<Long> enUso = idsEnUso(encontrados.getContent().stream().map(Medicamento::getId).toList());
+		return PaginaResponseDTO.desde(encontrados, medicamento -> toResponse(medicamento, enUso.contains(medicamento.getId())));
+	}
+
+	@Override
+	public long contarInactivos() {
+		return medicamentoRepository.countByActivoFalse();
+	}
+
+	@Override
+	public List<MedicamentoResponseDTO> bajoStock() {
+		List<Medicamento> encontrados = medicamentoRepository.bajoStock();
+		Set<Long> enUso = idsEnUso(encontrados.stream().map(Medicamento::getId).toList());
+		return encontrados.stream()
+				.map(medicamento -> toResponse(medicamento, enUso.contains(medicamento.getId())))
+				.toList();
 	}
 
 	@Override
 	public MedicamentoResponseDTO obtener(Long id) {
-		return toResponse(buscar(id));
+		Medicamento medicamento = buscar(id);
+		return toResponse(medicamento, estaUsado(id));
 	}
 
 	@Override
@@ -94,7 +117,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 			registrarMovimiento(guardado, TipoMovimiento.INGRESO, guardado.getStockActual(), null,
 					"Stock inicial", usuarioId);
 		}
-		return toResponse(guardado);
+		return toResponse(guardado, false);
 	}
 
 	@Override
@@ -143,7 +166,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 			registrarMovimiento(guardado, TipoMovimiento.AJUSTE, stockDeseado - stockActual, null,
 					request.observacionStock(), usuarioId);
 		}
-		return toResponse(guardado);
+		return toResponse(guardado, estaUsado(id));
 	}
 
 	@Override
@@ -153,6 +176,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 			throw new BadRequestException("La cantidad a agregar debe ser mayor a cero");
 		}
 		Medicamento medicamento = bloquear(id);
+		verificarActivo(medicamento, "cargar stock");
 		long resultado = (long) medicamento.getStockActual() + request.cantidad();
 		if (resultado > Integer.MAX_VALUE) {
 			throw new BusinessConflictException("El stock resultante supera el máximo permitido ("
@@ -163,7 +187,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 		Medicamento guardado = medicamentoRepository.save(medicamento);
 		registrarMovimiento(guardado, TipoMovimiento.INGRESO, request.cantidad(), null,
 				request.observacion(), usuarioId);
-		return toResponse(guardado);
+		return toResponse(guardado, estaUsado(id));
 	}
 
 	@Override
@@ -173,7 +197,53 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 		BigDecimal precio = request.precio().setScale(2, RoundingMode.HALF_UP);
 		medicamento.setPrecio(precio);
 		medicamento.setFechaActualizacion(LocalDateTime.now(reloj));
-		return toResponse(medicamentoRepository.save(medicamento));
+		return toResponse(medicamentoRepository.save(medicamento), estaUsado(id));
+	}
+
+	@Override
+	@Transactional
+	public void eliminar(Long id) {
+		Medicamento medicamento = bloquear(id);
+		if (estaUsado(id)) {
+			throw new BusinessConflictException("El medicamento '" + medicamento.getNombre()
+					+ "' fue usado en fichas clínicas: no se puede borrar. Desactivalo con el toggle "
+					+ "para que deje de estar disponible sin perder la trazabilidad.");
+		}
+		// Sin fichas asociadas, sus movimientos solo documentan la carga que se
+		// quiere corregir: se van con el medicamento en la misma transacción.
+		// Se borra entidad por entidad (no bulk JPQL) para que la persistence
+		// context no conserve movimientos apuntando a un medicamento borrado.
+		movimientoRepository.deleteByMedicamentoId(id);
+		medicamentoRepository.delete(medicamento);
+		medicamentoRepository.flush();
+	}
+
+	@Override
+	@Transactional
+	public MedicamentoResponseDTO desactivar(Long id) {
+		Medicamento medicamento = bloquear(id);
+		if (medicamento.isActivo()) {
+			medicamento.setActivo(false);
+			medicamento.setFechaActualizacion(LocalDateTime.now(reloj));
+			medicamentoRepository.save(medicamento);
+		}
+		return toResponse(medicamento, estaUsado(id));
+	}
+
+	@Override
+	@Transactional
+	public MedicamentoResponseDTO reactivar(Long id) {
+		Medicamento medicamento = bloquear(id);
+		Optional<Medicamento> duplicado = medicamentoRepository
+				.findByNombreNormalizadoAndPresentacionNormalizadaAndIdNot(
+						medicamento.getNombreNormalizado(), medicamento.getPresentacionNormalizada(), id);
+		if (duplicado.isPresent()) {
+			throw new BusinessConflictException("Ya existe otro medicamento con el nombre '"
+					+ medicamento.getNombre() + "' y su presentación: no se puede reactivar este.");
+		}
+		medicamento.setActivo(true);
+		medicamento.setFechaActualizacion(LocalDateTime.now(reloj));
+		return toResponse(medicamentoRepository.save(medicamento), estaUsado(id));
 	}
 
 	@Override
@@ -193,6 +263,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 			throw new BadRequestException("La cantidad consumida debe ser mayor a cero");
 		}
 		Medicamento medicamento = bloquear(medicamentoId);
+		verificarActivo(medicamento, "usarlo en una ficha");
 		if (medicamento.getStockActual() < cantidad) {
 			throw new BusinessConflictException("Stock insuficiente de " + medicamento.getNombre()
 					+ ": hay " + medicamento.getStockActual() + " unidades y se necesitan " + cantidad + ".");
@@ -203,6 +274,8 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 		registrarMovimiento(guardado, TipoMovimiento.EGRESO_FICHA, cantidad, referenciaId, observacion, usuarioId);
 	}
 
+	// ------------------------------------------------------------- internos
+
 	private Medicamento buscar(Long id) {
 		return medicamentoRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el medicamento " + id));
@@ -212,6 +285,32 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 	private Medicamento bloquear(Long id) {
 		return medicamentoRepository.bloquearPorId(id)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el medicamento " + id));
+	}
+
+	private void verificarActivo(Medicamento medicamento, String accion) {
+		if (!medicamento.isActivo()) {
+			throw new BadRequestException("El medicamento '" + medicamento.getNombre()
+					+ "' está desactivado: reactivalo antes de " + accion + ".");
+		}
+	}
+
+	/**
+	 * "Usado" significa consumido en una ficha, no simplemente cargado: un
+	 * medicamento cargado por error tiene INGRESO pero se puede borrar.
+	 */
+	private boolean estaUsado(Long medicamentoId) {
+		return movimientoRepository.existsByMedicamentoIdAndTipo(medicamentoId, TipoMovimiento.EGRESO_FICHA)
+				|| medicamentoUsadoRepository.existsByMedicamentoId(medicamentoId);
+	}
+
+	/** Misma regla que {@link #estaUsado}, resuelta en dos consultas para el listado. */
+	private Set<Long> idsEnUso(List<Long> ids) {
+		if (ids.isEmpty()) {
+			return Set.of();
+		}
+		Set<Long> enUso = new HashSet<>(movimientoRepository.idsConConsumo(TipoMovimiento.EGRESO_FICHA, ids));
+		enUso.addAll(medicamentoUsadoRepository.idsMedicamentosUsados(ids));
+		return enUso;
 	}
 
 	private void registrarMovimiento(Medicamento medicamento, TipoMovimiento tipo, int cantidad,
@@ -238,7 +337,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 				.orElse("sistema");
 	}
 
-	private static MedicamentoResponseDTO toResponse(Medicamento medicamento) {
+	private static MedicamentoResponseDTO toResponse(Medicamento medicamento, boolean enUso) {
 		return new MedicamentoResponseDTO(
 				medicamento.getId(),
 				medicamento.getNombre(),
@@ -250,6 +349,7 @@ public class MedicamentoServiceImpl implements MedicamentoService {
 				medicamento.getStockMinimo(),
 				medicamento.getStockMinimo() > 0 && medicamento.getStockActual() < medicamento.getStockMinimo(),
 				medicamento.isActivo(),
+				enUso,
 				medicamento.getFechaActualizacion());
 	}
 

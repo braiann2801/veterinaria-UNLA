@@ -126,6 +126,41 @@ class AtencionConMedicamentosTest {
 	}
 
 	@Test
+	@DisplayName("La ficha conserva nombre, presentación y cantidad del medicamento aunque se renombre y se desactive")
+	void snapshotEnLaFicha() throws Exception {
+		long suero = crearMedicamento("Suero", 1500, 8);
+		Medicamento entidad = medicamentoRepository.findById(suero).orElseThrow();
+		entidad.setPresentacion("Frasco 500ml");
+		entidad.setPresentacionNormalizada(
+				com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr.clave("Frasco 500ml"));
+		medicamentoRepository.saveAndFlush(entidad);
+
+		long consultaId = objectMapper
+				.readTree(ficha(null, "[{\"medicamentoId\":%d,\"cantidad\":3}]".formatted(suero))
+						.andExpect(status().isCreated())
+						.andExpect(jsonPath("$.medicamentos[0].nombre").value("Suero-" + sufijo))
+						.andExpect(jsonPath("$.medicamentos[0].presentacion").value("Frasco 500ml"))
+						.andExpect(jsonPath("$.medicamentos[0].cantidad").value(3))
+						.andReturn().getResponse().getContentAsString())
+				.get("id").asLong();
+
+		// Catálogo cambiado: la ficha no puede reescribirse con el nombre nuevo.
+		entidad.setNombre("Suero renombrado");
+		entidad.setActivo(false);
+		medicamentoRepository.saveAndFlush(entidad);
+
+		mockMvc.perform(get("/api/v1/consultas/{id}", consultaId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.medicamentos[0].medicamentoId").value(suero))
+				.andExpect(jsonPath("$.medicamentos[0].nombre").value("Suero-" + sufijo))
+				.andExpect(jsonPath("$.medicamentos[0].presentacion").value("Frasco 500ml"))
+				.andExpect(jsonPath("$.medicamentos[0].cantidad").value(3));
+		mockMvc.perform(get("/api/v1/consultas/mascota/{id}", mascotaId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].medicamentos[0].nombre").value("Suero-" + sufijo));
+	}
+
+	@Test
 	@DisplayName("Cambiar el precio despues no altera la comanda ya emitida, pero rige para la siguiente")
 	void precioCongelado() throws Exception {
 		long vacuna = crearMedicamento("Vacuna sextuple", 10000, 10);

@@ -1,9 +1,12 @@
 package com.veterinaria.veterinaria_backend.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,9 +39,25 @@ public class MedicamentoController {
 	@GetMapping
 	public ResponseEntity<PaginaResponseDTO<MedicamentoResponseDTO>> listar(
 			@RequestParam(defaultValue = "") String q,
+			@RequestParam(defaultValue = "false") boolean incluirInactivos,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "50") int size) {
-		return ResponseEntity.ok(medicamentoService.listar(q, page, size));
+		return ResponseEntity.ok(medicamentoService.listar(q, incluirInactivos, page, size));
+	}
+
+	/** Cantidad de desactivados para el toggle "Mostrar desactivados (N)". */
+	@GetMapping("/inactivos/cantidad")
+	public ResponseEntity<ConteoInactivosDTO> contarInactivos() {
+		return ResponseEntity.ok(new ConteoInactivosDTO(medicamentoService.contarInactivos()));
+	}
+
+	public record ConteoInactivosDTO(long cantidad) {
+	}
+
+	/** GET /api/v1/medicamentos/bajo-stock — avisos del Mostrador. */
+	@GetMapping("/bajo-stock")
+	public ResponseEntity<List<MedicamentoResponseDTO>> bajoStock() {
+		return ResponseEntity.ok(medicamentoService.bajoStock());
 	}
 
 	@GetMapping("/{id}")
@@ -72,6 +91,27 @@ public class MedicamentoController {
 			@Valid @RequestBody AgregarStockRequestDTO request,
 			@AuthenticationPrincipal Jwt jwt) {
 		return ResponseEntity.ok(medicamentoService.agregarStock(id, request, usuarioId(jwt)));
+	}
+
+	/**
+	 * Borrado fisico de un medicamento que nunca se uso en una ficha. Si ya se
+	 * uso, el servicio responde 409 indicando que debe desactivarse.
+	 */
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+		medicamentoService.eliminar(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	/** Baja logica: conserva fichas, comandas y movimientos. */
+	@PutMapping("/{id}/desactivar")
+	public ResponseEntity<MedicamentoResponseDTO> desactivar(@PathVariable Long id) {
+		return ResponseEntity.ok(medicamentoService.desactivar(id));
+	}
+
+	@PutMapping("/{id}/reactivar")
+	public ResponseEntity<MedicamentoResponseDTO> reactivar(@PathVariable Long id) {
+		return ResponseEntity.ok(medicamentoService.reactivar(id));
 	}
 
 	/**

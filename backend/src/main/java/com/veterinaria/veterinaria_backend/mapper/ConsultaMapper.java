@@ -22,6 +22,11 @@ import com.veterinaria.veterinaria_backend.entity.Profesional;
 public class ConsultaMapper {
 
 	public ConsultaMedicaResponseDTO toResponse(ConsultaMedica consulta, Long comandaId) {
+		return toResponse(consulta, comandaId, List.of());
+	}
+
+	public ConsultaMedicaResponseDTO toResponse(ConsultaMedica consulta, Long comandaId,
+			List<ConsultaMedicaResponseDTO.MedicamentoAplicadoDTO> medicamentos) {
 		Mascota mascota = consulta.getMascota();
 		Profesional profesional = consulta.getProfesional();
 
@@ -46,7 +51,8 @@ public class ConsultaMapper {
 				consulta.isAlertaConducta(),
 				mascotaDto,
 				profesionalDto,
-				comandaId);
+				comandaId,
+				medicamentos == null ? List.of() : medicamentos);
 	}
 
 	public List<ConsultaMedicaResponseDTO> toResponseList(List<ConsultaMedica> consultas) {

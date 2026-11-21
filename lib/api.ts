@@ -341,6 +341,18 @@ export interface ReservaGuarderiaInput {
 
 export type TipoEstadiaGuarderia = "DIURNA" | "NOCTURNA" | "COMPLETA_24H"
 
+/**
+ * Copia de lo aplicado en la atención: nombre y presentación congelados al
+ * registrar la ficha. Sin precio: el monto vive en la comanda (regla 2.3).
+ * Sobrevive a que el medicamento se desactive o se borre del catálogo.
+ */
+export interface MedicamentoAplicado {
+  medicamentoId: number
+  nombre: string
+  presentacion: string | null
+  cantidad: number
+}
+
 export interface ConsultaMedica {
   id: number
   turnoClinicoId: number | null
@@ -353,6 +365,8 @@ export interface ConsultaMedica {
   mascota: { id: number; nombre: string; especie: string }
   profesional: { id: number; nombreCompleto: string; matricula: string | null }
   comandaId: number
+  /** Medicamentos registrados en la ficha; vacío si no se usó ninguno. */
+  medicamentos: MedicamentoAplicado[]
 }
 
 /**
@@ -596,8 +610,33 @@ export interface TutorInput {
   direccion?: string
 }
 
+/** Filtros compartidos por los buscadores paginados del Padrón. */
+export interface BuscarPadron {
+  q?: string
+  page?: number
+  size?: number
+  incluirInactivos?: boolean
+  signal?: AbortSignal
+}
+
 export const tutores = {
   listar: () => get<Tutor[]>("/tutores"),
+  /** Búsqueda con paginación en servidor; `listar` sigue intacto para los selects. */
+  buscar: ({
+    q = "",
+    page = 0,
+    size = 50,
+    incluirInactivos = false,
+    signal,
+  }: BuscarPadron = {}) => {
+    const params = new URLSearchParams({
+      q,
+      page: String(page),
+      size: String(size),
+      incluirInactivos: String(incluirInactivos),
+    })
+    return get<Pagina<Tutor>>(`/tutores/buscar?${params.toString()}`, signal ? { signal } : undefined)
+  },
   buscarPorId: (id: number) => get<Tutor>(`/tutores/${id}`),
   crear: (body: TutorInput) => post<Tutor>("/tutores", body),
   actualizar: (id: number, body: Partial<TutorInput>) => put<Tutor>(`/tutores/${id}`, body),
@@ -652,6 +691,22 @@ export interface MascotaInput {
 
 export const mascotas = {
   listar: () => get<Mascota[]>("/mascotas"),
+  /** Búsqueda por nombre con paginación en servidor (Padrón). */
+  buscar: ({
+    q = "",
+    page = 0,
+    size = 50,
+    incluirInactivos = false,
+    signal,
+  }: BuscarPadron = {}) => {
+    const params = new URLSearchParams({
+      q,
+      page: String(page),
+      size: String(size),
+      incluirInactivos: String(incluirInactivos),
+    })
+    return get<Pagina<Mascota>>(`/mascotas/buscar?${params.toString()}`, signal ? { signal } : undefined)
+  },
   buscarPorId: (id: number) => get<Mascota>(`/mascotas/${id}`),
   crear: (body: MascotaInput) => post<Mascota>("/mascotas", body),
   actualizar: (id: number, body: MascotaInput) => put<Mascota>(`/mascotas/${id}`, body),
@@ -779,6 +834,8 @@ export interface Medicamento {
   stockMinimo: number
   bajoStock: boolean
   activo: boolean
+  /** True si se usó en alguna ficha: solo se puede desactivar, no borrar. */
+  enUso: boolean
   fechaActualizacion: string
 }
 
@@ -837,16 +894,27 @@ export interface MovimientoStock {
 
 export interface ListarMedicamentos {
   q?: string
+  /** Incluye los desactivados (toggle "Mostrar desactivados"). */
+  incluirInactivos?: boolean
   page?: number
   size?: number
   signal?: AbortSignal
 }
 
 export const medicamentos = {
-  listar: ({ q = "", page = 0, size = 50, signal }: ListarMedicamentos = {}) => {
-    const params = new URLSearchParams({ q, page: String(page), size: String(size) })
+  listar: ({ q = "", incluirInactivos = false, page = 0, size = 50, signal }: ListarMedicamentos = {}) => {
+    const params = new URLSearchParams({
+      q,
+      incluirInactivos: String(incluirInactivos),
+      page: String(page),
+      size: String(size),
+    })
     return get<Pagina<Medicamento>>(`/medicamentos?${params.toString()}`, signal ? { signal } : undefined)
   },
+  /** Cantidad de desactivados para el toggle, sin traer todas las filas. */
+  contarInactivos: () => get<{ cantidad: number }>("/medicamentos/inactivos/cantidad"),
+  /** Activos bajo el stock mínimo; alimenta los avisos del Mostrador. */
+  bajoStock: () => get<Medicamento[]>("/medicamentos/bajo-stock"),
   crear: (body: MedicamentoInput) => post<Medicamento>("/medicamentos", body),
   /** Edición completa; reemplaza al viejo endpoints de precio en la UI. */
   actualizar: (id: number, body: MedicamentoActualizacionInput) =>
@@ -856,6 +924,11 @@ export const medicamentos = {
     put<Medicamento>(`/medicamentos/${id}/precio`, body),
   agregarStock: (id: number, body: AgregarStockInput) =>
     post<Medicamento>(`/medicamentos/${id}/stock`, body),
+  /** Borrado físico: el backend responde 409 si ya se usó en una ficha. */
+  eliminar: (id: number) => del<void>(`/medicamentos/${id}`),
+  /** Baja lógica: conserva fichas, comandas e historial de stock. */
+  desactivar: (id: number) => put<Medicamento>(`/medicamentos/${id}/desactivar`),
+  reactivar: (id: number) => put<Medicamento>(`/medicamentos/${id}/reactivar`),
   /** Solo lectura: se muestra dentro del modal de carga de stock. */
   movimientos: (id: number, page = 0, size = 5, signal?: AbortSignal) =>
     get<Pagina<MovimientoStock>>(

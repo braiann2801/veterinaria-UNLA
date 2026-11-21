@@ -15,5 +15,7 @@ public record MedicamentoResponseDTO(
 		int stockMinimo,
 		boolean bajoStock,
 		boolean activo,
+		/** True si se usó en alguna ficha: en ese caso no se puede borrar, solo desactivar. */
+		boolean enUso,
 		LocalDateTime fechaActualizacion) {
 }

@@ -24,7 +24,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, FileText, Search } from "lucide-react"
+import { AlertTriangle, FileText, Pill, Search } from "lucide-react"
 
 import { consultas as apiConsultas, mascotas as apiMascotas } from "@/lib/api"
 import type { ConsultaMedica, ConductaMascota, ConductaObservada, Mascota } from "@/lib/api"
@@ -258,6 +258,27 @@ export function Fichas({ initialMascotaId }: { initialMascotaId?: number | null 
                             valor={CONDUCTA_OBSERVADA[c.conductaObservada]}
                           />
                         </dl>
+                        {c.medicamentos?.length > 0 && (
+                          <div className="mt-2 rounded-md border border-border bg-muted/30 p-2">
+                            <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              <Pill className="size-3.5" aria-hidden />
+                              Medicamentos aplicados
+                            </p>
+                            <ul className="flex flex-wrap gap-2">
+                              {c.medicamentos.map((medicamento, indice) => (
+                                <li
+                                  key={`${medicamento.medicamentoId}-${indice}`}
+                                  className="rounded-full border border-border bg-background px-2.5 py-1 text-xs"
+                                >
+                                  {medicamento.nombre}
+                                  {medicamento.presentacion ? ` · ${medicamento.presentacion}` : ""}
+                                  {" · "}
+                                  {medicamento.cantidad} u.
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

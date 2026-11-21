@@ -17,16 +17,28 @@
  */
 
 import { useRef, useState } from "react"
-import { Link2, PawPrint, Pencil, PowerOff, RotateCcw, ShieldCheck, ShieldOff, UserPlus } from "lucide-react"
+import {
+  FileText,
+  Link2,
+  PawPrint,
+  Pencil,
+  PowerOff,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  ShieldOff,
+  UserPlus,
+} from "lucide-react"
 
 import { hoyLocal, mascotas as apiMascotas, tutores as apiTutores } from "@/lib/api"
 import type { ConductaMascota, EspecieMascota, Mascota, Tutor } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
+import { useBusquedaPaginada, type BuscarPaginado } from "@/lib/use-busqueda-paginada"
 import { Panel, Select, TextArea, TextInput } from "@/components/ui/field"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Modal } from "@/components/ui/modal"
-import { Recurso, TOQUE_MINIMO, filtrarPorModo, formatearDni } from "@/lib/vista"
-import { Paginado } from "@/components/ui/paginado"
+import { Recurso, TOQUE_MINIMO, Vacio, filtrarPorModo, formatearDni } from "@/lib/vista"
+import { PaginadoServidor } from "@/components/ui/paginado-servidor"
 import { ToggleInactivos } from "@/components/ui/toggle-inactivos"
 import { AltaMascota, CONDUCTAS, ESPECIES } from "@/components/modules/alta-mascota"
 
@@ -34,7 +46,26 @@ import { AltaMascota, CONDUCTAS, ESPECIES } from "@/components/modules/alta-masc
 const BOTON_ACCION =
   "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border transition-colors"
 
-export function Padron() {
+/** Botón con texto de las acciones de fila (Fichas). */
+const BOTON_TEXTO =
+  "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium transition-colors hover:bg-muted"
+
+/** Referencias estables: el hook las usa como dependencia de la recarga. */
+const BUSCAR_TUTORES: BuscarPaginado<Tutor> = (args) => apiTutores.buscar(args)
+const BUSCAR_MASCOTAS: BuscarPaginado<Mascota> = (args) => apiMascotas.buscar(args)
+
+export function Padron({ onVerFichas }: { onVerFichas: (mascotaId: number) => void }) {
+  const [verInactivos, setVerInactivos] = useState(false)
+  const busquedaTutores = useBusquedaPaginada(
+    BUSCAR_TUTORES,
+    verInactivos,
+    "No se pudo cargar el listado de tutores.",
+  )
+  const busquedaMascotas = useBusquedaPaginada(
+    BUSCAR_MASCOTAS,
+    verInactivos,
+    "No se pudo cargar el listado de mascotas.",
+  )
   const tutores = useApi<Tutor[]>(() => apiTutores.listar())
   const mascotas = useApi<Mascota[]>(() => apiMascotas.listar())
   const [seleccion, setSeleccion] = useState<Tutor | null>(null)
@@ -44,7 +75,6 @@ export function Padron() {
   const [editandoMascota, setEditandoMascota] = useState<Mascota | null>(null)
   const [eliminandoMascota, setEliminandoMascota] = useState<Mascota | null>(null)
   const [agregandoCotutor, setAgregandoCotutor] = useState<Mascota | null>(null)
-  const [verInactivos, setVerInactivos] = useState(false)
   const [errorReactivar, setErrorReactivar] = useState<string | null>(null)
   const refAltaMascota = useRef<HTMLDivElement | null>(null)
 
@@ -56,7 +86,12 @@ export function Padron() {
    * veria hasta reabrir el modal.</p>
    */
   async function refrescar(tutorId?: number) {
-    await Promise.all([tutores.recargar(), mascotas.recargar()])
+    await Promise.all([
+      tutores.recargar(),
+      mascotas.recargar(),
+      busquedaTutores.recargar(),
+      busquedaMascotas.recargar(),
+    ])
     if (tutorId !== undefined) {
       setSeleccion(await apiTutores.buscarPorId(tutorId))
     }
@@ -114,167 +149,236 @@ export function Padron() {
           </div>
         }
       >
+        <div className="relative mb-3">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <TextInput
+            value={busquedaTutores.q}
+            onChange={(e) => busquedaTutores.cambiarQ(e.target.value)}
+            placeholder="Buscar tutor por nombre o DNI"
+            aria-label="Buscar tutores"
+            className={`pl-10 ${TOQUE_MINIMO}`}
+          />
+        </div>
+
         <Recurso
-          estado={tutores}
+          estado={busquedaTutores}
           textoCarga="Cargando tutores"
-          textoVacio="Todavía no hay tutores cargados"
+          onReintentar={busquedaTutores.recargar}
         >
-          {(todos) => {
-            const lista = verInactivos ? todos : todos.filter((t) => t.activo)
-            return (
-            <Paginado items={lista} clave="padron-tutores" reiniciarCon={verInactivos ? 1 : 0}>
-            {(pagina) => (
-            <ul className="flex flex-col divide-y divide-border">
-              {pagina.map((t) => (
-                <li key={t.id} className={`flex items-center gap-2 py-2 ${t.activo ? "" : "opacity-60"}`}>
-                  <button
-                    onClick={() => setSeleccion(t)}
-                    className="flex min-w-0 flex-1 flex-col gap-1 rounded-md py-1 text-left transition-colors hover:bg-muted/50"
-                  >
-                    <span className="truncate text-sm font-medium">
-                      {t.nombreCompleto}
-                      {!t.activo && <EtiquetaInactivo />}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      DNI {formatearDni(t.dni)}
-                      {t.telefono ? ` · ${t.telefono}` : ""} · {t.mascotas.length} mascota
-                      {t.mascotas.length === 1 ? "" : "s"}
-                    </span>
-                  </button>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      onClick={() => setEditandoTutor(t)}
-                      aria-label={`Editar ${t.nombreCompleto}`}
-                      title="Editar tutor"
-                      className={`${BOTON_ACCION} border-border text-muted-foreground hover:bg-muted hover:text-foreground`}
-                    >
-                      <Pencil className="size-4" aria-hidden />
-                    </button>
-                    {t.activo ? (
+          {(pagina) => (
+            <>
+              {pagina.contenido.length === 0 ? (
+                <Vacio
+                  texto={
+                    busquedaTutores.q
+                      ? "No hay tutores que coincidan con la búsqueda"
+                      : "Todavía no hay tutores cargados"
+                  }
+                />
+              ) : (
+                <ul className="flex flex-col divide-y divide-border">
+                  {pagina.contenido.map((t) => (
+                    <li key={t.id} className={`flex items-center gap-2 py-2 ${t.activo ? "" : "opacity-60"}`}>
                       <button
-                        onClick={() => setEliminandoTutor(t)}
-                        aria-label={`Desactivar ${t.nombreCompleto}`}
-                        title="Desactivar tutor"
-                        className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
+                        onClick={() => setSeleccion(t)}
+                        className="flex min-w-0 flex-1 flex-col gap-1 rounded-md py-1 text-left transition-colors hover:bg-muted/50"
                       >
-                        <PowerOff className="size-4" aria-hidden />
+                        <span className="truncate text-sm font-medium">
+                          {t.nombreCompleto}
+                          {!t.activo && <EtiquetaInactivo />}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          DNI {formatearDni(t.dni)}
+                          {t.telefono ? ` · ${t.telefono}` : ""} · {t.mascotas.length} mascota
+                          {t.mascotas.length === 1 ? "" : "s"}
+                        </span>
                       </button>
-                    ) : (
-                      <button
-                        onClick={() => reactivar(() => apiTutores.reactivar(t.id))}
-                        aria-label={`Reactivar ${t.nombreCompleto}`}
-                        title="Reactivar tutor"
-                        className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10`}
-                      >
-                        <RotateCcw className="size-4" aria-hidden />
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-            )}
-            </Paginado>
-            )
-          }}
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          onClick={() => setEditandoTutor(t)}
+                          aria-label={`Editar ${t.nombreCompleto}`}
+                          title="Editar tutor"
+                          className={`${BOTON_ACCION} border-border text-muted-foreground hover:bg-muted hover:text-foreground`}
+                        >
+                          <Pencil className="size-4" aria-hidden />
+                        </button>
+                        {t.activo ? (
+                          <button
+                            onClick={() => setEliminandoTutor(t)}
+                            aria-label={`Desactivar ${t.nombreCompleto}`}
+                            title="Desactivar tutor"
+                            className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
+                          >
+                            <PowerOff className="size-4" aria-hidden />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => reactivar(() => apiTutores.reactivar(t.id))}
+                            aria-label={`Reactivar ${t.nombreCompleto}`}
+                            title="Reactivar tutor"
+                            className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10`}
+                          >
+                            <RotateCcw className="size-4" aria-hidden />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <PaginadoServidor
+                pagina={busquedaTutores.pagina}
+                tamanio={busquedaTutores.tamanio}
+                totalElementos={pagina.totalElementos}
+                totalPaginas={pagina.totalPaginas}
+                onChange={(paginaNueva, tamanioNuevo) => {
+                  busquedaTutores.cambiarTamanio(tamanioNuevo)
+                  busquedaTutores.cambiarPagina(paginaNueva)
+                }}
+                deshabilitado={busquedaTutores.cargando}
+              />
+            </>
+          )}
         </Recurso>
       </Panel>
 
       <Panel title="Mascotas">
+        <div className="relative mb-3">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <TextInput
+            value={busquedaMascotas.q}
+            onChange={(e) => busquedaMascotas.cambiarQ(e.target.value)}
+            placeholder="Buscar mascota por nombre"
+            aria-label="Buscar mascotas"
+            className={`pl-10 ${TOQUE_MINIMO}`}
+          />
+        </div>
+
         <Recurso
-          estado={mascotas}
+          estado={busquedaMascotas}
           textoCarga="Cargando mascotas"
-          textoVacio="Todavía no hay mascotas cargadas"
+          onReintentar={busquedaMascotas.recargar}
         >
-          {(todas) => {
-            const lista = verInactivos ? todas : todas.filter((m) => m.activo)
-            return (
-            <Paginado items={lista} clave="padron-mascotas" reiniciarCon={verInactivos ? 1 : 0}>
-            {(pagina) => (
-            <ul className="flex flex-col divide-y divide-border">
-              {pagina.map((m) => (
-                <li key={m.id} className={`flex flex-col gap-2 py-3 ${m.activo ? "" : "opacity-60"}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {m.nombre}
-                        {!m.activo && <EtiquetaInactivo />}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {[m.especie, m.raza].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      {m.conducta && m.conducta !== "normal" && (
-                        <span className="mr-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
-                          {m.conducta}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => setEditandoMascota(m)}
-                        aria-label={`Editar ${m.nombre}`}
-                        title="Editar mascota"
-                        className={`${BOTON_ACCION} border-border text-muted-foreground hover:bg-muted hover:text-foreground`}
-                      >
-                        <Pencil className="size-4" aria-hidden />
-                      </button>
-                      {m.activo ? (
-                        <button
-                          onClick={() => setEliminandoMascota(m)}
-                          aria-label={`Desactivar ${m.nombre}`}
-                          title="Desactivar mascota"
-                          className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
-                        >
-                          <PowerOff className="size-4" aria-hidden />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => reactivar(() => apiMascotas.reactivar(m.id))}
-                          aria-label={`Reactivar ${m.nombre}`}
-                          title="Reactivar mascota"
-                          className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10`}
-                        >
-                          <RotateCcw className="size-4" aria-hidden />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {m.tutores.map((t) => (
-                      <li
-                        key={t.id}
-                        className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs"
-                      >
-                        {t.autorizadoRetiro ? (
-                          <ShieldCheck className="size-3 text-emerald-600" aria-hidden />
-                        ) : (
-                          <ShieldOff className="size-3 text-muted-foreground" aria-hidden />
+          {(pagina) => (
+            <>
+              {pagina.contenido.length === 0 ? (
+                <Vacio
+                  texto={
+                    busquedaMascotas.q
+                      ? "No hay mascotas que coincidan con la búsqueda"
+                      : "Todavía no hay mascotas cargadas"
+                  }
+                />
+              ) : (
+                <ul className="flex flex-col divide-y divide-border">
+                  {pagina.contenido.map((m) => (
+                    <li key={m.id} className={`flex flex-col gap-2 py-3 ${m.activo ? "" : "opacity-60"}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {m.nombre}
+                            {!m.activo && <EtiquetaInactivo />}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {[m.especie, m.raza].filter(Boolean).join(" · ")}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-1">
+                          {m.conducta && m.conducta !== "normal" && (
+                            <span className="mr-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
+                              {m.conducta}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => onVerFichas(m.id)}
+                            aria-label={`Ver ficha de ${m.nombre}`}
+                            title="Ver atenciones de la mascota"
+                            className={BOTON_TEXTO}
+                          >
+                            <FileText className="size-4" aria-hidden />
+                            Fichas
+                          </button>
+                          <button
+                            onClick={() => setEditandoMascota(m)}
+                            aria-label={`Editar ${m.nombre}`}
+                            title="Editar mascota"
+                            className={`${BOTON_ACCION} border-border text-muted-foreground hover:bg-muted hover:text-foreground`}
+                          >
+                            <Pencil className="size-4" aria-hidden />
+                          </button>
+                          {m.activo ? (
+                            <button
+                              onClick={() => setEliminandoMascota(m)}
+                              aria-label={`Desactivar ${m.nombre}`}
+                              title="Desactivar mascota"
+                              className={`${BOTON_ACCION} border-destructive/40 text-destructive hover:bg-destructive/10`}
+                            >
+                              <PowerOff className="size-4" aria-hidden />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => reactivar(() => apiMascotas.reactivar(m.id))}
+                              aria-label={`Reactivar ${m.nombre}`}
+                              title="Reactivar mascota"
+                              className={`${BOTON_ACCION} border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10`}
+                            >
+                              <RotateCcw className="size-4" aria-hidden />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <ul className="flex flex-wrap gap-1.5">
+                        {m.tutores.map((t) => (
+                          <li
+                            key={t.id}
+                            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs"
+                          >
+                            {t.autorizadoRetiro ? (
+                              <ShieldCheck className="size-3 text-emerald-600" aria-hidden />
+                            ) : (
+                              <ShieldOff className="size-3 text-muted-foreground" aria-hidden />
+                            )}
+                            {t.nombre} {t.apellido}
+                          </li>
+                        ))}
+                        {m.tutores.length === 0 && (
+                          <li className="text-xs text-muted-foreground">Sin tutores vinculados</li>
                         )}
-                        {t.nombre} {t.apellido}
-                      </li>
-                    ))}
-                    {m.tutores.length === 0 && (
-                      <li className="text-xs text-muted-foreground">Sin tutores vinculados</li>
-                    )}
-                    <li>
-                      {/* Sumar un tutor desde la mascota, sin ir a buscar la ficha del tutor. */}
-                      <button
-                        onClick={() => setAgregandoCotutor(m)}
-                        aria-label={`Agregar cotutor a ${m.nombre}`}
-                        className={`inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${TOQUE_MINIMO}`}
-                      >
-                        <Link2 className="size-3" aria-hidden />
-                        Agregar cotutor
-                      </button>
+                        <li>
+                          {/* Sumar un tutor desde la mascota, sin ir a buscar la ficha del tutor. */}
+                          <button
+                            onClick={() => setAgregandoCotutor(m)}
+                            aria-label={`Agregar cotutor a ${m.nombre}`}
+                            className={`inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${TOQUE_MINIMO}`}
+                          >
+                            <Link2 className="size-3" aria-hidden />
+                            Agregar cotutor
+                          </button>
+                        </li>
+                      </ul>
                     </li>
-                  </ul>
-                </li>
-              ))}
-            </ul>
-            )}
-            </Paginado>
-            )
-          }}
+                  ))}
+                </ul>
+              )}
+              <PaginadoServidor
+                pagina={busquedaMascotas.pagina}
+                tamanio={busquedaMascotas.tamanio}
+                totalElementos={pagina.totalElementos}
+                totalPaginas={pagina.totalPaginas}
+                onChange={(paginaNueva, tamanioNuevo) => {
+                  busquedaMascotas.cambiarTamanio(tamanioNuevo)
+                  busquedaMascotas.cambiarPagina(paginaNueva)
+                }}
+                deshabilitado={busquedaMascotas.cargando}
+              />
+            </>
+          )}
         </Recurso>
       </Panel>
 
@@ -861,78 +965,75 @@ function ModalAltaTutor({
       <div className="flex flex-col gap-4 p-4">
         <section>
           <h3 className="mb-2 text-xs font-medium text-muted-foreground">Mascotas vinculadas</h3>
-          <Recurso estado={mascotas} textoCarga="Cargando mascotas">
-            {(lista) =>
-              lista.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay mascotas cargadas.</p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-border">
-                  {lista.map((m) => {
-                    const vinculo = tutor.mascotas.find((v) => v.id === m.id)
-                    return (
-                      <li key={m.id} className="flex items-center justify-between gap-3 py-2.5">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm">{m.nombre}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {vinculo
-                              ? vinculo.autorizadoRetiro
-                                ? "Autorizado a retirar"
-                                : "Cotutor: no puede retirar"
-                              : "Sin vincular"}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {vinculo && (
-                            <>
-                              <button
-                                onClick={() => alternar(m.id, vinculo.autorizadoRetiro)}
-                                disabled={guardando}
-                                role="switch"
-                                aria-checked={vinculo.autorizadoRetiro}
-                                aria-label={`Autorizado a retirar a ${m.nombre}`}
-                                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${TOQUE_MINIMO} ${
-                                  vinculo.autorizadoRetiro
-                                    ?"border-emerald-300 bg-emerald-50 text-emerald-900"
-                                    : "border-border bg-muted text-muted-foreground"
-                                }`}
-                              >
-                                {vinculo.autorizadoRetiro ? "Autorizado" : "No autorizado"}
-                              </button>
-                              <button
-                                onClick={() => desvincular(m.id)}
-                                disabled={guardando}
-                                className={`rounded-md px-2 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60 ${TOQUE_MINIMO}`}
-                              >
-                                Quitar
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )
-            }
-          </Recurso>
+          {tutor.mascotas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Este tutor todavía no tiene mascotas vinculadas.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border">
+              {tutor.mascotas.map((vinculo) => (
+                <li key={vinculo.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">
+                      {vinculo.nombre}
+                      {!vinculo.activo && <EtiquetaInactivo />}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {vinculo.autorizadoRetiro ? "Autorizado a retirar" : "Cotutor: no puede retirar"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={() => alternar(vinculo.id, vinculo.autorizadoRetiro)}
+                      disabled={guardando}
+                      role="switch"
+                      aria-checked={vinculo.autorizadoRetiro}
+                      aria-label={`Autorizado a retirar a ${vinculo.nombre}`}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${TOQUE_MINIMO} ${
+                        vinculo.autorizadoRetiro
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                          : "border-border bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {vinculo.autorizadoRetiro ? "Autorizado" : "No autorizado"}
+                    </button>
+                    <button
+                      onClick={() => desvincular(vinculo.id)}
+                      disabled={guardando}
+                      className={`rounded-md px-2 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60 ${TOQUE_MINIMO}`}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="flex flex-col gap-3 border-t border-border pt-4">
           <h3 className="text-xs font-medium text-muted-foreground">Vincular otra mascota</h3>
-          <Select
-            value={seleccion ?? ""}
-            onChange={(e) => setSeleccion(e.target.value ? Number(e.target.value) : null)}
-            className={TOQUE_MINIMO}
-          >
-            <option value="">Elegí una mascota…</option>
-            {(mascotas.datos ?? [])
-              .filter((m) => m.activo && !tutor.mascotas.some((v) => v.id === m.id))
-              .map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre}
-                </option>
-              ))}
-          </Select>
+          <Recurso estado={mascotas} textoCarga="Cargando mascotas">
+            {(lista) => {
+              const disponibles = lista.filter(
+                (m) => m.activo && !tutor.mascotas.some((v) => v.id === m.id),
+              )
+              return (
+                <Select
+                  value={seleccion ?? ""}
+                  onChange={(e) => setSeleccion(e.target.value ? Number(e.target.value) : null)}
+                  className={TOQUE_MINIMO}
+                >
+                  <option value="">Elegí una mascota…</option>
+                  {disponibles.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nombre}
+                    </option>
+                  ))}
+                </Select>
+              )
+            }}
+          </Recurso>
 
           <label className="flex min-h-[44px] items-center gap-3 rounded-md border border-border px-3">
             <input
@@ -957,7 +1058,7 @@ function ModalAltaTutor({
 
           <button
             onClick={vincular}
-            disabled={guardando || !seleccion}
+            disabled={guardando || !seleccion || mascotas.cargando || mascotas.error !== null}
             className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground disabled:opacity-60 ${TOQUE_MINIMO}`}
           >
             <Link2 className="size-4" aria-hidden />

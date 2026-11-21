@@ -6,6 +6,27 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 
 ## Estado Actual
 
+- **Hotfix resuelto (2026-11-20):** al tocar el recuadro de un tutor en el
+  Padrón se listaban **todas** las mascotas del catálogo (las no vinculadas
+  aparecían como "Sin vincular"). `ModalAltaTutor` ahora muestra solo
+  `tutor.mascotas` en "Mascotas vinculadas"; el catálogo completo queda
+  únicamente en el selector "Vincular otra mascota", que excluye las ya
+  vinculadas y se deshabilita mientras carga o si falla. Archivo:
+  `components/modules/padron.tsx`. Harness en verde (421 tests). Sin commit.
+- **Tarea completada (2026-11-20):** **baja de medicamentos sin perder la
+  trazabilidad clínica**. Borrado físico si nunca se usó en una ficha; toggle
+  de desactivación si se usó; snapshot con nombre, presentación y cantidad en
+  la ficha. Implementada y verificada con harness en verde (**421 tests**).
+  Detalle en `odd/tasks/baja-medicamentos.md`. Sin commit, a la espera de
+  revisión. Bloqueantes: ninguno. No se modifica `AGENTS.md`.
+- **Tarea completada (2026-11-20):** **aviso de stock bajo en "Avisos
+  importantes" del Mostrador**. Implementada y verificada con harness en verde
+  (415 tests). Detalle en `odd/tasks/avisos-stock-bajo-mostrador.md`. Sin commit,
+  a la espera de revisión. Bloqueantes: ninguno. No se modifica `AGENTS.md`.
+- **Tarea completada (2026-11-20):** **buscadores paginados en el Padrón +
+  botón "Fichas"**. Implementada y verificada con harness en verde (414 tests).
+  Detalle en `odd/tasks/busqueda-padron-fichas.md`. Sin commit, a la espera de
+  revisión. Bloqueantes: ninguno. No se modifica `AGENTS.md`.
 - **Tarea completada (2026-11-20):** **edición de medicamentos + búsqueda
   superior clickeable**. Implementada y revisada; detalle en
   `odd/tasks/edicion-medicamentos-busqueda-clickeable.md`. Sin commit, a la
@@ -82,6 +103,8 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       (con selector mes/año).
 - [x] **ABM del Padrón** — editar/eliminar tutores y mascotas; regla del huérfano
       (una mascota no queda sin tutor; con historial bloquea 409 atómico).
+- [x] **Buscadores del Padrón** — filtros propios con debounce/abort y paginación
+      en servidor; botón "Fichas" por mascota sin tocar la barra superior.
 - [x] **Alta de tutor unificada** — mismos campos (email/dirección) en Mostrador y Padrón.
 - [x] **Reestilo visual** — tema oscuro azul/negro por defecto (primario #2563EB,
       sin `prefers-color-scheme`), `rounded-xl`, navegación activa y aforo azul.
@@ -329,6 +352,26 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
       0 fallos** y `tsc --noEmit` limpio. Detalle en
       `odd/tasks/edicion-medicamentos-busqueda-clickeable.md`. Sin commit.
 
+- [x] **Baja de medicamentos (2026-11-20)** — `DELETE /medicamentos/{id}`
+      borra físicamente solo si el medicamento nunca se usó en una ficha; si se
+      usó responde 409 con el mensaje *"fue usado en fichas clínicas: no se
+      puede borrar. Desactivalo con el toggle..."*. `PUT /{id}/desactivar` y
+      `PUT /{id}/reactivar` hacen la baja lógica con el mismo patrón que tutores
+      y mascotas; `GET /inactivos/cantidad` y `?incluirInactivos=true` alimentan
+      el toggle. "Usado" = consumo en ficha (`EGRESO_FICHA` o snapshot), no el
+      `INGRESO` de carga: lo cargado por error se puede borrar. Nueva tabla
+      `medicamento_usado_ficha` (`medicamentoId` escalar sin FK, nombre,
+      presentación, cantidad, **sin precio**) congela lo aplicado; las fichas
+      históricas sin snapshot se reconstruyen en lectura desde los movimientos
+      `EGRESO_FICHA` con `referenciaId`. Inactivos no admiten carga de stock ni
+      consumos (400). Frontend: toggle "Mostrar desactivados", badge "Usado en
+      fichas", confirmación visual para borrar/desactivar, reactivación y
+      bloque "Medicamentos aplicados" en Fichas. Borrado del historial con
+      `deleteByMedicamentoId` (no bulk JPQL: dejaba entidades stale y daba
+      `TransientPropertyValueException`). Verificado: harness completo
+      **421 tests, 0 fallos** (39 en las suites focales). Detalle en
+      `odd/tasks/baja-medicamentos.md`. Sin commit.
+
 ## Decisiones Críticas de Arquitectura
 
 1. **Rutas:** frontend en `app/` + `components/` + `lib/` (sin `frontend/src/`);
@@ -386,6 +429,10 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
    `ApplicationContext` (Caused by: `Communications link failure` /
    `Connection refused` en 3306), no es el código: MySQL se cayó. Reiniciar
    `C:\xampp\mysql\bin\mysqld.exe`, esperar el puerto y relanzar el harness.
+  Variante vista el 2026-11-20: el primer `Caused by` fue
+  `Unable to determine Dialect without JDBC metadata` (mismo motivo: MySQL caído);
+  con `mysqld.exe --defaults-file=C:\xampp\mysql\bin\my.ini --console` el harness
+  pasó con 414 tests sin tocar código.
 8. **Datos previos sin normalizar:** tutores con teléfono que no tenga 10
    dígitos o DNI de 9-10 dígitos dan 400 al editarlos hasta corregir el dato.
    No se reescribió la base existente.
@@ -406,15 +453,16 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
 12. **CSP en `Report-Only`:** no bloquea todavía. Siguiente bloque: nonce vía
     `middleware.ts`, revisar reportes y pasar a `enforce`, quitando
     `'unsafe-inline'` cuando los estilos inline se migren a variables CSS.
-13. **Descuento de stock desde ficha clínica (resuelto 2026-11-20):**
+13. **[RESUELTO] Descuento de stock y baja de medicamentos (2026-11-20):**
     `ConsultaMedicaServiceImpl.registrar` invoca `registrarConsumo(...)` dentro
     de la misma transacción: resuelve medicamentos activos, valida stock y
     escribe `EGRESO_FICHA` con `referenciaId` de la ficha; sin stock, 409 con
     rollback de ficha, comanda y movimientos. Los extras (conceptos de cobro sin
     vínculo con `Medicamento`) se eliminaron y reemplazaron por esta lista.
-    Ya hay edición completa (`PUT /{id}`, ver tarea del 2026-11-20); sigue sin
-    haber desactivación: el campo `activo` existe, el listado solo muestra
-    activos y no hay endpoint para cambiarlo.
+    Ya hay edición completa (`PUT /{id}`) y baja: borrado físico si nunca se
+    usó, `PUT /{id}/desactivar` + `PUT /{id}/reactivar` si se usó, con snapshot
+    clínico en `medicamento_usado_ficha`. Detalle en
+    `odd/tasks/baja-medicamentos.md`.
 14. **Precio congelado:** `ComandaItem` guarda descripción, cantidad, precio
     unitario y subtotal como escalares, sin FK a `Medicamento` ni a `Extra`.
     Así las comandas históricas (incluidas las de extras) sobreviven a cambios
@@ -454,9 +502,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   (todas las fechas, estado opcional) y `/mascotas/{id}/deuda`),
   consultas, `/turnos?desde=&hasta=` (vista mensual), `/turnos/con-alta`,
   `/medicamentos` (catálogo + `POST` con precio + `PUT /{id}` (edición) +
-  `PUT /{id}/precio` (legacy) + `POST /{id}/stock` + `GET /{id}/movimientos`;
+  `PUT /{id}/precio` (legacy) + `POST /{id}/stock` + `GET /{id}/movimientos` +
+  `DELETE /{id}` + `PUT /{id}/desactivar` + `PUT /{id}/reactivar` +
+  `GET /inactivos/cantidad` + `?incluirInactivos=true` en el listado;
   los cuatro roles en `SecurityConfig`). Ya no existe `/extras`.
-- **Tests backend:** 409 en verde (harness completo del 2026-11-20). Cobertura clave: aforo concurrente (lock
+- **Tests backend:** 421 en verde (harness completo del 2026-11-20). Cobertura clave: aforo concurrente (lock
   real en MySQL), ventana de desinfección 45+15, cotutor puede pagar, egreso por
   DNI sin vínculo, huérfano con historial → 409, aislamiento en
   `veterinaria_test` (no pisa `veterinaria_db`), balance por período (rango
@@ -465,7 +515,11 @@ exploración. Los detalles finos de cada fase quedaron en los commits; acá no.
   `medicamento` con `SELECT ... FOR UPDATE`, sin `@Transactional` en la clase
   de test para no enmascarar el lock), precio congelado en comanda, stock
   insuficiente con rollback y movimientos `EGRESO_FICHA` con `referenciaId` de
-  la ficha, y parsers/conciliación de la importación histórica.
+  la ficha, baja de medicamentos (`MedicamentoBajaTest`: borrado de lo nunca
+  usado, 409 con mensaje de desactivación para lo usado, toggle y
+  reactivación, bloqueo de movimientos sobre inactivos, 404), snapshot
+  persistente tras renombrar/desactivar (`AtencionConMedicamentosTest`) y
+  parsers/conciliación de la importación histórica.
 - **Importación histórica:** vive en `importacion/` (`ImportacionRunner`,
   `ConstructorPlan`, `ConciliacionHistorica`, `ImportacionService`,
   `ReporteImportacion`). Es una vía única de consola: no hay endpoint, no hay

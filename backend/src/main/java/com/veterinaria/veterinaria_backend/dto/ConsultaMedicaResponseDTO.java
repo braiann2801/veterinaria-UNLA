@@ -1,6 +1,7 @@
 package com.veterinaria.veterinaria_backend.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Vista publica de una ficha clinica.
@@ -28,11 +29,24 @@ public record ConsultaMedicaResponseDTO(
 		boolean alertaConducta,
 		MascotaFichaResumenDTO mascota,
 		ProfesionalFichaResumenDTO profesional,
-		Long comandaId) {
+		Long comandaId,
+		/** Copia de lo aplicado en la atención; sobrevive a la baja del catálogo. Sin precios. */
+		List<MedicamentoAplicadoDTO> medicamentos) {
 
 	public record MascotaFichaResumenDTO(Long id, String nombre, String especie) {
 	}
 
 	public record ProfesionalFichaResumenDTO(Long id, String nombreCompleto, String matricula) {
+	}
+
+	/**
+	 * Dato clínico, no contable: nombre y presentación congelados al atender y
+	 * cantidad aplicada. No expone monto ni precio (regla 3 de AGENTS.md).
+	 */
+	public record MedicamentoAplicadoDTO(
+			Long medicamentoId,
+			String nombre,
+			String presentacion,
+			int cantidad) {
 	}
 }

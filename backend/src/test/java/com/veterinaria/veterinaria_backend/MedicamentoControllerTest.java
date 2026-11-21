@@ -151,6 +151,30 @@ class MedicamentoControllerTest {
 	}
 
 	@Test
+	@DisplayName("Bajo stock para avisos: solo activos bajo el mínimo, primero los que menos unidades tienen")
+	void bajoStockParaAvisos() throws Exception {
+		crearMedicamento("Aviso Sin Stock", "Frasco", "A", "Lab", 0, 2);
+		crearMedicamento("Aviso Bajo", "Comprimidos", "B", "Lab", 2, 5);
+		crearMedicamento("Aviso Normal", "Comprimidos", "C", "Lab", 10, 5);
+		crearMedicamento("Aviso Sin Minimo", "Comprimidos", "D", "Lab", 0, 0);
+		Medicamento inactivo = crearMedicamento("Aviso Inactivo", "Frasco", "E", "Lab", 0, 3);
+		inactivo.setActivo(false);
+		medicamentoRepository.saveAndFlush(inactivo);
+
+		mockMvc.perform(get("/api/v1/medicamentos/bajo-stock")
+				.header(HttpHeaders.AUTHORIZATION, autorizacion))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(2))
+				.andExpect(jsonPath("$[0].nombre").value("Aviso Sin Stock"))
+				.andExpect(jsonPath("$[0].stockActual").value(0))
+				.andExpect(jsonPath("$[0].stockMinimo").value(2))
+				.andExpect(jsonPath("$[0].bajoStock").value(true))
+				.andExpect(jsonPath("$[1].nombre").value("Aviso Bajo"))
+				.andExpect(jsonPath("$[1].stockActual").value(2))
+				.andExpect(jsonPath("$[1].stockMinimo").value(5));
+	}
+
+	@Test
 	@DisplayName("La búsqueda es case-insensitive por nombre, principio activo y laboratorio")
 	void busquedaPorFiltro() throws Exception {
 		crearMedicamento("Amoxicilina", "Comprimidos", "Amoxicilina", "Lab Norte", 10, 0);

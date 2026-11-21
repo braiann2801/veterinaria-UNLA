@@ -72,7 +72,7 @@ function Shell({ role }: { role: Role }) {
             )}
             {active === "agenda" && <Agenda />}
             {active === "guarderia" && <AgendaGuarderia />}
-            {active === "padron" && <Padron />}
+            {active === "padron" && <Padron onVerFichas={verFichas} />}
             {active === "cobros" && <Caja />}
             {active === "egreso" && <Egreso />}
             {active === "medicamentos" && <Medicamentos />}

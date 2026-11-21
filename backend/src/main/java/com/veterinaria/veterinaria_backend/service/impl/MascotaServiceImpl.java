@@ -10,11 +10,17 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.MascotaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResumenDTO;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
@@ -34,6 +40,9 @@ import com.veterinaria.veterinaria_backend.service.MascotaService;
 @Transactional(readOnly = true)
 public class MascotaServiceImpl implements MascotaService {
 
+	private static final int TAMANIO_MAXIMO = 200;
+	private static final int FILTRO_MAXIMO = 120;
+
 	private final MascotaRepository mascotaRepository;
 	private final TutorRepository tutorRepository;
 	private final TutorMascotaRepository tutorMascotaRepository;
@@ -50,6 +59,34 @@ public class MascotaServiceImpl implements MascotaService {
 	@Override
 	public List<MascotaResponseDTO> listar() {
 		return mapper.toMascotaResponseList(mascotaRepository.findAll());
+	}
+
+	@Override
+	public PaginaResponseDTO<MascotaResponseDTO> buscar(String q, boolean incluirInactivos, int page, int size) {
+		String filtro = q == null ? "" : q.trim();
+		if (filtro.length() > FILTRO_MAXIMO) {
+			filtro = filtro.substring(0, FILTRO_MAXIMO);
+		}
+		Pageable pagina = PageRequest.of(
+				Math.max(page, 0),
+				Math.min(Math.max(size, 1), TAMANIO_MAXIMO),
+				Sort.by("nombre").ascending().and(Sort.by("id").ascending()));
+
+		// Se pagina por id y después se cargan las entidades con el grafo de
+		// tutores: paginar un join de colección obligaría a hacerlo en memoria.
+		Page<Long> ids = mascotaRepository.buscarIds(filtro, incluirInactivos, pagina);
+		List<Mascota> entidades = ids.getContent().isEmpty()
+				? List.of()
+				: mascotaRepository.findConTutoresPorIds(ids.getContent());
+		Map<Long, Mascota> porId = entidades.stream()
+				.collect(Collectors.toMap(Mascota::getId, Function.identity()));
+		List<Mascota> ordenadas = ids.getContent().stream()
+				.map(porId::get)
+				.filter(Objects::nonNull)
+				.toList();
+
+		return PaginaResponseDTO.desde(
+				new PageImpl<>(ordenadas, pagina, ids.getTotalElements()), mapper::toResponse);
 	}
 
 	@Override

@@ -17,14 +17,16 @@
  */
 
 import { useEffect, useState } from "react"
-import { CheckCircle2, History, PackagePlus, Pencil, Plus, Search } from "lucide-react"
+import { Ban, CheckCircle2, History, PackagePlus, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react"
 
 import { ApiError, medicamentos as apiMedicamentos, type Medicamento, type MovimientoStock, type Pagina } from "@/lib/api"
 import { useMedicamentos } from "@/lib/use-medicamentos"
 import { mensajeDeError } from "@/lib/use-api"
+import { ConfirmarModal, type Confirmacion } from "@/components/ui/confirmar"
 import { Field, Panel, TextArea, TextInput } from "@/components/ui/field"
 import { Modal } from "@/components/ui/modal"
 import { PaginadoServidor } from "@/components/ui/paginado-servidor"
+import { ToggleInactivos } from "@/components/ui/toggle-inactivos"
 import { Cargando, fechaCorta, money, Recurso, Semforo, soloDecimal, soloDigitos, TOQUE_MINIMO, Vacio } from "@/lib/vista"
 import { cn } from "@/lib/utils"
 
@@ -55,11 +57,90 @@ function parsearPrecio(valor: string): number | null {
 }
 
 function EstadoStock({ medicamento }: { medicamento: Medicamento }) {
+  if (!medicamento.activo) return <Semforo tono="rojo">Inactivo</Semforo>
   if (medicamento.stockActual === 0) return <Semforo tono="rojo">Sin stock</Semforo>
   if (medicamento.bajoStock) {
     return <Semforo tono="ambar">Bajo mínimo · {medicamento.stockActual}/{medicamento.stockMinimo}</Semforo>
   }
   return <Semforo tono="verde">Disponible · {medicamento.stockActual}</Semforo>
+}
+
+function NombreMedicamento({ medicamento }: { medicamento: Medicamento }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="font-medium">{medicamento.nombre}</span>
+      {medicamento.enUso && (
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+          Usado en fichas
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** Acciones compartidas entre la tabla de escritorio y las tarjetas del celular. */
+function AccionesCatalogo({
+  medicamento,
+  onEditar,
+  onStock,
+  onBaja,
+  onReactivar,
+}: {
+  medicamento: Medicamento
+  onEditar: (medicamento: Medicamento) => void
+  onStock: (medicamento: Medicamento) => void
+  onBaja: (medicamento: Medicamento) => void
+  onReactivar: (medicamento: Medicamento) => void
+}) {
+  const etiquetaBaja = medicamento.enUso ? "Desactivar" : "Borrar"
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => onEditar(medicamento)}
+        className={BOTON_SECUNDARIO}
+        aria-label={`Editar ${medicamento.nombre}`}
+      >
+        <Pencil className="size-4" aria-hidden />
+        Editar
+      </button>
+      <button
+        type="button"
+        onClick={() => onStock(medicamento)}
+        disabled={!medicamento.activo}
+        className={BOTON_SECUNDARIO}
+        aria-label={`Agregar stock a ${medicamento.nombre}`}
+      >
+        <PackagePlus className="size-4" aria-hidden />
+        Agregar stock
+      </button>
+      {medicamento.activo ? (
+        <button
+          type="button"
+          onClick={() => onBaja(medicamento)}
+          className={cn(BOTON_SECUNDARIO, "text-destructive hover:bg-destructive/10")}
+          aria-label={`${etiquetaBaja} ${medicamento.nombre}`}
+        >
+          {medicamento.enUso ? (
+            <Ban className="size-4" aria-hidden />
+          ) : (
+            <Trash2 className="size-4" aria-hidden />
+          )}
+          {etiquetaBaja}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onReactivar(medicamento)}
+          className={BOTON_SECUNDARIO}
+          aria-label={`Reactivar ${medicamento.nombre}`}
+        >
+          <RotateCcw className="size-4" aria-hidden />
+          Reactivar
+        </button>
+      )}
+    </div>
+  )
 }
 
 function detalle(medicamento: Medicamento): string {
@@ -73,6 +154,8 @@ export function Medicamentos() {
   const [modal, setModal] = useState<"nuevo" | "stock" | "editar" | null>(null)
   const [seleccionado, setSeleccionado] = useState<Medicamento | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [accionError, setAccionError] = useState<string | null>(null)
+  const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null)
 
   function abrirStock(medicamento: Medicamento) {
     setSeleccionado(medicamento)
@@ -82,6 +165,63 @@ export function Medicamentos() {
   function abrirEditar(medicamento: Medicamento) {
     setSeleccionado(medicamento)
     setModal("editar")
+  }
+
+  /**
+   * El backend decide en el DELETE: si nunca se usó lo borra, si tiene ficha
+   * responde 409. Igual mostramos desde ya el mensaje correcto para que el
+   * operador entienda por qué un caso se desactiva y el otro desaparece.
+   */
+  function pedirBaja(medicamento: Medicamento) {
+    setConfirmacion(
+      medicamento.enUso
+        ? {
+            titulo: "Desactivar medicamento",
+            mensaje: `"${medicamento.nombre}" se usó en fichas clínicas: no se puede borrar sin perder la trazabilidad. Al desactivarlo deja de estar disponible para nuevas atenciones, pero las fichas y comandas ya emitidas se conservan.`,
+            textoConfirmar: "Desactivar",
+            alConfirmar: () => ejecutarBaja(medicamento),
+          }
+        : {
+            titulo: "Borrar medicamento",
+            mensaje: `"${medicamento.nombre}" nunca se usó en una ficha. Se borrará del catálogo junto con sus movimientos de stock. Esta acción no se puede deshacer.`,
+            textoConfirmar: "Borrar",
+            peligrosa: true,
+            alConfirmar: () => ejecutarBaja(medicamento),
+          },
+    )
+  }
+
+  async function ejecutarBaja(medicamento: Medicamento) {
+    setAccionError(null)
+    try {
+      if (medicamento.enUso) {
+        await apiMedicamentos.desactivar(medicamento.id)
+      } else {
+        await apiMedicamentos.eliminar(medicamento.id)
+      }
+      setSeleccionado(null)
+      await catalogo.recargar()
+      setAviso(
+        medicamento.enUso
+          ? `Se desactivó "${medicamento.nombre}". Ya no aparece en el catálogo activo ni en las atenciones; podés reactivarlo desde "Mostrar desactivados".`
+          : `Se borró "${medicamento.nombre}" del catálogo.`,
+      )
+    } catch (e) {
+      // Cubre la carrera: otro operador lo usó en una ficha entre el listado y el DELETE.
+      setAccionError(textoError(e))
+    }
+  }
+
+  /** Reactivar es reversible y no necesita confirmación. */
+  async function reactivar(medicamento: Medicamento) {
+    setAccionError(null)
+    try {
+      await apiMedicamentos.reactivar(medicamento.id)
+      await catalogo.recargar()
+      setAviso(`Se reactivó "${medicamento.nombre}". Ya está disponible para nuevas atenciones.`)
+    } catch (e) {
+      setAccionError(textoError(e))
+    }
   }
 
   return (
@@ -102,8 +242,23 @@ export function Medicamentos() {
       <div className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">
           Catálogo y stock disponible. Cargar stock suma unidades y deja constancia en el historial del
-          medicamento.
+          medicamento. Los que se usaron en fichas solo se pueden desactivar; los que nunca se usaron
+          se pueden borrar.
         </p>
+
+        <div className="flex justify-end">
+          <ToggleInactivos
+            valor={catalogo.verInactivos}
+            onChange={catalogo.cambiarVerInactivos}
+            cantidad={catalogo.cantidadInactivos}
+          />
+        </div>
+
+        {accionError && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            {accionError}
+          </p>
+        )}
 
         <div className="relative">
           <Search
@@ -136,7 +291,15 @@ export function Medicamentos() {
         >
           {(pagina) =>
             pagina.contenido.length === 0 ? (
-              <Vacio texto={catalogo.q ? "No hay medicamentos que coincidan con la búsqueda" : "Todavía no hay medicamentos cargados"} />
+              <Vacio
+                texto={
+                  catalogo.q
+                    ? "No hay medicamentos que coincidan con la búsqueda"
+                    : catalogo.verInactivos
+                      ? "Todavía no hay medicamentos desactivados"
+                      : "Todavía no hay medicamentos cargados"
+                }
+              />
             ) : (
               <>
                 {/* Tabla en desktop: scroll local para no desbordar la página. */}
@@ -154,31 +317,18 @@ export function Medicamentos() {
                     <tbody className="divide-y divide-border">
                       {pagina.contenido.map((medicamento) => (
                         <tr key={medicamento.id} className="transition-colors hover:bg-muted/40">
-                          <td className="px-3 py-2 font-medium">{medicamento.nombre}</td>
+                          <td className="px-3 py-2"><NombreMedicamento medicamento={medicamento} /></td>
                           <td className="px-3 py-2 text-muted-foreground">{detalle(medicamento) || "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{money(medicamento.precio)}</td>
                           <td className="px-3 py-2"><EstadoStock medicamento={medicamento} /></td>
                           <td className="px-3 py-2">
-                            <div className="flex flex-wrap justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => abrirEditar(medicamento)}
-                                className={BOTON_SECUNDARIO}
-                                aria-label={`Editar ${medicamento.nombre}`}
-                              >
-                                <Pencil className="size-4" aria-hidden />
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => abrirStock(medicamento)}
-                                className={BOTON_SECUNDARIO}
-                                aria-label={`Agregar stock a ${medicamento.nombre}`}
-                              >
-                                <PackagePlus className="size-4" aria-hidden />
-                                Agregar stock
-                              </button>
-                            </div>
+                            <AccionesCatalogo
+                              medicamento={medicamento}
+                              onEditar={abrirEditar}
+                              onStock={abrirStock}
+                              onBaja={pedirBaja}
+                              onReactivar={reactivar}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -191,31 +341,21 @@ export function Medicamentos() {
                   {pagina.contenido.map((medicamento) => (
                     <li key={medicamento.id} className="rounded-xl border border-border bg-background p-3">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium">{medicamento.nombre}</p>
+                        <NombreMedicamento medicamento={medicamento} />
                         <span className="shrink-0 font-semibold tabular-nums">{money(medicamento.precio)}</span>
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">{detalle(medicamento) || "Sin datos adicionales"}</p>
                       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                         <EstadoStock medicamento={medicamento} />
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => abrirEditar(medicamento)}
-                            className={BOTON_SECUNDARIO}
-                            aria-label={`Editar ${medicamento.nombre}`}
-                          >
-                            <Pencil className="size-4" aria-hidden />
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => abrirStock(medicamento)}
-                            className={BOTON_SECUNDARIO}
-                          >
-                            <PackagePlus className="size-4" aria-hidden />
-                            Agregar stock
-                          </button>
-                        </div>
+                      </div>
+                      <div className="mt-2 flex justify-end">
+                        <AccionesCatalogo
+                          medicamento={medicamento}
+                          onEditar={abrirEditar}
+                          onStock={abrirStock}
+                          onBaja={pedirBaja}
+                          onReactivar={reactivar}
+                        />
                       </div>
                     </li>
                   ))}
@@ -285,6 +425,8 @@ export function Medicamentos() {
           }}
         />
       )}
+
+      <ConfirmarModal confirmacion={confirmacion} onCerrar={() => setConfirmacion(null)} />
     </Panel>
   )
 }

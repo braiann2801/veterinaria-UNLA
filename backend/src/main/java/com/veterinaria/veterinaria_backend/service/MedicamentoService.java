@@ -1,5 +1,7 @@
 package com.veterinaria.veterinaria_backend.service;
 
+import java.util.List;
+
 import com.veterinaria.veterinaria_backend.dto.AgregarStockRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoActualizacionRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoRequestDTO;
@@ -11,7 +13,14 @@ import com.veterinaria.veterinaria_backend.dto.PrecioMedicamentoRequestDTO;
 /** Catálogo, stock e historial de medicamentos. Accesible a los cuatro roles. */
 public interface MedicamentoService {
 
-	PaginaResponseDTO<MedicamentoResponseDTO> listar(String q, int page, int size);
+	/** Listado paginado; por defecto excluye los desactivados (toggle de la UI). */
+	PaginaResponseDTO<MedicamentoResponseDTO> listar(String q, boolean incluirInactivos, int page, int size);
+
+	/** Cantidad de desactivados, para el toggle "Mostrar desactivados (N)". */
+	long contarInactivos();
+
+	/** Activos bajo el stock mínimo, para los avisos del Mostrador. */
+	List<MedicamentoResponseDTO> bajoStock();
 
 	MedicamentoResponseDTO obtener(Long id);
 
@@ -24,6 +33,17 @@ public interface MedicamentoService {
 
 	/** Cambia el precio de catálogo. Solo afecta a las comandas emitidas desde ahora. */
 	MedicamentoResponseDTO actualizarPrecio(Long id, PrecioMedicamentoRequestDTO request);
+
+	/**
+	 * Borrado físico, permitido solo si nunca se usó en una ficha. Si se usó,
+	 * responde 409 indicando que debe desactivarse.
+	 */
+	void eliminar(Long id);
+
+	/** Toggle de baja: conserva fichas, comandas y movimientos. */
+	MedicamentoResponseDTO desactivar(Long id);
+
+	MedicamentoResponseDTO reactivar(Long id);
 
 	PaginaResponseDTO<MovimientoStockResponseDTO> movimientos(Long id, int page, int size);
 

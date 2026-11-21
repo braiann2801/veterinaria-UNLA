@@ -1,5 +1,6 @@
 package com.veterinaria.veterinaria_backend.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -25,13 +26,31 @@ public interface MedicamentoRepository extends JpaRepository<Medicamento, Long> 
 	 */
 	@Query("""
 			SELECT m FROM Medicamento m
-			WHERE m.activo = true
+			WHERE (:incluirInactivos = true OR m.activo = true)
 			  AND (:q = '' OR
 			       LOWER(m.nombre) LIKE LOWER(CONCAT('%', :q, '%')) OR
 			       LOWER(COALESCE(m.principioActivo, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
 			       LOWER(COALESCE(m.laboratorio, '')) LIKE LOWER(CONCAT('%', :q, '%')))
 			""")
-	Page<Medicamento> buscar(@Param("q") String q, Pageable pageable);
+	Page<Medicamento> buscar(@Param("q") String q, @Param("incluirInactivos") boolean incluirInactivos,
+			Pageable pageable);
+
+	/** Para el toggle "Mostrar desactivados (N)" del catálogo. */
+	long countByActivoFalse();
+
+	/**
+	 * Activos cuyo stock está por debajo del mínimo cargado. El mínimo 0 significa
+	 * "sin control de stock", por eso se excluye explícitamente. El orden muestra
+	 * primero los que tienen menos unidades.
+	 */
+	@Query("""
+			SELECT m FROM Medicamento m
+			WHERE m.activo = true
+			  AND m.stockMinimo > 0
+			  AND m.stockActual < m.stockMinimo
+			ORDER BY m.stockActual ASC, m.nombre ASC, m.id ASC
+			""")
+	List<Medicamento> bajoStock();
 
 	/** Duplicados por identidad normalizada, sin depender de mayúsculas ni acentos. */
 	Optional<Medicamento> findByNombreNormalizadoAndPresentacionNormalizada(

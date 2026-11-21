@@ -3,7 +3,10 @@ package com.veterinaria.veterinaria_backend.service.impl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.stereotype.Service;
@@ -11,10 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.ConsultaMedicaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.ConsultaMedicaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.ConsultaMedicaResponseDTO.MedicamentoAplicadoDTO;
 import com.veterinaria.veterinaria_backend.dto.MedicamentoResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.ComandaCobro;
 import com.veterinaria.veterinaria_backend.entity.ConsultaMedica;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
+import com.veterinaria.veterinaria_backend.entity.MedicamentoUsadoFicha;
+import com.veterinaria.veterinaria_backend.entity.MovimientoStockMedicamento;
+import com.veterinaria.veterinaria_backend.entity.MovimientoStockMedicamento.TipoMovimiento;
 import com.veterinaria.veterinaria_backend.entity.Profesional;
 import com.veterinaria.veterinaria_backend.entity.Tutor;
 import com.veterinaria.veterinaria_backend.entity.TutorMascota;
@@ -26,6 +33,8 @@ import com.veterinaria.veterinaria_backend.mapper.ConsultaMapper;
 import com.veterinaria.veterinaria_backend.repository.ComandaCobroRepository;
 import com.veterinaria.veterinaria_backend.repository.ConsultaMedicaRepository;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
+import com.veterinaria.veterinaria_backend.repository.MedicamentoUsadoFichaRepository;
+import com.veterinaria.veterinaria_backend.repository.MovimientoStockMedicamentoRepository;
 import com.veterinaria.veterinaria_backend.repository.ProfesionalRepository;
 import com.veterinaria.veterinaria_backend.repository.TarifaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
@@ -57,6 +66,8 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 	private final TarifaRepository tarifaRepository;
 	private final ComandaCobroRepository comandaRepository;
 	private final MedicamentoService medicamentoService;
+	private final MedicamentoUsadoFichaRepository medicamentoUsadoRepository;
+	private final MovimientoStockMedicamentoRepository movimientoRepository;
 	private final ConsultaMapper mapper;
 
 	public ConsultaMedicaServiceImpl(ConsultaMedicaRepository consultaRepository,
@@ -67,8 +78,12 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 			TarifaRepository tarifaRepository,
 			ComandaCobroRepository comandaRepository,
 			MedicamentoService medicamentoService,
+			MedicamentoUsadoFichaRepository medicamentoUsadoRepository,
+			MovimientoStockMedicamentoRepository movimientoRepository,
 			ConsultaMapper mapper) {
 		this.medicamentoService = medicamentoService;
+		this.medicamentoUsadoRepository = medicamentoUsadoRepository;
+		this.movimientoRepository = movimientoRepository;
 		this.consultaRepository = consultaRepository;
 		this.turnoRepository = turnoRepository;
 		this.mascotaRepository = mascotaRepository;
@@ -133,6 +148,10 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 
 		ConsultaMedica guardada = consultaRepository.save(consulta);
 
+		// Snapshot clinico: nombre y presentacion se copian aca, antes de cualquier
+		// cambio de catalogo. Va en la misma transaccion que ficha, stock y comanda.
+		List<MedicamentoAplicadoDTO> aplicados = guardarSnapshot(guardada, medicamentos);
+
 		// El consumo descuenta stock y deja el movimiento con el id de la ficha.
 		// Si no hay stock, excepcion y rollback: ni ficha ni comanda quedan a medias.
 		descontarStock(guardada.getId(), medicamentos, usuarioId);
@@ -141,19 +160,27 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 		// cobro al mostrador con el precio congelado de la tarifa vigente.
 		ComandaCobro comanda = emitirComanda(guardada, mascota, medicamentos);
 
-		return mapper.toResponse(guardada, comanda.getId());
+		return mapper.toResponse(guardada, comanda.getId(), aplicados);
 	}
 
 	@Override
 	public ConsultaMedicaResponseDTO buscarPorId(Long id) {
 		ConsultaMedica consulta = obtenerConsulta(id);
-		return mapper.toResponse(consulta, comandaDe(id));
+		List<MedicamentoAplicadoDTO> aplicados = medicamentosDe(List.of(id))
+				.getOrDefault(id, List.of());
+		return mapper.toResponse(consulta, comandaDe(id), aplicados);
 	}
 
 	@Override
 	public List<ConsultaMedicaResponseDTO> listarPorMascota(Long mascotaId) {
 		obtenerMascota(mascotaId);
-		return mapper.toResponseList(consultaRepository.findByMascotaIdOrderByFechaAtencionDesc(mascotaId));
+		List<ConsultaMedica> consultas = consultaRepository.findByMascotaIdOrderByFechaAtencionDesc(mascotaId);
+		Map<Long, List<MedicamentoAplicadoDTO>> aplicados = medicamentosDe(
+				consultas.stream().map(ConsultaMedica::getId).toList());
+		return consultas.stream()
+				.map(consulta -> mapper.toResponse(consulta, null,
+						aplicados.getOrDefault(consulta.getId(), List.of())))
+				.toList();
 	}
 
 	@Override
@@ -335,6 +362,68 @@ public class ConsultaMedicaServiceImpl implements ConsultaMedicaService {
 					usuarioId,
 					"Consumo en ficha clinica #" + consultaId);
 		}
+	}
+
+	/** Guarda el snapshot clinico y lo devuelve listo para la respuesta. */
+	private List<MedicamentoAplicadoDTO> guardarSnapshot(ConsultaMedica consulta,
+			List<MedicamentoUsado> medicamentos) {
+		if (medicamentos.isEmpty()) {
+			return List.of();
+		}
+		List<MedicamentoUsadoFicha> entidades = medicamentos.stream().map(usado -> {
+			MedicamentoResponseDTO medicamento = usado.medicamento();
+			MedicamentoUsadoFicha ficha = new MedicamentoUsadoFicha();
+			ficha.setConsultaMedica(consulta);
+			ficha.setMedicamentoId(medicamento.id());
+			ficha.setNombre(medicamento.nombre());
+			ficha.setPresentacion(medicamento.presentacion());
+			ficha.setCantidad(usado.cantidad());
+			return ficha;
+		}).toList();
+		return medicamentoUsadoRepository.saveAll(entidades).stream()
+				.map(ConsultaMedicaServiceImpl::aAplicado)
+				.toList();
+	}
+
+	/**
+	 * Medicamentos aplicados por ficha. Las fichas nuevas tienen snapshot propio;
+	 * las anteriores a este cambio se reconstruyen desde el egreso de stock, que
+	 * siempre conserva el id del medicamento y la cantidad.
+	 */
+	private Map<Long, List<MedicamentoAplicadoDTO>> medicamentosDe(List<Long> consultaIds) {
+		if (consultaIds.isEmpty()) {
+			return Map.of();
+		}
+		Map<Long, List<MedicamentoAplicadoDTO>> porConsulta = new HashMap<>();
+		medicamentoUsadoRepository.findPorConsultas(consultaIds).forEach(ficha ->
+				porConsulta.computeIfAbsent(ficha.getConsultaMedica().getId(), clave -> new ArrayList<>())
+						.add(aAplicado(ficha)));
+
+		List<Long> sinSnapshot = consultaIds.stream()
+				.filter(id -> !porConsulta.containsKey(id))
+				.toList();
+		if (!sinSnapshot.isEmpty()) {
+			movimientoRepository
+					.findByTipoAndReferenciaIdInOrderByReferenciaIdAscIdAsc(
+							TipoMovimiento.EGRESO_FICHA, sinSnapshot)
+					.forEach(movimiento ->
+							porConsulta.computeIfAbsent(movimiento.getReferenciaId(), clave -> new ArrayList<>())
+									.add(aAplicado(movimiento)));
+		}
+		return porConsulta;
+	}
+
+	private static MedicamentoAplicadoDTO aAplicado(MedicamentoUsadoFicha ficha) {
+		return new MedicamentoAplicadoDTO(ficha.getMedicamentoId(), ficha.getNombre(),
+				ficha.getPresentacion(), ficha.getCantidad());
+	}
+
+	private static MedicamentoAplicadoDTO aAplicado(MovimientoStockMedicamento movimiento) {
+		return new MedicamentoAplicadoDTO(
+				movimiento.getMedicamento().getId(),
+				movimiento.getMedicamento().getNombre(),
+				movimiento.getMedicamento().getPresentacion(),
+				movimiento.getCantidad());
 	}
 
 	private static ComandaItem item(String descripcion, int cantidad, BigDecimal precio) {

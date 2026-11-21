@@ -17,6 +17,8 @@
  *       que trae la conducta de cada mascota presente y sus tutores: de ahí salen
  *       los avisos de manejo y la lista de tutores del día. No se agregó ningún
  *       endpoint.</li>
+ *   <li><code>GET /api/v1/medicamentos/bajo-stock</code> — avisos de stock
+ *       bajo en "Avisos importantes".</li>
  * </ul>
  *
  * <p><b>Por qué el componente ya no importa el store.</b> Antes depended de
@@ -47,12 +49,14 @@ import { DatePicker } from "@/components/ui/date-picker"
 import {
   egreso as apiEgreso,
   guarderia as apiGuarderia,
+  medicamentos as apiMedicamentos,
   turnos as apiTurnos,
   hoyLocal,
 } from "@/lib/api"
 import type {
   AforoGuarderia,
   MascotaDelDia,
+  Medicamento,
   ReservaGuarderia,
   TurnoClinico,
 } from "@/lib/api"
@@ -81,14 +85,16 @@ export function Mostrador() {
   const [openMascota, setOpenMascota] = useState(false)
   const [openTurno, setOpenTurno] = useState(false)
 
-  // Las cuatro llamadas llevan la fecha como `clave` y no solo como closure:
-  // `useApi` guarda la fn en un ref, así que sin la clave cambiar de día no
-  // dispararía nada y la grilla mostraría el día anterior como si fuera el
-  // pedido. Ver la nota de `clave` en `lib/use-api.ts`.
+  // Las llamadas que dependen del día llevan la fecha como `clave` y no solo
+  // como closure: `useApi` guarda la fn en un ref, así que sin la clave cambiar
+  // de día no dispararía nada y la grilla mostraría el día anterior como si
+  // fuera el pedido. El aviso de stock no depende del día; se recarga al
+  // reintentar. Ver la nota de `clave` en `lib/use-api.ts`.
   const turnos = useApi<TurnoClinico[]>(() => apiTurnos.listar(fecha), true, fecha)
   const reservas = useApi<ReservaGuarderia[]>(() => apiGuarderia.listar(fecha), true, fecha)
   const aforo = useApi<AforoGuarderia>(() => apiGuarderia.aforo(fecha), true, fecha)
   const jornada = useApi<MascotaDelDia[]>(() => apiEgreso.pacientesDelDia(fecha), true, fecha)
+  const stockBajo = useApi<Medicamento[]>(() => apiMedicamentos.bajoStock())
 
   const deudas = useDeudasDelDia(jornada.datos, fecha)
 
@@ -102,8 +108,14 @@ export function Mostrador() {
    * alta.</p>
    */
   const refrescar = useCallback(async () => {
-    await Promise.all([turnos.recargar(), reservas.recargar(), aforo.recargar(), jornada.recargar()])
-  }, [turnos, reservas, aforo, jornada])
+    await Promise.all([
+      turnos.recargar(),
+      reservas.recargar(),
+      aforo.recargar(),
+      jornada.recargar(),
+      stockBajo.recargar(),
+    ])
+  }, [turnos, reservas, aforo, jornada, stockBajo])
 
   return (
     <div className="flex flex-col gap-4">
@@ -144,7 +156,7 @@ export function Mostrador() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <WidgetAforo aforo={aforo} fecha={fecha} />
-        <AvisosImportantes jornada={jornada} deudas={deudas} fecha={fecha} />
+        <AvisosImportantes jornada={jornada} deudas={deudas} stockBajo={stockBajo} fecha={fecha} />
       </div>
 
       <TableroJornada turnos={turnos} reservas={reservas} fecha={fecha} onReintentar={refrescar} />

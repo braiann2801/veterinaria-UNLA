@@ -9,10 +9,16 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResponseDTO;
 import com.veterinaria.veterinaria_backend.entity.Mascota;
@@ -21,6 +27,7 @@ import com.veterinaria.veterinaria_backend.entity.TutorMascota;
 import com.veterinaria.veterinaria_backend.exception.BadRequestException;
 import com.veterinaria.veterinaria_backend.exception.ResourceNotFoundException;
 import com.veterinaria.veterinaria_backend.mapper.EntityMapper;
+import com.veterinaria.veterinaria_backend.normalizacion.NormalizadorAr;
 import com.veterinaria.veterinaria_backend.repository.MascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorMascotaRepository;
 import com.veterinaria.veterinaria_backend.repository.TutorRepository;
@@ -36,6 +43,9 @@ import com.veterinaria.veterinaria_backend.service.TutorService;
 @Service
 @Transactional(readOnly = true)
 public class TutorServiceImpl implements TutorService {
+
+	private static final int TAMANIO_MAXIMO = 200;
+	private static final int FILTRO_MAXIMO = 120;
 
 	private final TutorRepository tutorRepository;
 	private final MascotaRepository mascotaRepository;
@@ -55,6 +65,36 @@ public class TutorServiceImpl implements TutorService {
 		// Las colecciones se inicializan dentro de la transaccion; el mapper las
 		// proyecta a DTOs resumen antes de que se cierre la sesion.
 		return mapper.toTutorResponseList(tutorRepository.findAll());
+	}
+
+	@Override
+	public PaginaResponseDTO<TutorResponseDTO> buscar(String q, boolean incluirInactivos, int page, int size) {
+		String filtro = q == null ? "" : q.trim();
+		if (filtro.length() > FILTRO_MAXIMO) {
+			filtro = filtro.substring(0, FILTRO_MAXIMO);
+		}
+		String dni = filtro.isEmpty() ? "" : NormalizadorAr.dni(filtro);
+		if (dni == null) {
+			dni = "";
+		}
+		Pageable pagina = PageRequest.of(
+				Math.max(page, 0),
+				Math.min(Math.max(size, 1), TAMANIO_MAXIMO),
+				Sort.by("apellido").ascending().and(Sort.by("nombre").ascending()).and(Sort.by("id").ascending()));
+
+		Page<Long> ids = tutorRepository.buscarIds(filtro, dni, incluirInactivos, pagina);
+		List<Tutor> entidades = ids.getContent().isEmpty()
+				? List.of()
+				: tutorRepository.findConMascotasPorIds(ids.getContent());
+		Map<Long, Tutor> porId = entidades.stream()
+				.collect(Collectors.toMap(Tutor::getId, Function.identity()));
+		List<Tutor> ordenadas = ids.getContent().stream()
+				.map(porId::get)
+				.filter(Objects::nonNull)
+				.toList();
+
+		return PaginaResponseDTO.desde(
+				new PageImpl<>(ordenadas, pagina, ids.getTotalElements()), mapper::toResponse);
 	}
 
 	@Override

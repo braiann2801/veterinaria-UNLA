@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.veterinaria.veterinaria_backend.dto.MascotaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResumenDTO;
 
 /**
@@ -14,6 +15,9 @@ public interface MascotaService {
 
 	/** Lista todas las mascotas con sus tutores resumidos. */
 	List<MascotaResponseDTO> listar();
+
+	/** Busca mascotas por nombre con paginacion en servidor (Padrón). */
+	PaginaResponseDTO<MascotaResponseDTO> buscar(String q, boolean incluirInactivos, int page, int size);
 
 	/** Busca una mascota por id. Lanza {@code ResourceNotFoundException} si no existe. */
 	MascotaResponseDTO buscarPorId(Long id);

@@ -31,6 +31,11 @@ export type EstadoMedicamentos = {
   cambiarPagina: (pagina: number) => void
   tamanio: number
   cambiarTamanio: (tamanio: number) => void
+  /** Baja lógica: al activarlo aparecen también los medicamentos desactivados. */
+  verInactivos: boolean
+  cambiarVerInactivos: (valor: boolean) => void
+  /** Total de desactivados, para la etiqueta del toggle. */
+  cantidadInactivos: number
 }
 
 function esAbort(error: unknown): boolean {
@@ -45,6 +50,8 @@ export function useMedicamentos(): EstadoMedicamentos {
   const [qAplicada, setQAplicada] = useState("")
   const [pagina, setPagina] = useState(0)
   const [tamanio, setTamanio] = useState(50)
+  const [verInactivos, setVerInactivos] = useState(false)
+  const [cantidadInactivos, setCantidadInactivos] = useState(0)
   const [datos, setDatos] = useState<Pagina<Medicamento> | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<ApiError | null>(null)
@@ -72,10 +79,23 @@ export function useMedicamentos(): EstadoMedicamentos {
   }, [q])
 
   useEffect(() => {
-    // Mientras cambia el filtro o la página, la tabla anterior no debe seguir
-    // pareciendo válida: Recurso muestra el estado de carga.
+    // Mientras cambia el filtro, la página o el toggle, la tabla anterior no
+    // debe seguir pareciendo válida: Recurso muestra el estado de carga.
     setDatos(null)
-  }, [qAplicada, pagina, tamanio])
+  }, [qAplicada, pagina, tamanio, verInactivos])
+
+  /** El contador se refresca con el mismo `version` que la lista tras una baja. */
+  useEffect(() => {
+    apiMedicamentos
+      .contarInactivos()
+      .then((respuesta) => {
+        if (montado.current) setCantidadInactivos(respuesta.cantidad)
+      })
+      .catch(() => {
+        // Si falla el conteo, el toggle sigue funcionando con el número previo:
+        // un aviso optativo no debe dejar la lista completa sin mostrar.
+      })
+  }, [version])
 
   const recargar = useCallback(async () => {
     controlador.current?.abort()
@@ -85,6 +105,7 @@ export function useMedicamentos(): EstadoMedicamentos {
     try {
       const respuesta = await apiMedicamentos.listar({
         q: qAplicada,
+        incluirInactivos: verInactivos,
         page: pagina,
         size: tamanio,
         signal: actual.signal,
@@ -102,7 +123,7 @@ export function useMedicamentos(): EstadoMedicamentos {
     } finally {
       if (montado.current && !actual.signal.aborted) setCargando(false)
     }
-  }, [qAplicada, pagina, tamanio, version])
+  }, [qAplicada, pagina, tamanio, verInactivos, version])
 
   useEffect(() => {
     void recargar()
@@ -129,5 +150,8 @@ export function useMedicamentos(): EstadoMedicamentos {
     cambiarPagina: setPagina,
     tamanio,
     cambiarTamanio,
+    verInactivos,
+    cambiarVerInactivos: setVerInactivos,
+    cantidadInactivos,
   }
 }

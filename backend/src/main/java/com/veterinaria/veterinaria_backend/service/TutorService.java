@@ -3,6 +3,7 @@ package com.veterinaria.veterinaria_backend.service;
 import java.util.List;
 
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResponseDTO;
 
@@ -18,6 +19,9 @@ public interface TutorService {
 
 	/** Lista todos los tutores con sus mascotas resumidas. */
 	List<TutorResponseDTO> listar();
+
+	/** Busca tutores por nombre, apellido, DNI o telefono con paginacion en servidor (Padrón). */
+	PaginaResponseDTO<TutorResponseDTO> buscar(String q, boolean incluirInactivos, int page, int size);
 
 	/** Busca un tutor por id. Lanza {@code ResourceNotFoundException} si no existe. */
 	TutorResponseDTO buscarPorId(Long id);

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.veterinaria.veterinaria_backend.dto.DeudaTutorResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.VinculoRequestDTO;
@@ -48,6 +49,16 @@ public class TutorController {
 	@GetMapping
 	public ResponseEntity<List<TutorResponseDTO>> listar() {
 		return ResponseEntity.ok(tutorService.listar());
+	}
+
+	/** GET /api/v1/tutores/buscar?q=&page=&size=&incluirInactivos= (Padrón). */
+	@GetMapping("/buscar")
+	public ResponseEntity<PaginaResponseDTO<TutorResponseDTO>> buscar(
+			@RequestParam(defaultValue = "") String q,
+			@RequestParam(defaultValue = "false") boolean incluirInactivos,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "50") int size) {
+		return ResponseEntity.ok(tutorService.buscar(q, incluirInactivos, page, size));
 	}
 
 	/** GET /api/v1/tutores/{id} */

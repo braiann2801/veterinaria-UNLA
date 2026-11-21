@@ -11,11 +11,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.veterinaria.veterinaria_backend.dto.DeudaMascotaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaRequestDTO;
 import com.veterinaria.veterinaria_backend.dto.MascotaResponseDTO;
+import com.veterinaria.veterinaria_backend.dto.PaginaResponseDTO;
 import com.veterinaria.veterinaria_backend.dto.TutorResumenDTO;
 import com.veterinaria.veterinaria_backend.service.ComandaCobroService;
 import com.veterinaria.veterinaria_backend.service.MascotaService;
@@ -41,6 +43,16 @@ public class MascotaController {
 	@GetMapping
 	public ResponseEntity<List<MascotaResponseDTO>> listar() {
 		return ResponseEntity.ok(mascotaService.listar());
+	}
+
+	/** GET /api/v1/mascotas/buscar?q=&page=&size=&incluirInactivos= (Padrón). */
+	@GetMapping("/buscar")
+	public ResponseEntity<PaginaResponseDTO<MascotaResponseDTO>> buscar(
+			@RequestParam(defaultValue = "") String q,
+			@RequestParam(defaultValue = "false") boolean incluirInactivos,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "50") int size) {
+		return ResponseEntity.ok(mascotaService.buscar(q, incluirInactivos, page, size));
 	}
 
 	/** GET /api/v1/mascotas/{id} */
